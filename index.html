@@ -663,8 +663,9 @@ button .ic, a .ic{vertical-align:middle;}
  <div style="font-size:14px;font-weight:700;color:var(--blue);margin-bottom:9px;">Pending Disbursements</div>
  <div id="repDisbList"></div>
  </div>
+ </div>
 
- <!-- Rep Transactions (change 13) -->
+ <!-- Rep Transactions — always visible, outside repCustCard -->
  <div style="padding:11px 13px 32px;">
  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;">
  <div class="search-card-title">My Recent Collections</div>
@@ -1068,7 +1069,7 @@ async function doLogin(){
 
 async function doLogout(){
  const u=getUser(); if(u) await audit('login',u.id,u.role||'unknown',`${u.first_name} ${u.last_name} signed out`);
- localStorage.removeItem('wagActiveUser'); showView('landingView');
+ sessionStorage.removeItem('wagUser'); localStorage.removeItem('wagActiveUser'); _payPinCallback=null; closeModal('payPinModal'); closeModal('emgModal'); closeModal('newPlanModal'); showView('landingView');
 }
 
 function showForgotModal(){ showModal('forgotModal'); }
@@ -1158,10 +1159,13 @@ async function renderPlanDetail(planId){
  txs=r1.data||[]; rejDisbs=r2.data||[];
  } catch(e){ console.warn('tx fetch error:',e); }
  const rejRows=(rejDisbs||[]).map(d=>({id:d.id,type:'rejected',amount:d.amount,created_at:d.requested_at,ref:d.ref}));
- const allTxs=[...txs,...rejRows].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+const allTxs=[
+  ...txs,
+  ...rejRows
+].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
  const txList=document.getElementById('txList');
- if(!txs||!txs.length){ txList.innerHTML='<div class="tx-empty">No transactions yet</div>'; }
- else{ txList.innerHTML=txs.slice(0,3).map(tx=>{ const isIn=tx.type==='deposit'||tx.type==='opening'; return `<div class="tx-row"><div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div><div class="tx-body"><div class="tx-name">${isIn?'Collection Deposit':'Payout'}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${tx.ref}</div></div><div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div></div>`; }).join(''); }
+ if(!allTxs||!allTxs.length){ txList.innerHTML='<div class="tx-empty">No transactions yet</div>'; }
+ else{ txList.innerHTML=allTxs.slice(0,3).map(tx=>{ const isIn=tx.type==='deposit'||tx.type==='opening'; const label=tx.type==='opening'?'Opening Contribution':tx.type==='deposit'?'Collection Deposit':tx.type==='rejected'?'Rejected Disbursement':'Payout'; return `<div class="tx-row"><div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div><div class="tx-body"><div class="tx-name">${label}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${tx.ref||'—'}</div></div><div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div></div>`; }).join(''); }
  if(false&&!plan.milestone_shown){ document.getElementById('mileTitle').textContent=plan.name+' Goal Reached! '; document.getElementById('mileMsg').textContent='Your "'+plan.name+'" plan hit its target of '+fmt(plan.target_amount)+'. What would you like to do?'; showModal('milestoneModal'); }
 }
 
@@ -1394,19 +1398,39 @@ async function doRejectDisb(disbId){
 let adminClicks=0, adminTimer=null, adminSubSearch='customer';
 
 function initAdminTrigger(){
+  // Attach to landing footer as before
   const footer=document.getElementById('footer');
-  if(!footer) return;
-  footer.addEventListener('click',()=>{
-    adminClicks++;
-    clearTimeout(adminTimer);
-    adminTimer=setTimeout(()=>{ adminClicks=0; }, 4000);
-    if(adminClicks>=5){ adminClicks=0; showModal('adminPinModal'); }
+  if(footer){
+    footer.addEventListener('click',()=>{
+      adminClicks++;
+      clearTimeout(adminTimer);
+      adminTimer=setTimeout(()=>{ adminClicks=0; }, 4000);
+      if(adminClicks>=6){ adminClicks=0; showModal('adminPinModal'); }
+    });
+  }
+  // Also attach to bottom-right corner of the screen (20x20px zone) for all views
+  document.addEventListener('click',(e)=>{
+    const fromBottom=window.innerHeight-e.clientY;
+    const fromRight=window.innerWidth-e.clientX;
+    if(fromBottom<=30&&fromRight<=60){
+      adminClicks++;
+      clearTimeout(adminTimer);
+      adminTimer=setTimeout(()=>{ adminClicks=0; }, 4000);
+      if(adminClicks>=6){ adminClicks=0; showModal('adminPinModal'); }
+    }
   });
 }
 async function doAdminPin(){
  const pin=document.getElementById('adminPinInp').value;
- if(pin==='WAGE2026'){ closeModal('adminPinModal'); document.getElementById('adminPinInp').value=''; showView('adminView'); await renderAdminDash(); }
- else setMsg('adminPinMsg','<div class="msg-err">Invalid PIN</div>');
+ if(pin==='WAGE2026'){
+  closeModal('adminPinModal');
+  document.getElementById('adminPinInp').value='';
+  setMsg('adminPinMsg','');
+  showView('adminView');
+  await renderAdminDash();
+ } else {
+  setMsg('adminPinMsg','<div class="msg-err">Invalid PIN</div>');
+ }
 }
 async function renderAdminDash(){
  if(!db) return;
@@ -1702,6 +1726,7 @@ async function openRepTxHistory(){
   if(!_repTxCache.length) await loadRepTxPreview();
   const el=document.getElementById('repAllTxList');
   if(!el){ showView('repTxHistoryView'); return; }
+  showView('repTxHistoryView');
   const custIds=[...new Set(_repTxCache.map(t=>t.customer_id).filter(Boolean))];
   let custMap={};
   if(custIds.length&&db){
@@ -1825,7 +1850,14 @@ async function openTxHistory(){
   const { data:plan } = await db.from('plan_balances').select('name').eq('plan_id',activePlanId).single();
   const { data:rDbs } = await db.from('disbursements').select('*').eq('plan_id',activePlanId).eq('status','rejected');
   hideLoading();
-  allTxForHistory=[...(txs||[]),...(rDbs||[]).map(d=>({...d,type:'rejected',created_at:d.requested_at}))].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  allTxForHistory=[
+  ...(txs||[]),
+  ...(rDbs||[]).map(d=>({
+    ...d,
+    type:'rejected',
+    created_at:d.requested_at
+  }))
+].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
   const nameEl=document.getElementById('txHistPlanName'); if(nameEl) nameEl.textContent=plan?.name||'';
   document.getElementById('txFilterCat').value='all';
   document.getElementById('txFilterStatus').value='all';
