@@ -462,13 +462,15 @@ body.dark .cal-month-name{color:#f0f0f0;}
 body.dark .mini-cal-days-hdr{border-color:#2a2a2a;}
 .cal-day-hdr{font-size:10px;font-weight:700;color:var(--sub);text-align:center;}
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
-.cal-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:12px;font-weight:600;border:1.5px solid var(--border);}
-body.dark .cal-cell{border-color:#2a2a2a;color:#888;}
-.cal-cell.c-green{background:#d1fae5;color:#065f46;border-color:#d1fae5;}
-.cal-cell.c-red{background:#fee2e2;color:#991b1b;border-color:#fee2e2;}
-.cal-cell.c-grey{color:#bbb;border-color:#f0f0f0;}
-body.dark .cal-cell.c-grey{color:#333;border-color:#222;}
-.cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:800;}
+.cal-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:12px;font-weight:800;border:2px solid #aaa;color:#111;}
+body.dark .cal-cell{border-color:#bbb;color:#eee;}
+.cal-cell.c-green{background:#d1fae5;color:#065f46;border-color:#065f46;}
+body.dark .cal-cell.c-green{background:#064e3b;color:#6ee7b7;border-color:#6ee7b7;}
+.cal-cell.c-red{background:#fee2e2;color:#991b1b;border-color:#991b1b;}
+body.dark .cal-cell.c-red{background:#450a0a;color:#fca5a5;border-color:#fca5a5;}
+.cal-cell.c-grey{color:#999;border-color:#ddd;}
+body.dark .cal-cell.c-grey{color:#555;border-color:#444;}
+.cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:900;border-width:2.5px;}
 body.dark .cal-cell.c-today{border-color:var(--yellow);color:var(--yellow);}
 .cal-legend{display:flex;gap:14px;margin-top:10px;}
 .cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub);}
@@ -656,7 +658,7 @@ button .ic, a .ic{vertical-align:middle;}
  <select class="plan-sel-dd" id="repPlanDd" onchange="repOnPlanChange()"><option value="">— Select a plan —</option></select>
  <div id="repPlanDetails" style="display:none;">
  <div class="bt-row"><span class="bt-lbl">Balance</span><span class="bt-val" id="rpBal">₦0.00</span></div>
- <div class="bt-row" style="border-bottom:none;"><span class="bt-lbl">Target</span><span class="bt-val-s" id="rpTgt">₦0.00</span></div>
+ <div class="bt-row" style="border-bottom:none;"><span class="bt-lbl">Regular Contribution</span><span class="bt-val-s" id="rpTgt">₦0.00</span></div>
  </div>
  <button class="collect-btn" onclick="openCollectModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Record Collection</button>
  </div>
@@ -857,7 +859,15 @@ async function hashPin(pin) {
  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-function togglePw(id){ const e=document.getElementById(id); e.type=e.type==='password'?'text':'password'; }
+const EYE_OPEN=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYE_CLOSED=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+function togglePw(id){
+  const e=document.getElementById(id);
+  const isHidden=e.type==='password';
+  e.type=isHidden?'text':'password';
+  const btn=e.parentElement.querySelector('.pw-eye');
+  if(btn) btn.innerHTML=isHidden?EYE_CLOSED:EYE_OPEN;
+}
 function setMsg(id,html){ const el=document.getElementById(id); if(el) el.innerHTML=html; }
 function showModal(id){ document.getElementById(id).classList.add('active'); }
 function closeModal(id){ document.getElementById(id).classList.remove('active'); }
@@ -876,13 +886,23 @@ function showView(id){
  VIEWS.forEach(v=>{ const el=document.getElementById(v); el.classList.remove('active'); el.style.display='none'; });
  const t=document.getElementById(id); t.style.display=id==='landingView'?'flex':'block';
  setTimeout(()=>t.classList.add('active'),10);
+ window.scrollTo(0,0); t.scrollTop=0;
 }
-function toggleTheme(){ document.body.classList.toggle('dark'); localStorage.setItem('wagT',document.body.classList.contains('dark')?'d':'l'); document.querySelectorAll('.theme-btn,.land-theme-btn').forEach(b=>b.textContent=document.body.classList.contains('dark')?'◐':'◑'); }
+function toggleTheme(){
+  document.body.classList.toggle('dark');
+  const isDark=document.body.classList.contains('dark');
+  localStorage.setItem('wagT',isDark?'d':'l');
+  updateThemeIcons();
+}
+function updateThemeIcons(){
+  const isDark=document.body.classList.contains('dark');
+  const moonSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>`;
+  const sunSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+  document.querySelectorAll('.theme-btn,.land-theme-btn').forEach(b=>b.innerHTML=isDark?sunSVG:moonSVG);
+}
 function initTheme(){
- if(localStorage.getItem('wagT')==='d'){
- document.body.classList.add('dark');
- document.querySelectorAll('.theme-btn,.land-theme-btn').forEach(b=>b.textContent='◐');
- }
+ if(localStorage.getItem('wagT')==='d') document.body.classList.add('dark');
+ updateThemeIcons();
 }
 
 // Landing
@@ -1158,7 +1178,12 @@ const allTxs=[
  if(false&&!plan.milestone_shown){ document.getElementById('mileTitle').textContent=plan.name+' Goal Reached! '; document.getElementById('mileMsg').textContent='Your "'+plan.name+'" plan hit its target of '+fmt(plan.target_amount)+'. What would you like to do?'; showModal('milestoneModal'); }
 }
 
-function toggleBalVis(){ balHidden=!balHidden; document.getElementById('planBal').textContent=balHidden?'••••••':fmt(activePlanBalance); }
+function toggleBalVis(){
+  balHidden=!balHidden;
+  document.getElementById('planBal').textContent=balHidden?'••••••':fmt(activePlanBalance);
+  const btn=document.querySelector('.eye-btn');
+  if(btn) btn.innerHTML=balHidden?EYE_CLOSED:EYE_OPEN;
+}
 
 async function openNewPlanModal(){ showModal('newPlanModal'); }
 
@@ -1308,13 +1333,16 @@ async function repDoSearch(){
  document.getElementById('repCustCard').style.display='block';
 }
 
-function repOnPlanChange(){
+async function repOnPlanChange(){
  const dd=document.getElementById('repPlanDd'); const opt=dd.options[dd.selectedIndex];
  repSelectedPlan=dd.value?{id:dd.value,balance:+opt.dataset.bal,target:+opt.dataset.tgt}:null;
  const det=document.getElementById('repPlanDetails');
  if(!repSelectedPlan){ det.style.display='none'; return; }
  document.getElementById('rpBal').textContent=fmt(repSelectedPlan.balance);
- document.getElementById('rpTgt').textContent=fmt(repSelectedPlan.target);
+ // Fetch regular_contribution from plans table
+ let regContrib=0;
+ if(db){ const {data:pl}=await db.from('plans').select('regular_contribution').eq('id',repSelectedPlan.id).single(); regContrib=pl?.regular_contribution||0; }
+ document.getElementById('rpTgt').textContent=regContrib>0?fmt(regContrib):'Not set';
  det.style.display='block';
 }
 
@@ -1445,7 +1473,12 @@ async function adminDoSearch(){
  const { data:plans } = await db.from('plan_balances').select('*').eq('customer_id',cust.id).neq('status','deleted');
  const planCards=await Promise.all((plans||[]).map(async p=>{
  const { data:txs } = await db.from('transactions').select('*').eq('plan_id',p.plan_id).order('created_at',{ascending:false}).limit(5);
- return `<div class="adr-plan-card"><div class="adr-plan-header"><div><div class="adr-plan-name">${p.name}</div></div><div><div class="adr-plan-bal">${fmt(p.balance)}</div><div class="adr-plan-of">of ${fmt(p.target_amount)}</div></div></div><div class="adr-plan-meta">${p.frequency?.toLowerCase()} · ${Number(p.balance)>=Number(p.target_amount)?'completed':'active'}</div>${(txs||[]).map(tx=>{const isIn=tx.type==='deposit'||tx.type==='opening';return `<div class="adr-plan-tx"><span class="adr-tx-info">${fmtDate(tx.created_at)} · ${isIn?'deposit':'payout'}</span><span class="${isIn?'adr-tx-green':'adr-tx-red'}">${isIn?'+':'-'}${fmt(tx.amount)}</span></div>`;}).join('')}</div>`;
+ const { data:planExtra } = await db.from('plans').select('regular_contribution,status').eq('id',p.plan_id).single();
+ const regContrib=planExtra?.regular_contribution||0;
+ const realStatus=planExtra?.status||p.status;
+ const statusLabel=realStatus==='closed'?'closed':realStatus==='active'?'active':'inactive';
+ const statusColor=realStatus==='closed'?'#dc2626':realStatus==='active'?'#059669':'#d97706';
+ return `<div class="adr-plan-card"><div class="adr-plan-header"><div><div class="adr-plan-name">${p.name}</div></div><div><div class="adr-plan-bal">${fmt(p.balance)}</div><div class="adr-plan-of" style="color:${statusColor};font-weight:700;font-size:11px;text-transform:uppercase;">${statusLabel}</div></div></div><div class="adr-plan-meta">${p.frequency?.toLowerCase()} · Regular: ${regContrib>0?fmt(regContrib):'Not set'}</div>${(txs||[]).map(tx=>{const isIn=tx.type==='deposit'||tx.type==='opening';return `<div class="adr-plan-tx"><span class="adr-tx-info">${fmtDate(tx.created_at)} · ${isIn?'deposit':'payout'}</span><span class="${isIn?'adr-tx-green':'adr-tx-red'}">${isIn?'+':'-'}${fmt(tx.amount)}</span></div>`;}).join('')}</div>`;
  }));
  hideLoading();
  document.getElementById('adminSearchResult').innerHTML=`<div class="adr-profile"><div><div class="adr-name">${cust.first_name} ${cust.last_name}</div><div class="adr-phone">${cust.phone.replace('+234','0')}</div><div class="adr-since">Member since ${fmtDate(cust.created_at)}</div></div><span class="adr-cust-badge">CUSTOMER</span></div>${planCards.join('')||'<div style="color:#8b949e;text-align:center;padding:14px;">No plans yet</div>'}`;
