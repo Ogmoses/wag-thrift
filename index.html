@@ -722,11 +722,6 @@ button .ic, a .ic{vertical-align:middle;}
  <button onclick="deleteInactiveUsers()" style="width:100%;margin-top:13px;padding:13px;background:rgba(220,38,38,.15);color:#fca5a5;border:1px solid rgba(220,38,38,.3);border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></svg>Remove Inactive Users</button>
  </div>
  <div id="adminAgentsTab" class="admin-tab-content">
- <div class="elevate-card">
- <div class="elevate-title">Elevate Customer → Representative</div>
- <div class="admin-search-row"><input type="tel" id="elevatePhone" class="admin-inp" placeholder="Customer phone" maxlength="11"><button class="admin-search-btn" onclick="elevateCustomer()">Elevate</button></div>
- <div id="elevateMsg"></div>
- </div>
  <div class="admin-section-lbl" id="agentListLbl">All Field Agents (0)</div>
  <div id="agentsList"></div>
  </div>
@@ -801,7 +796,7 @@ button .ic, a .ic{vertical-align:middle;}
 </div>
 <div id="agentIdModal" class="modal"><div class="msheet" style="max-width:480px;text-align:center;"><div class="m-handle"></div><div style="font-size:36px;margin-bottom:7px;"></div><div class="m-title" style="text-align:center;">Account Created!</div><p style="color:var(--sub);font-size:13px;margin-bottom:4px;">Save or screenshot your Agent ID — you'll use it to log in.</p><div class="agentid-card"><div class="agentid-lbl">Your Agent ID</div><div class="agentid-val" id="newRepId">------</div></div><div class="msg-info">! This is your login credential. Keep it safe!</div><button class="btn btn-blue" onclick="closeModal('agentIdModal');setAuthTab('signin')">I've Saved My Agent ID</button></div></div>
 <div id="forgotModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('forgotModal')">×</button><div class="m-handle"></div><div class="m-title">Reset Password</div><div class="msg-info">Enter your email and we'll send you a password reset link.</div><div class="mform-group"><label class="form-lbl">Email Address</label><input type="email" id="resetEmail" class="form-inp"></div><div id="resetMsg"></div><button class="btn btn-blue" onclick="doForgotPin()">Send Password Reset Link</button></div></div>
-<div id="newPlanModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('newPlanModal')">×</button><div class="m-handle"></div><div class="m-title">New Savings Plan</div><div class="mform-group"><label class="form-lbl">Plan Name</label><input type="text" id="npName" class="form-inp" placeholder="e.g. School Fees"></div><div class="mform-group"><label class="form-lbl">Savings Frequency</label><select id="npFreq" class="form-inp"><option value="Daily" selected>Daily</option></select></div><div class="mform-group"><label class="form-lbl">Regular Contribution (₦)</label><input type="number" id="npContrib" class="form-inp" placeholder="2000" min="1"></div><div class="mform-group"><label class="form-lbl">Opening Contribution (₦)</label><input type="number" id="npFirst" class="form-inp" placeholder="2000" min="1"></div><div id="npMsg"></div><button class="btn btn-blue" onclick="doCreatePlan()" style="margin-top:8px;">Create Plan</button></div></div>
+<div id="newPlanModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('newPlanModal')">×</button><div class="m-handle"></div><div class="m-title">New Savings Plan</div><div class="mform-group"><label class="form-lbl">Plan Name</label><input type="text" id="npName" class="form-inp" placeholder="e.g. School Fees"></div><div class="mform-group"><label class="form-lbl">Savings Frequency</label><select id="npFreq" class="form-inp"><option value="Daily" selected>Daily</option></select></div><div class="mform-group"><label class="form-lbl">Regular Contribution (₦)</label><input type="number" id="npContrib" class="form-inp" placeholder="2000" min="1"></div><div id="npMsg"></div><button class="btn btn-blue" onclick="doCreatePlan()" style="margin-top:8px;">Create Plan</button></div></div>
 <div id="emgModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('emgModal')">×</button><div class="m-handle"></div><div class="m-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Request Disbursement</div><div class="msg-info">A representative will review and approve your request.</div><div class="mform-group"><label class="form-lbl">Plan</label><select id="emgPlan" class="form-inp"><option value="">— Select plan —</option></select></div><div class="mform-group"><label class="form-lbl">Amount Requested (₦)</label><input type="number" id="emgAmt" class="form-inp" placeholder="5000" min="1"></div><div class="mform-group"><label class="form-lbl">Reason (Optional)</label><textarea id="emgReason" class="form-inp" style="resize:vertical;min-height:70px;"></textarea></div><div id="emgMsg"></div><button class="btn btn-blue" onclick="doEmgRequest()" style="margin-top:8px;">Submit Request</button></div></div>
 <div id="milestoneModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('milestoneModal')">×</button><div class="m-handle"></div><div class="mile-body"><div class="mile-ico"></div><div class="mile-title" id="mileTitle">Plan Complete!</div><div class="mile-msg" id="mileMsg">Your savings plan has reached its target.</div><div style="display:flex;flex-direction:column;gap:9px;"><button class="btn btn-blue" onclick="milAct('payout')">Request Payout / Disbursement</button><button class="btn btn-outline" onclick="milAct('extend')">Extend Target Date</button><button class="btn btn-outline" onclick="milAct('increase')">Start New Plan</button></div></div></div></div>
 <div id="collectModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('collectModal')">×</button><div class="m-handle"></div><div class="m-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Record Collection</div><div class="mform-group"><label class="form-lbl">Amount Received (₦)</label><input type="number" id="colAmt" class="form-inp" placeholder="5000" min="1"></div><div class="mform-group"><label class="form-lbl">Payment Method</label><select id="colMethod" class="form-inp"><option value="">Select method</option><option value="Cash">Cash</option><option value="Bank Transfer">Bank Transfer</option><option value="Mobile Money">Mobile Money</option></select></div><div class="mform-group"><label class="form-lbl">Notes (Optional)</label><textarea id="colNotes" class="form-inp" style="resize:vertical;min-height:55px;"></textarea></div><div id="colMsg"></div><button class="btn btn-blue" onclick="doCollection()" style="margin-top:8px;">Confirm Collection</button></div></div>
@@ -1143,9 +1138,7 @@ async function renderPlanDetail(planId){
  const schedLabel = sched.label||'period';
  document.getElementById('scheduleBlock').innerHTML=`
  <div class="sched-row"><span class="sched-label">Regular contribution</span><span class="sched-val">${regularAmt>0?fmt(regularAmt)+' / '+schedLabel:'Not set'}</span></div>
- <div class="sched-row"><span class="sched-label">Expected contributions</span><span class="sched-val">${sched.expected}</span></div>
- <div class="sched-row"><span class="sched-label">Missed contributions</span><span class="sched-val ${sched.missed===0?'ok':sched.missed<3?'warn':'bad'}">${sched.missed===0?'None ':sched.missed}</span></div>
- <div class="sched-row"><span class="sched-label">Current balance</span><span class="sched-val ok">${fmt(activePlanBalance)}</span></div>`;
+ <div class="sched-row" style="border-bottom:none;"><span class="sched-label">Missed contributions</span><span class="sched-val ${sched.missed===0?'ok':sched.missed<3?'warn':'bad'}">${sched.missed===0?'None':sched.missed}</span></div>`;
  let txs=[], rejDisbs=[];
  try {
  const [r1,r2] = await Promise.all([
@@ -1455,7 +1448,7 @@ async function adminDoSearch(){
  return `<div class="adr-plan-card"><div class="adr-plan-header"><div><div class="adr-plan-name">${p.name}</div></div><div><div class="adr-plan-bal">${fmt(p.balance)}</div><div class="adr-plan-of">of ${fmt(p.target_amount)}</div></div></div><div class="adr-plan-meta">${p.frequency?.toLowerCase()} · ${Number(p.balance)>=Number(p.target_amount)?'completed':'active'}</div>${(txs||[]).map(tx=>{const isIn=tx.type==='deposit'||tx.type==='opening';return `<div class="adr-plan-tx"><span class="adr-tx-info">${fmtDate(tx.created_at)} · ${isIn?'deposit':'payout'}</span><span class="${isIn?'adr-tx-green':'adr-tx-red'}">${isIn?'+':'-'}${fmt(tx.amount)}</span></div>`;}).join('')}</div>`;
  }));
  hideLoading();
- document.getElementById('adminSearchResult').innerHTML=`<div class="adr-profile"><div><div class="adr-name">${cust.first_name} ${cust.last_name}</div><div class="adr-phone">${cust.phone.replace('+234','0')}</div><div class="adr-since">Member since ${fmtDate(cust.created_at)}</div></div><span class="adr-cust-badge">CUSTOMER</span></div>${planCards.join('')||'<div style="color:#8b949e;text-align:center;padding:14px;">No plans yet</div>'}<div class="adr-elevate-section"><div class="adr-elevate-label">Elevate this customer to Representative status:</div><div class="adr-elevate-row"><input type="tel" value="${cust.phone.replace('+234','0')}" class="admin-inp" readonly style="flex:1;"><button class="admin-search-btn" onclick="elevateByPhone('${cust.phone}')">Elevate</button></div><div id="adminElevateMsg"></div></div>`;
+ document.getElementById('adminSearchResult').innerHTML=`<div class="adr-profile"><div><div class="adr-name">${cust.first_name} ${cust.last_name}</div><div class="adr-phone">${cust.phone.replace('+234','0')}</div><div class="adr-since">Member since ${fmtDate(cust.created_at)}</div></div><span class="adr-cust-badge">CUSTOMER</span></div>${planCards.join('')||'<div style="color:#8b949e;text-align:center;padding:14px;">No plans yet</div>'}`;
  } else {
  const { data:rep } = await db.from('representatives').select('*').eq('rep_id',val).single();
  if(!rep){ hideLoading(); setMsg('adminSearchResult','<div style="color:#fca5a5;font-size:12px;margin-top:7px;">Agent not found</div>'); return; }
@@ -1510,21 +1503,6 @@ async function resolveFlag(id){ await db.from('fraud_flags').update({resolved:tr
 
 // renderAuditLog — defined below with search support
 
-
-async function elevateCustomer(){ await elevateByPhone(normPhone(document.getElementById('elevatePhone').value.trim())); }
-async function elevateByPhone(phone){
- if(!dbReady()) return;
- const msgEl=document.getElementById('adminElevateMsg')||document.getElementById('elevateMsg');
- let { data:cust } = await db.from('customers').select('*').eq('phone',phone).single();
- if(!cust){ if(msgEl) msgEl.innerHTML='<div style="color:#fca5a5;font-size:12px;margin-top:7px;">Customer not found</div>'; return; }
- const { data:existing } = await db.from('representatives').select('id').eq('phone',phone).single();
- if(existing){ if(msgEl) msgEl.innerHTML='<div style="color:#fca5a5;font-size:12px;margin-top:7px;">Already a representative</div>'; return; }
- const repId=genRepId();
- await db.from('representatives').insert({ first_name:cust.first_name, last_name:cust.last_name, email:cust.email, phone:cust.phone, pin_hash:cust.pin_hash, rep_id:repId, confirmed_count:0 });
- await audit('elevate','admin','admin',`Elevated ${cust.first_name} ${cust.last_name} — New ID: ${repId}`);
- await renderAdminDash();
- if(msgEl) msgEl.innerHTML=`<div style="color:#6ee7b7;font-size:12px;margin-top:7px;"> Elevated! New Agent ID: <strong style="color:var(--yellow);font-size:16px;font-family:monospace;">${repId}</strong></div>`;
-}
 
 async function renderAgentsList(){
  if(!db) return;
@@ -1712,16 +1690,22 @@ async function loadRepTxPreview(){
   (custs||[]).forEach(cu=>{ _repCustMap[cu.id]=cu.first_name+' '+cu.last_name; });
  }
  const el=document.getElementById('repTxPreview'); if(!el) return;
- if(!_repTxCache.length){ el.innerHTML='<div class="tx-empty">No collections yet</div>'; return; }
- el.innerHTML=_repTxCache.slice(0,3).map(tx=>`<div class="tx-row">
- <div class="tx-ico tx-ico-g">↓</div>
+ if(!_repTxCache.length){ el.innerHTML='<div class="tx-empty">No transactions yet</div>'; return; }
+ el.innerHTML=_repTxCache.slice(0,3).map(tx=>{
+ const isPayout=tx.type==='payout';
+ const isRejected=tx.type==='rejected_disb';
+ const isIn=!isPayout&&!isRejected;
+ const label=tx.type==='opening'?'Opening':isPayout?'Payout':isRejected?'Rejected Disbursement':'Collection';
+ return `<div class="tx-row">
+ <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div>
  <div class="tx-body">
  <div class="tx-name">${_repCustMap[tx.customer_id]||'Customer'}</div>
- <div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${tx.type==='opening'?'Opening':'Collection'}</div>
+ <div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${label}</div>
  <div class="tx-ref">${tx.ref||'—'}</div>
  </div>
- <div class="tx-amt-g">+${fmt(tx.amount)}</div>
- </div>`).join('');
+ <div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div>
+ </div>`;
+ }).join('');
  if(_repTxCache.length>3) el.innerHTML+=`<div style="text-align:center;padding:8px 0;"><button onclick="openRepTxHistory()" style="background:none;border:none;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;">+ ${_repTxCache.length-3} more →</button></div>`;
 }
 async function openRepTxHistory(){
@@ -1729,22 +1713,40 @@ async function openRepTxHistory(){
   const el=document.getElementById('repAllTxList');
   if(!el){ showView('repTxHistoryView'); return; }
   showView('repTxHistoryView');
+  const rep=getUser();
   const custIds=[...new Set(_repTxCache.map(t=>t.customer_id).filter(Boolean))];
   let custMap={};
   if(custIds.length&&db){
     const {data:custs}=await db.from('customers').select('id,first_name,last_name').in('id',custIds);
     (custs||[]).forEach(cu=>custMap[cu.id]=cu.first_name+' '+cu.last_name);
   }
-  el.innerHTML=_repTxCache.length?_repTxCache.map(tx=>`
+  // Fetch rejected disbursements handled by this rep
+  let rejDisbs=[];
+  if(db){
+    const {data:rd}=await db.from('disbursements').select('*').eq('confirmed_by',rep.id).eq('status','rejected');
+    rejDisbs=rd||[];
+  }
+  const rejRows=rejDisbs.map(d=>({
+    id:d.id, type:'rejected_disb', amount:d.amount,
+    created_at:d.requested_at||d.created_at, ref:d.ref, customer_id:d.customer_id
+  }));
+  const allRows=[..._repTxCache,...rejRows].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  el.innerHTML=allRows.length?allRows.map(tx=>{
+    const isPayout=tx.type==='payout';
+    const isRejected=tx.type==='rejected_disb';
+    const isIn=!isPayout&&!isRejected;
+    const label=tx.type==='opening'?'Opening':isPayout?'Payout':isRejected?'Rejected Disbursement':'Collection';
+    return `
     <div class="tx-row" style="background:var(--white);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:11px;">
-      <div class="tx-ico tx-ico-g" style="width:36px;height:36px;border-radius:10px;background:#d1fae5;display:flex;align-items:center;justify-content:center;flex-shrink:0;">↓</div>
+      <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}" style="width:36px;height:36px;border-radius:10px;background:${isIn?'#d1fae5':'#fee2e2'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${isIn?'↓':'↑'}</div>
       <div class="tx-body">
         <div class="tx-name">${custMap[tx.customer_id]||'Customer'}</div>
         <div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div>
-        <div class="tx-ref">${tx.ref||'—'} · ${tx.type==='opening'?'Opening':'Collection'}</div>
+        <div class="tx-ref">${tx.ref||'—'} · ${label}</div>
       </div>
-      <div class="tx-amt-g">+${fmt(tx.amount)}</div>
-    </div>`).join(''):'<div class="tx-empty" style="text-align:center;padding:32px;color:var(--sub);">No collections yet</div>';
+      <div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div>
+    </div>`;
+  }).join(''):'<div class="tx-empty" style="text-align:center;padding:32px;color:var(--sub);">No transactions yet</div>';
   showView('repTxHistoryView');
 }
 
