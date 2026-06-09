@@ -230,9 +230,11 @@ body.dark .tx-title{color:var(--yellow);}
 .tx-row{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--border);animation:fadeUp .22s ease;}
 .tx-row:last-child{border-bottom:none;}
 body.dark .tx-row{border-color:#2a2a2a;}
-.tx-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
-.tx-ico-g{background:#d1fae5;}
-.tx-ico-r{background:#fee2e2;}
+.tx-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;font-weight:900;}
+.tx-ico-g{background:#d1fae5;color:#065f46;}
+.tx-ico-r{background:#fee2e2;color:#991b1b;}
+body.dark .tx-ico-g{background:#064e3b;color:#6ee7b7;}
+body.dark .tx-ico-r{background:#450a0a;color:#fca5a5;}
 .tx-body{flex:1;min-width:0;}
 .tx-name{font-size:13px;font-weight:700;}
 .tx-dt{font-size:11px;color:var(--sub);margin-top:2px;}
@@ -324,7 +326,9 @@ body.dark .dis-amt{color:var(--yellow);}
 .agent-card{background:rgba(255,255,255,.04);border:1px solid var(--dark-border);border-radius:11px;padding:13px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;transition:background .2s;animation:fadeUp .22s ease;}
 .agent-card:hover{background:rgba(255,255,255,.07);}
 .agent-card-name{color:#e6edf3;font-size:14px;font-weight:700;margin-bottom:2px;}
+body:not(.dark) .agent-card-name{color:#111;}
 .agent-card-sub{color:#8b949e;font-size:11px;}
+body:not(.dark) .agent-card-sub{color:#6b7280;}
 .agent-card-id{color:var(--yellow);font-size:17px;font-weight:800;font-family:monospace;}
 .gen-tok-btn{width:100%;background:var(--yellow);color:#111;border:none;padding:15px;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:18px;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .2s;}
 .gen-tok-btn:hover{background:#e6a800;}
@@ -462,17 +466,19 @@ body.dark .cal-month-name{color:#f0f0f0;}
 body.dark .mini-cal-days-hdr{border-color:#2a2a2a;}
 .cal-day-hdr{font-size:10px;font-weight:700;color:var(--sub);text-align:center;}
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
-.cal-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:12px;font-weight:800;border:2px solid #aaa;color:#111;}
-body.dark .cal-cell{border-color:#bbb;color:#eee;}
+.cal-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:12px;font-weight:800;border:2px solid #444;color:#111;}
+body.dark .cal-cell{border-color:#ccc;color:#f0f0f0;}
 .cal-cell.c-green{background:#d1fae5;color:#065f46;border-color:#065f46;}
 body.dark .cal-cell.c-green{background:#064e3b;color:#6ee7b7;border-color:#6ee7b7;}
 .cal-cell.c-red{background:#fee2e2;color:#991b1b;border-color:#991b1b;}
 body.dark .cal-cell.c-red{background:#450a0a;color:#fca5a5;border-color:#fca5a5;}
-.cal-cell.c-grey{color:#999;border-color:#ddd;}
-body.dark .cal-cell.c-grey{color:#555;border-color:#444;}
+.cal-cell.c-grey{color:#aaa;border-color:#ccc;}
+body.dark .cal-cell.c-grey{color:#444;border-color:#333;}
 .cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:900;border-width:2.5px;}
 body.dark .cal-cell.c-today{border-color:var(--yellow);color:var(--yellow);}
-.cal-legend{display:flex;gap:14px;margin-top:10px;}
+.cal-cell.c-payout{background:#fef3c7;color:#92400e;border-color:#f59e0b;}
+body.dark .cal-cell.c-payout{background:#451a03;color:#fcd34d;border-color:#f59e0b;}
+.cal-legend{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;}
 .cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub);}
 .cal-dot{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0;}
 
@@ -603,6 +609,7 @@ button .ic, a .ic{vertical-align:middle;}
  <div class="cal-legend">
  <div class="cal-legend-item"><span class="cal-dot" style="background:#d1fae5;"></span>Paid</div>
  <div class="cal-legend-item"><span class="cal-dot" style="background:#fee2e2;"></span>Missed</div>
+ <div class="cal-legend-item"><span class="cal-dot" style="background:#fef3c7;border:1px solid #f59e0b;"></span>Payout</div>
  </div>
  </div>
  <div id="planActionBtns" class="cust-btns">
@@ -1353,6 +1360,14 @@ async function doCollection(){
  if(!amtVal||+amtVal<=0){ setMsg('colMsg','<div class="msg-err">Enter a valid amount</div>'); return; }
  if(!method){ setMsg('colMsg','<div class="msg-err">Select a payment method</div>'); return; }
  const amt=+amtVal; const rep=getUser(); const ref=genRef();
+ // Validate amount is a multiple of regular contribution
+ let regContrib=0;
+ if(db&&repSelectedPlan){ const {data:pl}=await db.from('plans').select('regular_contribution').eq('id',repSelectedPlan.id).single(); regContrib=Number(pl?.regular_contribution||0); }
+ if(regContrib>0&&amt%regContrib!==0){
+  const multiples=[1,2,3].map(n=>fmt(regContrib*n)).join(', ');
+  setMsg('colMsg',`<div class="msg-err">Amount must be a multiple of the regular contribution (${fmt(regContrib)}).<br>e.g. ${multiples}…</div>`);
+  return;
+ }
  showLoading('Recording collection…');
  const { count:txCount } = await db.from('transactions').select('*',{count:'exact',head:true}).eq('plan_id',repSelectedPlan.id);
  const txType = (txCount===0) ? 'opening' : 'deposit';
@@ -1807,29 +1822,40 @@ async function deleteInactiveUsers(){
 // ═══════════════════════════════════════════════
 // MINI CALENDAR
 // ═══════════════════════════════════════════════
-let calState={yr:0,mo:0,covered:new Set(),missed:new Set()};
+let calState={yr:0,mo:0,covered:new Set(),missed:new Set(),payouts:new Set()};
 
 async function renderCalendar(plan,balance){
  const regularAmt=Number(plan.regular_contribution)||1000;
  const startDate=new Date(plan.created_at);
  const today=new Date();
- const { data:txs } = await db.from('transactions').select('amount').eq('plan_id',plan.plan_id||plan.id);
+ const planId=plan.plan_id||plan.id;
+ const [txRes, disbRes] = await Promise.all([
+   db.from('transactions').select('amount,created_at,type').eq('plan_id',planId),
+   db.from('disbursements').select('confirmed_at,amount').eq('plan_id',planId).eq('status','paid')
+ ]);
+ const txs=txRes.data||[];
+ const paidDisbs=disbRes.data||[];
  const totalPaid=(txs||[]).reduce((s,t)=>s+Number(t.amount),0);
  const daysCovered=Math.floor(totalPaid/regularAmt);
  calState.covered=new Set();
  calState.missed=new Set();
+ calState.payouts=new Set();
+ // Mark the date of each approved disbursement
+ paidDisbs.forEach(d=>{
+   if(d.confirmed_at) calState.payouts.add(d.confirmed_at.split('T')[0]);
+ });
  // Assign covered days from plan start
  const d=new Date(startDate);
  for(let i=0;i<daysCovered;i++){
- calState.covered.add(d.toISOString().split('T')[0]);
- d.setDate(d.getDate()+1);
+   calState.covered.add(d.toISOString().split('T')[0]);
+   d.setDate(d.getDate()+1);
  }
  // Assign missed days from end of covered to today
  const m=new Date(startDate);
  m.setDate(m.getDate()+daysCovered);
  while(m<today){
- calState.missed.add(m.toISOString().split('T')[0]);
- m.setDate(m.getDate()+1);
+   calState.missed.add(m.toISOString().split('T')[0]);
+   m.setDate(m.getDate()+1);
  }
  calState.yr=today.getFullYear();
  calState.mo=today.getMonth();
@@ -1837,7 +1863,7 @@ async function renderCalendar(plan,balance){
 }
 
 function drawCal(){
- const {yr,mo,covered,missed}=calState;
+ const {yr,mo,covered,missed,payouts}=calState;
  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
  const DN=['Su','Mo','Tu','We','Th','Fr','Sa'];
  const todayStr=new Date().toISOString().split('T')[0];
@@ -1854,11 +1880,12 @@ function drawCal(){
  for(let d=1;d<=daysInMonth;d++){
  const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
  let cls='cal-cell';
- if(covered.has(ds)) cls+=' c-green';
+ if(payouts.has(ds)) cls+=' c-payout';
+ else if(covered.has(ds)) cls+=' c-green';
  else if(missed.has(ds)) cls+=' c-red';
  else cls+=' c-grey';
  if(ds===todayStr) cls+=' c-today';
- cells+=`<div class="${cls}">${d}</div>`;
+ cells+=`<div class="${cls}" title="${payouts.has(ds)?'Payout date':covered.has(ds)?'Paid':missed.has(ds)?'Missed':''}">${d}</div>`;
  }
  grid.innerHTML=`<div class="mini-cal-grid">${cells}</div>`;
 }
