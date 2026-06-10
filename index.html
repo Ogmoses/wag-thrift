@@ -476,8 +476,8 @@ body.dark .cal-cell.c-red{background:#450a0a;color:#fca5a5;border-color:#fca5a5;
 body.dark .cal-cell.c-grey{color:#444;border-color:#333;}
 .cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:900;border-width:2.5px;}
 body.dark .cal-cell.c-today{border-color:var(--yellow);color:var(--yellow);}
-.cal-cell.c-payout{background:#fef3c7;color:#92400e;border-color:#f59e0b;}
-body.dark .cal-cell.c-payout{background:#451a03;color:#fcd34d;border-color:#f59e0b;}
+.cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#cc9200;font-weight:900;}
+body.dark .cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#FFBA09;font-weight:900;}
 .cal-legend{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;}
 .cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub);}
 .cal-dot{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0;}
@@ -961,14 +961,19 @@ async function checkFailedPin(phone){
 // SCHEDULE ENGINE — calculated client-side
 // ═══════════════════════════════════════════════
 function getScheduleInfo(plan, balance){
- const start=new Date(plan.created_at), today=new Date();
- const days=Math.max(0,Math.floor((today-start)/(1000*60*60*24)));
- let expected=0, label='';
- if(plan.frequency==='Daily'){ expected=days; label='daily'; }
- else if(plan.frequency==='Weekly'){ expected=Math.floor(days/7); label='weekly'; }
- else if(plan.frequency==='Monthly'){ expected=Math.floor(days/30); label='monthly'; }
- const expectedTotal = expected * (plan.regular_contribution||1000);
- return { expected, label, expectedTotal, missed:Math.max(0,expected-Math.floor(balance/(plan.regular_contribution||1000))) };
+  // Under the ongoing daily thrift model:
+  // - daysCovered = total deposited ÷ regular contribution (streak days earned)
+  // - missedDays  = calendar days elapsed since plan start MINUS daysCovered
+  //   (capped at 0 if paid ahead — no negative missed)
+  const regularAmt = Number(plan.regular_contribution) || 1000;
+  const start = new Date(plan.created_at);
+  start.setHours(0,0,0,0);
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const calendarDaysElapsed = Math.max(0, Math.floor((today - start) / (1000*60*60*24)));
+  const daysCovered = Math.floor(Number(balance) / regularAmt);
+  const missed = Math.max(0, calendarDaysElapsed - daysCovered);
+  return { expected: calendarDaysElapsed, label: 'daily', expectedTotal: calendarDaysElapsed * regularAmt, missed };
 }
 
 // ═══════════════════════════════════════════════
@@ -1838,74 +1843,119 @@ async function deleteInactiveUsers(){
 
 
 // ═══════════════════════════════════════════════
-// MINI CALENDAR
+// MINI CALENDAR — ONGOING DAILY THRIFT STREAK
+// Rules:
+//   • Every deposit advances the streak forward from plan start date.
+//   • Disbursements NEVER reset or clear past streak days.
+//   • On the exact calendar day a disbursement was confirmed, colour it Yellow.
+//   • Missed days = gap between streak-end and today (only past dates).
+//   • Advance-payment (paid ahead) = streak extends beyond today — those future
+//     dates show Green, not missed.
 // ═══════════════════════════════════════════════
 let calState={yr:0,mo:0,covered:new Set(),missed:new Set(),payouts:new Set()};
 
-async function renderCalendar(plan,balance){
- const regularAmt=Number(plan.regular_contribution)||1000;
- const startDate=new Date(plan.created_at);
- const today=new Date();
- const planId=plan.plan_id||plan.id;
- const [txRes, disbRes] = await Promise.all([
-   db.from('transactions').select('amount,created_at,type').eq('plan_id',planId),
-   db.from('disbursements').select('confirmed_at,amount').eq('plan_id',planId).eq('status','paid')
- ]);
- const txs=txRes.data||[];
- const paidDisbs=disbRes.data||[];
- const totalPaid=(txs||[]).reduce((s,t)=>s+Number(t.amount),0);
- const daysCovered=Math.floor(totalPaid/regularAmt);
- calState.covered=new Set();
- calState.missed=new Set();
- calState.payouts=new Set();
- // Mark the date of each approved disbursement
- paidDisbs.forEach(d=>{
-   if(d.confirmed_at) calState.payouts.add(d.confirmed_at.split('T')[0]);
- });
- // Assign covered days from plan start
- const d=new Date(startDate);
- for(let i=0;i<daysCovered;i++){
-   calState.covered.add(d.toISOString().split('T')[0]);
-   d.setDate(d.getDate()+1);
- }
- // Assign missed days from end of covered to today
- const m=new Date(startDate);
- m.setDate(m.getDate()+daysCovered);
- while(m<today){
-   calState.missed.add(m.toISOString().split('T')[0]);
-   m.setDate(m.getDate()+1);
- }
- calState.yr=today.getFullYear();
- calState.mo=today.getMonth();
- drawCal();
+async function renderCalendar(plan, balance){
+  const regularAmt = Number(plan.regular_contribution) || 1000;
+  // plan_start is the absolute day-0 of the streak (never changes)
+  const planStart = new Date(plan.created_at);
+  planStart.setHours(0,0,0,0);
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const planId = plan.plan_id || plan.id;
+
+  // Fetch ALL deposits for this plan (openings + deposits)
+  const [txRes, disbRes] = await Promise.all([
+    db.from('transactions').select('amount,created_at,type').eq('plan_id', planId)
+      .in('type',['opening','deposit']).order('created_at',{ascending:true}),
+    db.from('disbursements').select('confirmed_at,amount').eq('plan_id', planId)
+      .eq('status','paid')
+  ]);
+  const txs       = txRes.data  || [];
+  const paidDisbs = disbRes.data || [];
+
+  // ── STEP 1: Total days covered by ALL deposits ever made
+  //    (disbursements do NOT subtract from the streak counter —
+  //     they only reduce the *financial* balance, handled by DB triggers)
+  const totalDeposited = txs.reduce((s,t) => s + Number(t.amount), 0);
+  const totalDaysCovered = Math.floor(totalDeposited / regularAmt);
+
+  // ── STEP 2: Walk the streak forward from plan start
+  //    Each "covered day" is assigned sequentially, ignoring payout events
+  calState.covered = new Set();
+  calState.missed  = new Set();
+  calState.payouts = new Set();
+
+  // Mark every confirmed-payout date as Yellow
+  paidDisbs.forEach(d => {
+    if(d.confirmed_at) {
+      calState.payouts.add(d.confirmed_at.split('T')[0]);
+    }
+  });
+
+  // Walk the streak
+  const streakWalker = new Date(planStart);
+  for(let i = 0; i < totalDaysCovered; i++){
+    const ds = streakWalker.toISOString().split('T')[0];
+    // A payout day stays Yellow — it is NOT also marked Green
+    // (covered set only matters for non-payout days in drawCal)
+    calState.covered.add(ds);
+    streakWalker.setDate(streakWalker.getDate() + 1);
+  }
+  // streakWalker is now pointing at the NEXT unrecorded day
+
+  // ── STEP 3: Missed days = from streak-end up to (but not including) today
+  //    If streak is ahead of today, there are NO missed days.
+  const missWalker = new Date(streakWalker);
+  while(missWalker < today){
+    calState.missed.add(missWalker.toISOString().split('T')[0]);
+    missWalker.setDate(missWalker.getDate() + 1);
+  }
+
+  // Default calendar view: show the month containing today
+  calState.yr = today.getFullYear();
+  calState.mo = today.getMonth();
+  drawCal();
 }
 
 function drawCal(){
- const {yr,mo,covered,missed,payouts}=calState;
- const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
- const DN=['Su','Mo','Tu','We','Th','Fr','Sa'];
- const todayStr=new Date().toISOString().split('T')[0];
- const firstDay=new Date(yr,mo,1).getDay();
- const daysInMonth=new Date(yr,mo+1,0).getDate();
- const lbl=document.getElementById('calMonthLbl');
- const hdr=document.getElementById('calDaysHdr');
- const grid=document.getElementById('calGrid');
- if(!lbl||!hdr||!grid) return;
- lbl.textContent=MN[mo]+' '+yr;
- hdr.innerHTML=DN.map(d=>`<div class="cal-day-hdr">${d}</div>`).join('');
- let cells='';
- for(let i=0;i<firstDay;i++) cells+='<div></div>';
- for(let d=1;d<=daysInMonth;d++){
- const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
- let cls='cal-cell';
- if(payouts.has(ds)) cls+=' c-payout';
- else if(covered.has(ds)) cls+=' c-green';
- else if(missed.has(ds)) cls+=' c-red';
- else cls+=' c-grey';
- if(ds===todayStr) cls+=' c-today';
- cells+=`<div class="${cls}" title="${payouts.has(ds)?'Payout date':covered.has(ds)?'Paid':missed.has(ds)?'Missed':''}">${d}</div>`;
- }
- grid.innerHTML=`<div class="mini-cal-grid">${cells}</div>`;
+  const {yr,mo,covered,missed,payouts}=calState;
+  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DN=['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const todayStr=new Date().toISOString().split('T')[0];
+  const firstDay=new Date(yr,mo,1).getDay();
+  const daysInMonth=new Date(yr,mo+1,0).getDate();
+  const lbl=document.getElementById('calMonthLbl');
+  const hdr=document.getElementById('calDaysHdr');
+  const grid=document.getElementById('calGrid');
+  if(!lbl||!hdr||!grid) return;
+  lbl.textContent=MN[mo]+' '+yr;
+  hdr.innerHTML=DN.map(d=>`<div class="cal-day-hdr">${d}</div>`).join('');
+  let cells='';
+  for(let i=0;i<firstDay;i++) cells+='<div></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isPayout  = payouts.has(ds);
+    const isCovered = covered.has(ds);
+    const isMissed  = missed.has(ds);
+    const isToday   = ds===todayStr;
+    let cls='cal-cell';
+    let title='';
+    if(isPayout){
+      cls+=' c-payout';
+      title='Payout / Disbursement day';
+    } else if(isCovered){
+      cls+=' c-green';
+      title='Paid';
+    } else if(isMissed){
+      cls+=' c-red';
+      title='Missed';
+    } else {
+      cls+=' c-grey';
+    }
+    if(isToday) cls+=' c-today';
+    cells+=`<div class="${cls}" title="${title}">${d}</div>`;
+  }
+  grid.innerHTML=`<div class="mini-cal-grid">${cells}</div>`;
 }
 
 function prevCalMonth(){calState.mo--;if(calState.mo<0){calState.mo=11;calState.yr--;}drawCal();}
