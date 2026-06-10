@@ -897,7 +897,7 @@ function renderDisbCard(d, compact){
 async function reviewDisb(disbId){
   if(!confirm('Mark this disbursement as REVIEWED?\nThis allows the representative to proceed with approval.')) return;
   showLoading('Updating…');
-  const {error} = await db.from('disbursements').update({ status:'reviewed', reviewed_at:new Date().toISOString(), reviewed_by:'admin' }).eq('id',disbId);
+  const {error} = await db.from('disbursements').update({ status:'reviewed' }).eq('id',disbId);
   if(error){ hideLoading(); alert('Error: '+error.message); return; }
   await audit('review',`Admin marked disbursement ${disbId} as reviewed`);
   hideLoading();
