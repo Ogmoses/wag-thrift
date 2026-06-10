@@ -714,6 +714,8 @@ function initAdminTheme(){
 function doAdminExit(){
   doAdminLogout();
 }
+
+async function auditLoginAttempt(success){
   if(!db) return;
   try {
     await db.from('audit_log').insert({
