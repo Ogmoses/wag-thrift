@@ -55,7 +55,7 @@ body.dark{background:#0f0f0f;color:#f0f0f0;}
 .role-badge{background:var(--yellow);color:#111;font-size:10px;font-weight:800;padding:4px 9px;border-radius:6px;letter-spacing:.5px;white-space:nowrap;}
 .theme-btn{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;}
 .theme-btn:hover{background:rgba(255,255,255,.22);transform:rotate(20deg);}
-.signout-btn{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.2);padding:7px 8px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:36px;display:flex;align-items:center;gap:4px;}
+.signout-btn{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.2);padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;}
 /* LANDING */
 .land-hero{background:var(--blue);padding:50px 24px 38px;text-align:center;flex-shrink:0;}
 .land-theme-btn{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
@@ -466,14 +466,14 @@ body.dark .cal-month-name{color:#f0f0f0;}
 body.dark .mini-cal-days-hdr{border-color:#2a2a2a;}
 .cal-day-hdr{font-size:10px;font-weight:700;color:var(--sub);text-align:center;}
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
-.cal-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:12px;font-weight:700;border:1.5px solid #111;color:#111;}
-body.dark .cal-cell{border-color:#fff;color:#fff;}
+.cal-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:12px;font-weight:800;border:2px solid #444;color:#111;}
+body.dark .cal-cell{border-color:#ccc;color:#f0f0f0;}
 .cal-cell.c-green{background:#d1fae5;color:#065f46;border-color:#065f46;}
 body.dark .cal-cell.c-green{background:#064e3b;color:#6ee7b7;border-color:#6ee7b7;}
 .cal-cell.c-red{background:#fee2e2;color:#991b1b;border-color:#991b1b;}
 body.dark .cal-cell.c-red{background:#450a0a;color:#fca5a5;border-color:#fca5a5;}
-.cal-cell.c-grey{color:#bbb;border-color:#ddd;}
-body.dark .cal-cell.c-grey{color:#444;border-color:#444;}
+.cal-cell.c-grey{color:#aaa;border-color:#ccc;}
+body.dark .cal-cell.c-grey{color:#444;border-color:#333;}
 .cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:900;border-width:2.5px;}
 body.dark .cal-cell.c-today{border-color:var(--yellow);color:var(--yellow);}
 .cal-cell.c-payout{background:#fef3c7;color:#92400e;border-color:#f59e0b;}
@@ -691,17 +691,8 @@ button .ic, a .ic{vertical-align:middle;}
 <div id="repTxHistoryView" class="view">
  <div class="dash-header">
  <button onclick="showView('repView')" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
- <div class="hdr-info"><div class="hdr-name">All My Transactions</div></div>
+ <div class="hdr-info"><div class="hdr-name">All My Collections</div></div>
  <div class="hdr-right"><button class="theme-btn" onclick="toggleTheme()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button></div>
- </div>
- <div class="tx-hist-filters">
- <select id="repTxFilterCat" class="tx-hist-select" onchange="filterRepTxHistory()">
-  <option value="all">All Types</option>
-  <option value="opening">Opening</option>
-  <option value="deposit">Collections</option>
-  <option value="payout">Payouts</option>
-  <option value="rejected_disb">Rejected Disbursements</option>
- </select>
  </div>
  <div id="repAllTxList" style="padding:13px 13px 40px;"></div>
 </div>
@@ -1082,6 +1073,7 @@ async function doLogin(){
  const pinHash=await hashPin(pin);
  const { data:cust } = await db.from('customers').select('*').eq('phone',normPh).eq('pin_hash',pinHash).single();
  if(!cust){ hideLoading(); const locked=await checkFailedPin(normPh); setMsg('loginMsg',`<div class="msg-err">Invalid phone or password.${locked?' Account locked.':''}</div>`); return; }
+ if(cust.status==='suspended'){ hideLoading(); setMsg('loginMsg','<div class="msg-err">This account has been suspended. Please contact support.</div>'); return; }
  await db.from('pin_attempts').upsert({ phone:normPh, attempts:0 });
  await audit('login',cust.id,'customer',`Customer signed in: ${cust.first_name} ${cust.last_name}`);
  setUser({...cust,role:'customer'}); hideLoading();
@@ -1092,6 +1084,7 @@ async function doLogin(){
  const pinHash=await hashPin(pin);
  const { data:rep } = await db.from('representatives').select('*').eq('rep_id',rid).eq('pin_hash',pinHash).single();
  if(!rep){ hideLoading(); setMsg('loginRepMsg','<div class="msg-err">Invalid Agent ID or password</div>'); return; }
+ if(rep.status==='suspended'){ hideLoading(); setMsg('loginRepMsg','<div class="msg-err">This agent account has been suspended. Please contact your supervisor.</div>'); return; }
  await audit('login',rep.id,'representative',`Representative signed in: ${rep.first_name} ${rep.last_name} (${rep.rep_id})`);
  setUser({...rep,role:'representative'}); hideLoading();
  showView('repView'); await renderRepDash();
@@ -1781,56 +1774,46 @@ async function loadRepTxPreview(){
  }).join('');
  if(_repTxCache.length>3) el.innerHTML+=`<div style="text-align:center;padding:8px 0;"><button onclick="openRepTxHistory()" style="background:none;border:none;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;">+ ${_repTxCache.length-3} more →</button></div>`;
 }
-let _repAllTxRows=[];
-let _repTxCustMap={};
-
 async function openRepTxHistory(){
   if(!_repTxCache.length) await loadRepTxPreview();
+  const el=document.getElementById('repAllTxList');
+  if(!el){ showView('repTxHistoryView'); return; }
   showView('repTxHistoryView');
   const rep=getUser();
   const custIds=[...new Set(_repTxCache.map(t=>t.customer_id).filter(Boolean))];
-  _repTxCustMap={};
+  let custMap={};
   if(custIds.length&&db){
     const {data:custs}=await db.from('customers').select('id,first_name,last_name').in('id',custIds);
-    (custs||[]).forEach(cu=>_repTxCustMap[cu.id]=cu.first_name+' '+cu.last_name);
+    (custs||[]).forEach(cu=>custMap[cu.id]=cu.first_name+' '+cu.last_name);
   }
+  // Fetch rejected disbursements handled by this rep
   let rejDisbs=[];
   if(db){
     const {data:rd}=await db.from('disbursements').select('*').eq('confirmed_by',rep.id).eq('status','rejected');
     rejDisbs=rd||[];
   }
-  const rejRows=rejDisbs.map(d=>({ id:d.id, type:'rejected_disb', amount:d.amount, created_at:d.requested_at||d.created_at, ref:d.ref, customer_id:d.customer_id }));
-  _repAllTxRows=[..._repTxCache,...rejRows].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-  const catFilter=document.getElementById('repTxFilterCat');
-  if(catFilter) catFilter.value='all';
-  renderRepTxRows(_repAllTxRows);
-}
-
-function filterRepTxHistory(){
-  const cat=(document.getElementById('repTxFilterCat')?.value)||'all';
-  const filtered=cat==='all'?_repAllTxRows:_repAllTxRows.filter(tx=>tx.type===cat);
-  renderRepTxRows(filtered);
-}
-
-function renderRepTxRows(rows){
-  const el=document.getElementById('repAllTxList');
-  if(!el) return;
-  el.innerHTML=rows.length?rows.map(tx=>{
+  const rejRows=rejDisbs.map(d=>({
+    id:d.id, type:'rejected_disb', amount:d.amount,
+    created_at:d.requested_at||d.created_at, ref:d.ref, customer_id:d.customer_id
+  }));
+  const allRows=[..._repTxCache,...rejRows].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  el.innerHTML=allRows.length?allRows.map(tx=>{
     const isPayout=tx.type==='payout';
     const isRejected=tx.type==='rejected_disb';
     const isIn=!isPayout&&!isRejected;
     const label=tx.type==='opening'?'Opening':isPayout?'Payout':isRejected?'Rejected Disbursement':'Collection';
-    const statusDot=isRejected?'<span style="background:rgba(220,38,38,.15);color:#fca5a5;font-size:9px;font-weight:700;padding:2px 7px;border-radius:50px;margin-left:5px;">REJECTED</span>':isPayout?'<span style="background:rgba(217,119,6,.15);color:#fcd34d;font-size:9px;font-weight:700;padding:2px 7px;border-radius:50px;margin-left:5px;">PAYOUT</span>':'<span style="background:rgba(5,150,105,.12);color:#059669;font-size:9px;font-weight:700;padding:2px 7px;border-radius:50px;margin-left:5px;">CONFIRMED</span>';
-    return `<div class="tx-full-row">
-      <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div>
+    return `
+    <div class="tx-row" style="background:var(--white);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:11px;">
+      <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}" style="width:36px;height:36px;border-radius:10px;background:${isIn?'#d1fae5':'#fee2e2'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${isIn?'↓':'↑'}</div>
       <div class="tx-body">
-        <div class="tx-name">${_repTxCustMap[tx.customer_id]||'Customer'}</div>
+        <div class="tx-name">${custMap[tx.customer_id]||'Customer'}</div>
         <div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div>
-        <div class="tx-ref">${tx.ref||'—'} · ${label}${statusDot}</div>
+        <div class="tx-ref">${tx.ref||'—'} · ${label}</div>
       </div>
       <div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div>
     </div>`;
-  }).join(''):'<div class="tx-empty" style="text-align:center;padding:32px;color:var(--sub);">No transactions found</div>';
+  }).join(''):'<div class="tx-empty" style="text-align:center;padding:32px;color:var(--sub);">No transactions yet</div>';
+  showView('repTxHistoryView');
 }
 
 // ── 14. DELETE INACTIVE USERS
