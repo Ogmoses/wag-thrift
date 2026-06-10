@@ -375,6 +375,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
       <button class="nav-item" id="nav-flags" onclick="switchPage('flags')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
         Fraud Flags
+        <span class="nav-badge" id="flagBadge" style="display:none;">0</span>
       </button>
       <button class="nav-item" id="nav-tokens" onclick="switchPage('tokens')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg>
@@ -409,7 +410,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
       <div class="topbar-title" id="topbarTitle">Overview</div>
       <span class="topbar-badge">SUPER ADMIN</span>
       <button id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:var(--text);width:32px;height:32px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;">
-        <span id="themeIcon" style="font-size:14px;">☀️</span>
+        <span id="themeIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:block;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
       </button>
       <button onclick="doAdminLogout()" title="Exit Portal" style="background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.3);color:#fca5a5;padding:6px 11px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -462,7 +463,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
               <option value="rejected">Rejected</option>
               <option value="">All</option>
             </select>
-            <button class="btn btn-ghost" onclick="renderDisbPage()" style="padding:8px 14px;font-size:12px;">↻ Refresh</button>
+            <button class="btn btn-ghost" onclick="renderDisbPage()" style="padding:8px 14px;font-size:12px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh</button>
           </div>
         </div>
         <div id="disbPageList"><div class="empty-state">Loading…</div></div>
@@ -638,7 +639,9 @@ let isLightMode = false;
 function toggleTheme(){
   isLightMode = !isLightMode;
   document.body.classList.toggle('light-mode', isLightMode);
-  document.getElementById('themeIcon').textContent = isLightMode ? '🌙' : '☀️';
+  document.getElementById('themeIcon').innerHTML = isLightMode
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:block;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:block;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
   localStorage.setItem('wagAdminTheme', isLightMode ? 'light' : 'dark');
 }
 function initTheme(){
@@ -647,7 +650,7 @@ function initTheme(){
     isLightMode = true;
     document.body.classList.add('light-mode');
     const icon = document.getElementById('themeIcon');
-    if(icon) icon.textContent = '🌙';
+    if(icon) icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:block;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>';
   }
 }
 
@@ -691,6 +694,8 @@ async function doAdminLogin(){
     document.getElementById('appShell').classList.add('active');
     document.getElementById('sessionStart').textContent = fmtDate(adminSession.loginTime)+' '+fmtTime(adminSession.loginTime);
     await renderAdminDash();
+    setupRealtimeListeners();
+    await updateBadges();
   } else {
     loginAttempts++;
     sessionLog.push({ type:'fail', time: new Date().toLocaleString() });
@@ -750,6 +755,7 @@ function doAdminLogout(){
   const btn = document.getElementById('loginBtn');
   btn.disabled = false;
   btn.textContent = 'Access Super Admin Portal';
+  teardownRealtime();
   setMsg('loginMsg','<div class="msg-ok">Signed out successfully.</div>');
 }
 
@@ -848,8 +854,13 @@ async function renderOverview(){
     document.getElementById('ovDisbList').innerHTML=pendDisb.map(d=>renderDisbCard(d, true)).join('');
   }
 
-  // Recent audit
-  const {data:auditRows} = await db.from('audit_log').select('*').order('created_at',{ascending:false}).limit(8);
+  // Fraud flag badge count
+  const {count:flagCount} = await db.from('fraud_flags').select('*',{count:'exact',head:true}).eq('resolved',false);
+  const flagBadgeEl = document.getElementById('flagBadge');
+  if(flagBadgeEl){ flagBadgeEl.style.display=flagCount>0?'':'none'; flagBadgeEl.textContent=flagCount||0; }
+
+  // Recent audit — always fresh fetch, no caching
+  const {data:auditRows} = await db.from('audit_log').select('*').order('created_at',{ascending:false}).limit(10);
   renderAuditRows('ovAuditList', auditRows||[]);
 }
 
@@ -877,11 +888,11 @@ function renderDisbCard(d, compact){
 
   const actions = canReview
     ? `<div class="disb-actions">
-        <button class="btn-review" onclick="reviewDisb('${d.id}')">✓ Mark as Reviewed</button>
-        <button class="btn-reject" onclick="rejectDisb('${d.id}')">✕ Reject</button>
+        <button class="btn-review" onclick="reviewDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark as Reviewed</button>
+        <button class="btn-reject" onclick="rejectDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button>
        </div>`
     : canReject
-    ? `<div class="disb-actions"><button class="btn-reject" onclick="rejectDisb('${d.id}')">✕ Reject</button></div>`
+    ? `<div class="disb-actions"><button class="btn-reject" onclick="rejectDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button></div>`
     : '';
 
   const phone = (cust.phone||'').replace('+234','0');
@@ -944,8 +955,8 @@ function renderCustomersList(custs){
       const isSuspended = c.status==='suspended';
       const statusLabel = isSuspended ? '<span style="background:rgba(220,38,38,.15);color:#fca5a5;font-size:9px;font-weight:800;padding:2px 7px;border-radius:50px;letter-spacing:.5px;margin-left:6px;">SUSPENDED</span>' : '';
       const actionBtns = isSuspended
-        ? `<button class="btn btn-green" onclick="restoreCustomer('${c.id}','${c.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;">↩ Restore</button>
-           <button class="btn btn-red" onclick="deleteCustomer('${c.id}','${c.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;margin-left:4px;">✕ Delete</button>`
+        ? `<button class="btn btn-green" onclick="restoreCustomer('${c.id}','${c.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:3px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.51"/></svg>Restore</button>
+           <button class="btn btn-red" onclick="deleteCustomer('${c.id}','${c.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:3px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>Delete</button>`
         : `<button class="btn btn-ghost" onclick="suspendCustomer('${c.id}','${c.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;">Suspend</button>`;
       return `<div class="cust-row">
         <div><div class="cust-row-name">${c.first_name} ${c.last_name}${statusLabel}</div><div class="cust-row-sub">${(c.phone||'').replace('+234','0')}</div></div>
@@ -1035,8 +1046,8 @@ async function renderAgentsPage(){
     const isSuspended = r.status==='suspended';
     const statusLabel = isSuspended ? '<span style="background:rgba(220,38,38,.15);color:#fca5a5;font-size:9px;font-weight:800;padding:2px 7px;border-radius:50px;letter-spacing:.5px;margin-left:6px;">SUSPENDED</span>' : '';
     const actionBtns = isSuspended
-      ? `<button class="btn btn-green" onclick="restoreAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;">↩ Restore</button>
-         <button class="btn btn-red" onclick="deleteAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;margin-left:4px;">✕ Delete</button>`
+      ? `<button class="btn btn-green" onclick="restoreAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:3px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.51"/></svg>Restore</button>
+         <button class="btn btn-red" onclick="deleteAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;margin-left:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:3px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>Delete</button>`
       : `<button class="btn btn-ghost" onclick="suspendAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;">Suspend</button>`;
     const reliabilityColor = reliability>=80?'var(--green)':reliability>=60?'var(--yellow)':'var(--red)';
     return `<div class="agent-row">
@@ -1144,10 +1155,10 @@ async function adminDoSearch(){
       <div class="adr-name" style="margin-bottom:4px;">${rep.first_name} ${rep.last_name}</div>
       <div class="adr-phone">${(rep.phone||'').replace('+234','0')}</div>
       <div class="adr-since">Agent ID: ${rep.rep_id} · Since ${fmtDate(rep.created_at)}</div>
-      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:100px;background:rgba(5,150,105,.1);border-radius:9px;padding:10px;text-align:center;"><div style="font-size:10px;color:var(--sub);">Total Collected</div><div style="font-size:16px;font-weight:800;color:var(--green);">${fmt(totalCol)}</div></div>
-        <div style="flex:1;min-width:100px;background:rgba(220,38,38,.1);border-radius:9px;padding:10px;text-align:center;"><div style="font-size:10px;color:var(--sub);">Total Paid Out</div><div style="font-size:16px;font-weight:800;color:var(--red);">${fmt(totalPay)}</div></div>
-        <div style="flex:1;min-width:100px;background:rgba(255,186,9,.08);border-radius:9px;padding:10px;text-align:center;"><div style="font-size:10px;color:var(--sub);">Reliability</div><div style="font-size:16px;font-weight:800;color:${reliabilityColor};">${reliability}%</div><div style="font-size:9px;color:var(--sub);">${totalTxCount} transactions</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;">
+        <div style="background:rgba(5,150,105,.1);border-radius:9px;padding:10px;text-align:center;min-width:0;overflow:hidden;"><div style="font-size:10px;color:var(--sub);margin-bottom:4px;white-space:nowrap;">Total Collected</div><div style="font-size:clamp(10px,3vw,15px);font-weight:800;color:var(--green);word-break:break-all;line-height:1.2;">${fmt(totalCol)}</div></div>
+        <div style="background:rgba(220,38,38,.1);border-radius:9px;padding:10px;text-align:center;min-width:0;overflow:hidden;"><div style="font-size:10px;color:var(--sub);margin-bottom:4px;white-space:nowrap;">Total Paid Out</div><div style="font-size:clamp(10px,3vw,15px);font-weight:800;color:var(--red);word-break:break-all;line-height:1.2;">${fmt(totalPay)}</div></div>
+        <div style="background:rgba(255,186,9,.08);border-radius:9px;padding:10px;text-align:center;min-width:0;overflow:hidden;"><div style="font-size:10px;color:var(--sub);margin-bottom:4px;">Reliability</div><div style="font-size:clamp(10px,3vw,15px);font-weight:800;color:${reliabilityColor};">${reliability}%</div><div style="font-size:9px;color:var(--sub);">${totalTxCount} tx</div></div>
       </div>
       ${txRows ? `<div style="margin-top:12px;"><div style="font-size:11px;font-weight:700;color:var(--yellow);margin-bottom:8px;">Recent Transactions (last 20)</div>${txRows}</div>` : ''}
     </div>`);
@@ -1198,7 +1209,7 @@ async function renderFraudFlags(){
   const {data:flags}=await db.from('fraud_flags').select('*').eq('resolved',false).order('created_at',{ascending:false});
   const el=document.getElementById('fraudFlagsList');
   if(!flags?.length){ el.innerHTML='<div class="empty-state">No active fraud flags</div>'; return; }
-  el.innerHTML=flags.map(f=>`<div class="fraud-flag-card"><div class="ff-header"><span class="ff-type">${f.type.replace(/_/g,' ')} · ${f.severity.toUpperCase()}</span><span class="ff-time">${fmtDate(f.created_at)}</span></div><div class="ff-desc">${f.description}</div><button class="btn btn-green" style="margin-top:9px;font-size:12px;padding:7px 12px;" onclick="resolveFlag('${f.id}')">✓ Mark Resolved</button></div>`).join('');
+  el.innerHTML=flags.map(f=>`<div class="fraud-flag-card"><div class="ff-header"><span class="ff-type">${f.type.replace(/_/g,' ')} · ${f.severity.toUpperCase()}</span><span class="ff-time">${fmtDate(f.created_at)}</span></div><div class="ff-desc">${f.description}</div><button class="btn btn-green" style="margin-top:9px;font-size:12px;padding:7px 12px;" onclick="resolveFlag('${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark Resolved</button></div>`).join('');
 }
 
 async function resolveFlag(id){
@@ -1310,6 +1321,57 @@ function showConfirm(title, msg, onOk){
 }
 
 // ═══════════════════════════════════════════════
+// REAL-TIME & BADGES
+// ═══════════════════════════════════════════════
+let realtimeChannels = [];
+
+async function updateBadges(){
+  if(!db || !isAdminLoggedIn()) return;
+  try {
+    const [{count:pdc},{count:fdc}] = await Promise.all([
+      db.from('disbursements').select('*',{count:'exact',head:true}).eq('status','pending'),
+      db.from('fraud_flags').select('*',{count:'exact',head:true}).eq('resolved',false)
+    ]);
+    const disbBadge = document.getElementById('disbBadge');
+    if(disbBadge){ disbBadge.style.display = pdc>0?'':'none'; disbBadge.textContent = pdc||0; }
+    const flagBadge = document.getElementById('flagBadge');
+    if(flagBadge){ flagBadge.style.display = fdc>0?'':'none'; flagBadge.textContent = fdc||0; }
+    document.getElementById('ovPendingDisb').textContent = pdc||0;
+  } catch(e){}
+}
+
+function setupRealtimeListeners(){
+  // Tear down any previous subscriptions first
+  realtimeChannels.forEach(ch=>{ try{ db.removeChannel(ch); }catch(e){} });
+  realtimeChannels = [];
+
+  // Helper: re-render current page + badges silently on any change
+  const onAny = async (table) => {
+    await updateBadges();
+    if(currentPage==='overview') await renderOverview();
+    else if(currentPage==='disbursements' && (table==='disbursements')) await renderDisbPage();
+    else if(currentPage==='customers' && (table==='customers')) await renderCustomersPage();
+    else if(currentPage==='agents' && (table==='representatives')) await renderAgentsPage();
+    else if(currentPage==='flags' && (table==='fraud_flags')) await renderFraudFlags();
+    else if(currentPage==='auditlog' && (table==='audit_log')) await renderAuditLog();
+    else if(currentPage==='analytics') await renderAnalytics();
+  };
+
+  const tables = ['disbursements','transactions','audit_log','fraud_flags','customers','representatives','plans'];
+  tables.forEach(table => {
+    const ch = db.channel('admin-rt-'+table)
+      .on('postgres_changes', { event:'*', schema:'public', table }, () => onAny(table))
+      .subscribe();
+    realtimeChannels.push(ch);
+  });
+}
+
+function teardownRealtime(){
+  realtimeChannels.forEach(ch=>{ try{ db.removeChannel(ch); }catch(e){} });
+  realtimeChannels = [];
+}
+
+// ═══════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -1322,7 +1384,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
       document.getElementById('loginScreen').style.display='none';
       document.getElementById('appShell').classList.add('active');
       document.getElementById('sessionStart').textContent=fmtDate(saved.loginTime)+' '+fmtTime(saved.loginTime);
-      renderAdminDash();
+      renderAdminDash().then(()=>{
+        setupRealtimeListeners();
+        updateBadges();
+      });
     }
   } catch(e){}
 
