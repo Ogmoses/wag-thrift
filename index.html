@@ -466,18 +466,18 @@ body.dark .cal-month-name{color:#f0f0f0;}
 body.dark .mini-cal-days-hdr{border-color:#2a2a2a;}
 .cal-day-hdr{font-size:10px;font-weight:700;color:var(--sub);text-align:center;}
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
-.cal-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:12px;font-weight:800;border:2px solid #444;color:#111;}
-body.dark .cal-cell{border-color:#ccc;color:#f0f0f0;}
-.cal-cell.c-green{background:#d1fae5;color:#065f46;border-color:#065f46;}
-body.dark .cal-cell.c-green{background:#064e3b;color:#6ee7b7;border-color:#6ee7b7;}
-.cal-cell.c-red{background:#fee2e2;color:#991b1b;border-color:#991b1b;}
-body.dark .cal-cell.c-red{background:#450a0a;color:#fca5a5;border-color:#fca5a5;}
-.cal-cell.c-grey{color:#aaa;border-color:#ccc;}
-body.dark .cal-cell.c-grey{color:#444;border-color:#333;}
-.cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:900;border-width:2.5px;}
+.cal-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:12px;font-weight:700;border:1px solid #111;color:#111;}
+body.dark .cal-cell{border-color:#fff;color:#fff;}
+.cal-cell.c-green{background:#d1fae5;color:#111;border-color:#111;}
+body.dark .cal-cell.c-green{background:#064e3b;color:#fff;border-color:#fff;}
+.cal-cell.c-red{background:#fee2e2;color:#111;border-color:#111;}
+body.dark .cal-cell.c-red{background:#450a0a;color:#fff;border-color:#fff;}
+.cal-cell.c-grey{color:#111;border-color:#111;opacity:.25;}
+body.dark .cal-cell.c-grey{color:#fff;border-color:#fff;opacity:.2;}
+.cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:900;border-width:2px;}
 body.dark .cal-cell.c-today{border-color:var(--yellow);color:var(--yellow);}
-.cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#cc9200;font-weight:900;}
-body.dark .cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#FFBA09;font-weight:900;}
+.cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#111;font-weight:900;}
+body.dark .cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#111;font-weight:900;}
 .cal-legend{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;}
 .cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub);}
 .cal-dot{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0;}
@@ -960,18 +960,21 @@ async function checkFailedPin(phone){
 // ═══════════════════════════════════════════════
 // SCHEDULE ENGINE — calculated client-side
 // ═══════════════════════════════════════════════
-function getScheduleInfo(plan, balance){
+function getScheduleInfo(plan, balance, totalDaysCoveredOverride){
   // Under the ongoing daily thrift model:
-  // - daysCovered = total deposited ÷ regular contribution (streak days earned)
-  // - missedDays  = calendar days elapsed since plan start MINUS daysCovered
-  //   (capped at 0 if paid ahead — no negative missed)
+  // - daysCovered comes from TOTAL DEPOSITS EVER (not current balance, which resets after payout)
+  // - missedDays = calendar days elapsed MINUS days covered by streak
+  //   (0 if paid ahead — streak end is beyond today)
   const regularAmt = Number(plan.regular_contribution) || 1000;
   const start = new Date(plan.created_at);
   start.setHours(0,0,0,0);
   const today = new Date();
   today.setHours(0,0,0,0);
   const calendarDaysElapsed = Math.max(0, Math.floor((today - start) / (1000*60*60*24)));
-  const daysCovered = Math.floor(Number(balance) / regularAmt);
+  // Use override (total deposits ÷ rate) when available, else fall back to balance
+  const daysCovered = totalDaysCoveredOverride !== undefined
+    ? totalDaysCoveredOverride
+    : Math.floor(Number(balance) / regularAmt);
   const missed = Math.max(0, calendarDaysElapsed - daysCovered);
   return { expected: calendarDaysElapsed, label: 'daily', expectedTotal: calendarDaysElapsed * regularAmt, missed };
 }
@@ -1144,16 +1147,21 @@ async function renderCustDash(){
 async function switchPlan(id){ activePlanId=id; await renderCustDash(); }
 
 async function renderPlanDetail(planId){
- const [{ data:plan },{ data:planExtra }] = await Promise.all([
+ const [{ data:plan },{ data:planExtra },{ data:allDeposits }] = await Promise.all([
  db.from('plan_balances').select('*').eq('plan_id',planId).single(),
- db.from('plans').select('regular_contribution,maturity_date').eq('id',planId).single()
+ db.from('plans').select('regular_contribution,maturity_date').eq('id',planId).single(),
+ db.from('transactions').select('amount').eq('plan_id',planId).in('type',['opening','deposit'])
  ]);
  if(!plan) return;
  plan.regular_contribution = planExtra?.regular_contribution || 0;
  activePlanBalance=Number(plan.balance||0);
+ // Compute streak from all-time deposits (not affected by disbursements)
+ const regularAmt = Number(plan.regular_contribution) || 1000;
+ const totalDeposited = (allDeposits||[]).reduce((s,t)=>s+Number(t.amount),0);
+ const totalDaysCovered = Math.floor(totalDeposited / regularAmt);
  document.getElementById('planBal').textContent=balHidden?'••••••':fmt(activePlanBalance);
  document.getElementById('planPct').textContent='';
- const sched=getScheduleInfo(plan,activePlanBalance);
+ const sched=getScheduleInfo(plan,activePlanBalance,totalDaysCovered);
  const isOverdue=sched.missed>0;
  const badge=document.getElementById('planBadge');
  badge.textContent=plan.status==='closed'?'CLOSED':isOverdue?'OVERDUE':'ACTIVE';
@@ -1168,7 +1176,6 @@ async function renderPlanDetail(planId){
  const ob=document.getElementById('overdueBanner');
  if(isOverdue){ ob.style.display='flex'; document.getElementById('overdueCount').textContent=`${sched.missed} ${sched.label} contribution${sched.missed!==1?'s':''} overdue`; }
  else ob.style.display='none';
- const regularAmt = Number(plan.regular_contribution)||0;
  const schedLabel = sched.label||'period';
  document.getElementById('scheduleBlock').innerHTML=`
  <div class="sched-row"><span class="sched-label">Regular contribution</span><span class="sched-val">${regularAmt>0?fmt(regularAmt)+' / '+schedLabel:'Not set'}</span></div>
