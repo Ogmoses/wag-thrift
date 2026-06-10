@@ -20,8 +20,23 @@
   --green:#059669;--red:#dc2626;--orange:#d97706;--purple:#7c3aed;
   --sidebar-w:260px;
 }
+body.light-mode{
+  --bg:#f0f2f7;--card:#ffffff;--border:#d1d5db;--text:#111111;--sub:#6b7280;
+}
+body.light-mode .disb-item{background:#f7f8fc;}
+body.light-mode .tok-row{background:#f7f8fc;}
+body.light-mode .search-inp{background:#fff;color:#111;}
+body.light-mode .settings-inp{background:#fff;color:#111;}
+body.light-mode .mform-inp{background:#fff;color:#111;}
+body.light-mode .login-inp{background:#fff;color:#111;}
+body.light-mode .login-card{background:#fff;}
+body.light-mode #loginScreen{background:#f0f2f7;}
+body.light-mode .adr-profile{background:#f7f8fc;}
+body.light-mode .adr-plan-card{background:#f7f8fc;}
+body.light-mode .fraud-flag-card{background:#fff5f5;}
+body.light-mode .msheet{background:#fff;}
 html,body{height:100%;overflow-x:hidden;}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);transition:background .25s,color .25s;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
 @keyframes spin{to{transform:rotate(360deg);}}
@@ -393,6 +408,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
       </button>
       <div class="topbar-title" id="topbarTitle">Overview</div>
       <span class="topbar-badge">SUPER ADMIN</span>
+      <button id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:var(--text);width:32px;height:32px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;">
+        <span id="themeIcon" style="font-size:14px;">☀️</span>
+      </button>
       <button onclick="doAdminLogout()" title="Exit Portal" style="background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.3);color:#fca5a5;padding:6px 11px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Exit
@@ -519,10 +537,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
     <!-- ── AUDIT LOG PAGE ── -->
     <div class="page" id="page-auditlog">
-      <div class="page-inner">
-        <div class="search-row">
+      <div style="position:sticky;top:57px;z-index:100;background:var(--bg);padding:12px 16px 0;margin:-0px;">
+        <div class="search-row" style="margin-bottom:0;">
           <input type="text" id="auditSearchInp" class="search-inp" placeholder="Search by action, description, role…" oninput="filterAuditLog()">
         </div>
+      </div>
+      <div class="page-inner" style="padding-top:10px;">
         <div class="section-card"><div id="auditLogList"><div class="empty-state">Loading…</div></div></div>
       </div>
     </div>
@@ -613,6 +633,24 @@ const EYE_OPEN=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const EYE_CLOSED=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
 function togglePw(id){ const e=document.getElementById(id); const h=e.type==='password'; e.type=h?'text':'password'; const b=e.parentElement.querySelector('.pw-eye'); if(b) b.innerHTML=h?EYE_CLOSED:EYE_OPEN; }
 
+// ─── THEME ───
+let isLightMode = false;
+function toggleTheme(){
+  isLightMode = !isLightMode;
+  document.body.classList.toggle('light-mode', isLightMode);
+  document.getElementById('themeIcon').textContent = isLightMode ? '🌙' : '☀️';
+  localStorage.setItem('wagAdminTheme', isLightMode ? 'light' : 'dark');
+}
+function initTheme(){
+  const saved = localStorage.getItem('wagAdminTheme');
+  if(saved === 'light'){
+    isLightMode = true;
+    document.body.classList.add('light-mode');
+    const icon = document.getElementById('themeIcon');
+    if(icon) icon.textContent = '🌙';
+  }
+}
+
 // ═══════════════════════════════════════════════
 // SESSION / AUTH
 // ═══════════════════════════════════════════════
@@ -628,6 +666,10 @@ async function doAdminLogin(){
   const btn = document.getElementById('loginBtn');
   const now = Date.now();
   if(now < lockoutUntil){ return; }
+
+  // Always reset button state first (guards against stuck state after logout)
+  btn.disabled = false;
+  btn.textContent = 'Access Super Admin Portal';
 
   const pin = document.getElementById('adminPinInp').value;
   if(!pin){ setMsg('loginMsg','<div class="msg-err">Please enter the Admin PIN</div>'); return; }
@@ -704,6 +746,10 @@ function doAdminLogout(){
   document.getElementById('appShell').classList.remove('active');
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('adminPinInp').value='';
+  // Always fully reset login button so it never stays stuck on "Verifying…"
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = false;
+  btn.textContent = 'Access Super Admin Portal';
   setMsg('loginMsg','<div class="msg-ok">Signed out successfully.</div>');
 }
 
@@ -914,10 +960,23 @@ function filterCustomersPage(){
   renderCustomersList(allCustomers.filter(c=>(c.first_name+' '+c.last_name).toLowerCase().includes(q)||(c.phone||'').includes(q)));
 }
 
+function showMigrationAlert(table){
+  const sql = `-- Run this SQL in your Supabase SQL Editor:\n-- Go to: Supabase Dashboard > SQL Editor > New Query\n\nALTER TABLE ${table} ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';`;
+  alert('⚠️ Database Setup Required\n\nThe \'status\' column is missing from your \''+table+'\' table.\n\nTo fix this, go to:\nSupabase Dashboard → SQL Editor → New Query\n\nThen paste and run this SQL:\n\n' + `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';` + '\n\nAfter running it, refresh this page and try again.');
+}
+
 async function suspendCustomer(id, name){
   showLoading('Suspending…');
   const { error } = await db.from('customers').update({ status:'suspended' }).eq('id', id);
-  if(error){ hideLoading(); alert('Error: '+error.message); return; }
+  if(error){
+    hideLoading();
+    if(error.message && error.message.includes("status")){
+      showMigrationAlert('customers');
+    } else {
+      alert('Error: '+error.message);
+    }
+    return;
+  }
   await audit('flag', `Admin suspended customer ${name} (${id})`);
   hideLoading();
   allCustomers = allCustomers.map(x => x.id===id ? {...x, status:'suspended'} : x);
@@ -927,7 +986,12 @@ async function suspendCustomer(id, name){
 async function restoreCustomer(id, name){
   showLoading('Restoring…');
   const { error } = await db.from('customers').update({ status:'active' }).eq('id', id);
-  if(error){ hideLoading(); alert('Error: '+error.message); return; }
+  if(error){
+    hideLoading();
+    if(error.message && error.message.includes("status")) showMigrationAlert('customers');
+    else alert('Error: '+error.message);
+    return;
+  }
   await audit('flag', `Admin restored customer ${name} (${id})`);
   hideLoading();
   allCustomers = allCustomers.map(x => x.id===id ? {...x, status:'active'} : x);
@@ -953,21 +1017,28 @@ async function deleteCustomer(id, name){
 // ═══════════════════════════════════════════════
 // AGENTS
 // ═══════════════════════════════════════════════
+// Reliability = fraud-flag deduction score (matches rep dashboard)
+// Starts at 100, deducts: low=3, medium=8, high=15 per unresolved flag
+async function getAgentReliability(repId){
+  const { data } = await db.from('fraud_flags').select('severity').eq('user_id',repId).eq('resolved',false);
+  let score = 100;
+  (data||[]).forEach(f=>{ score -= f.severity==='medium'?8:f.severity==='high'?15:3; });
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
 async function renderAgentsPage(){
   const {data:reps} = await db.from('representatives').select('*').order('created_at',{ascending:false});
   const el = document.getElementById('agentsPageList');
   if(!reps?.length){ el.innerHTML='<div class="empty-state">No agents registered</div>'; return; }
   const agentRows = await Promise.all((reps||[]).map(async r=>{
-    const {count:totalTx} = await db.from('transactions').select('*',{count:'exact',head:true}).eq('agent_id',r.id);
-    const {count:onTimeTx} = await db.from('transactions').select('*',{count:'exact',head:true}).eq('agent_id',r.id).eq('type','deposit');
-    const reliability = totalTx > 0 ? Math.round((onTimeTx / totalTx)*100) : 0;
+    const reliability = await getAgentReliability(r.id);
     const isSuspended = r.status==='suspended';
     const statusLabel = isSuspended ? '<span style="background:rgba(220,38,38,.15);color:#fca5a5;font-size:9px;font-weight:800;padding:2px 7px;border-radius:50px;letter-spacing:.5px;margin-left:6px;">SUSPENDED</span>' : '';
     const actionBtns = isSuspended
       ? `<button class="btn btn-green" onclick="restoreAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;">↩ Restore</button>
          <button class="btn btn-red" onclick="deleteAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;margin-left:4px;">✕ Delete</button>`
       : `<button class="btn btn-ghost" onclick="suspendAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;">Suspend</button>`;
-    const reliabilityColor = reliability>=80?'var(--green)':reliability>=50?'var(--orange)':'var(--red)';
+    const reliabilityColor = reliability>=80?'var(--green)':reliability>=60?'var(--yellow)':'var(--red)';
     return `<div class="agent-row">
       <div>
         <div class="agent-row-name">${r.first_name} ${r.last_name}${statusLabel}</div>
@@ -986,7 +1057,12 @@ async function renderAgentsPage(){
 async function suspendAgent(id, name){
   showLoading('Suspending…');
   const { error } = await db.from('representatives').update({ status:'suspended' }).eq('id', id);
-  if(error){ hideLoading(); alert('Error: '+error.message); return; }
+  if(error){
+    hideLoading();
+    if(error.message && error.message.includes("status")) showMigrationAlert('representatives');
+    else alert('Error: '+error.message);
+    return;
+  }
   await audit('flag', `Admin suspended agent ${name} (${id})`);
   hideLoading();
   await renderAgentsPage();
@@ -995,7 +1071,12 @@ async function suspendAgent(id, name){
 async function restoreAgent(id, name){
   showLoading('Restoring…');
   const { error } = await db.from('representatives').update({ status:'active' }).eq('id', id);
-  if(error){ hideLoading(); alert('Error: '+error.message); return; }
+  if(error){
+    hideLoading();
+    if(error.message && error.message.includes("status")) showMigrationAlert('representatives');
+    else alert('Error: '+error.message);
+    return;
+  }
   await audit('flag', `Admin restored agent ${name} (${id})`);
   hideLoading();
   await renderAgentsPage();
@@ -1052,8 +1133,8 @@ async function adminDoSearch(){
     const totalCol=colTx.reduce((s,t)=>s+Number(t.amount),0);
     const totalPay=payTx.reduce((s,t)=>s+Number(t.amount),0);
     const totalTxCount=(allRepTx||[]).length;
-    const reliability = totalTxCount>0 ? Math.round((colTx.length/totalTxCount)*100) : 0;
-    const reliabilityColor = reliability>=80?'var(--green)':reliability>=50?'var(--orange)':'var(--red)';
+    const reliability = await getAgentReliability(rep.id);
+    const reliabilityColor = reliability>=80?'var(--green)':reliability>=60?'var(--yellow)':'var(--red)';
     const txRows=(allRepTx||[]).slice(0,20).map(tx=>{
       const isIn=tx.type==='deposit'||tx.type==='opening';
       return `<div class="adr-plan-tx"><span class="adr-tx-info">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${tx.type}</span><span class="${isIn?'adr-tx-green':'adr-tx-red'}">${isIn?'+':'-'}${fmt(tx.amount)}</span></div>`;
@@ -1232,6 +1313,7 @@ function showConfirm(title, msg, onOk){
 // INIT
 // ═══════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', ()=>{
+  initTheme();
   // Check for existing session
   try {
     const saved=JSON.parse(sessionStorage.getItem('wagAdmin'));
