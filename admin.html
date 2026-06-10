@@ -20,6 +20,20 @@
   --green:#059669;--red:#dc2626;--orange:#d97706;--purple:#7c3aed;
   --sidebar-w:260px;
 }
+body.light{
+  --bg:#f0f2f7;--card:#ffffff;--border:#e5e7eb;--text:#111;--sub:#6b7280;
+}
+body.light .login-card{background:#fff;}
+body.light .login-inp{background:#fff;color:#111;border-color:#e5e7eb;}
+body.light .search-inp{background:#fff;color:#111;border-color:#e5e7eb;}
+body.light .settings-inp{background:#fff;color:#111;border-color:#e5e7eb;}
+body.light .mform-inp{background:#fff;color:#111;border-color:#e5e7eb;}
+body.light .disb-item{background:#f7f8fc;}
+body.light .tok-row{background:#f7f8fc;}
+body.light .fraud-flag-card{background:#fff5f5;}
+body.light .sidebar{background:#fff;}
+body.light .topbar{background:#fff;}
+body.light .stage-dot{background:#f0f2f7;}
 html,body{height:100%;overflow-x:hidden;}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
@@ -360,6 +374,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
       <button class="nav-item" id="nav-flags" onclick="switchPage('flags')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
         Fraud Flags
+        <span class="nav-badge" id="flagsBadge" style="display:none;">0</span>
       </button>
       <button class="nav-item" id="nav-tokens" onclick="switchPage('tokens')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg>
@@ -393,6 +408,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
       </button>
       <div class="topbar-title" id="topbarTitle">Overview</div>
       <span class="topbar-badge">SUPER ADMIN</span>
+      <button id="adminThemeBtn" onclick="toggleAdminTheme()" style="background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);color:var(--text);width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:6px;transition:all .2s;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
     </div>
 
     <!-- ── OVERVIEW PAGE ── -->
@@ -680,7 +698,22 @@ function showLockout(secs){
   },1000);
 }
 
-async function auditLoginAttempt(success){
+const MOON_SVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>`;
+const SUN_SVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+function toggleAdminTheme(){
+  const isLight=document.body.classList.toggle('light');
+  localStorage.setItem('wagAdminTheme', isLight?'light':'dark');
+  const btn=document.getElementById('adminThemeBtn');
+  if(btn) btn.innerHTML=isLight?SUN_SVG:MOON_SVG;
+}
+function initAdminTheme(){
+  const saved=localStorage.getItem('wagAdminTheme');
+  if(saved==='light'){ document.body.classList.add('light'); const btn=document.getElementById('adminThemeBtn'); if(btn) btn.innerHTML=SUN_SVG; }
+}
+
+function doAdminExit(){
+  doAdminLogout();
+}
   if(!db) return;
   try {
     await db.from('audit_log').insert({
@@ -791,6 +824,11 @@ async function renderOverview(){
   if(pdc>0){ badge.style.display=''; badge.textContent=pdc; }
   else badge.style.display='none';
 
+  // Fraud flags badge
+  const {count:fdc} = await db.from('fraud_flags').select('*',{count:'exact',head:true}).eq('resolved',false);
+  const fbadge=document.getElementById('flagsBadge');
+  if(fbadge){ if(fdc>0){ fbadge.style.display=''; fbadge.textContent=fdc; } else fbadge.style.display='none'; }
+
   // Pending disbursements in overview
   if(!pendDisb?.length){
     document.getElementById('ovDisbList').innerHTML='<div class="empty-state">No pending disbursements</div>';
@@ -855,12 +893,12 @@ function renderDisbCard(d, compact){
 }
 
 async function reviewDisb(disbId){
-  if(!confirm('Mark this disbursement as REVIEWED?\nThis will allow the representative to proceed with approval.')) return;
+  if(!confirm('Mark this disbursement as REVIEWED?\nThis allows the representative to proceed with approval.')) return;
   showLoading('Updating…');
-  await db.from('disbursements').update({ status:'reviewed', reviewed_at:new Date().toISOString(), reviewed_by:'admin' }).eq('id',disbId);
-  await audit('review', `Admin marked disbursement ${disbId} as reviewed`);
+  const {error} = await db.from('disbursements').update({ status:'reviewed', reviewed_at:new Date().toISOString(), reviewed_by:'admin' }).eq('id',disbId);
+  if(error){ hideLoading(); alert('Error: '+error.message); return; }
+  await audit('review',`Admin marked disbursement ${disbId} as reviewed`);
   hideLoading();
-  // Refresh both overview badge and current page
   await renderOverview();
   if(currentPage==='disbursements') await renderDisbPage();
 }
@@ -869,7 +907,7 @@ async function rejectDisb(disbId){
   if(!confirm('Reject this disbursement? This action cannot be undone.')) return;
   showLoading('Rejecting…');
   await db.from('disbursements').update({ status:'rejected' }).eq('id',disbId);
-  await audit('reject', `Admin rejected disbursement ${disbId}`);
+  await audit('reject',`Admin rejected disbursement ${disbId}`);
   hideLoading();
   await renderOverview();
   if(currentPage==='disbursements') await renderDisbPage();
@@ -890,12 +928,13 @@ function renderCustomersList(custs){
   const el = document.getElementById('custPageList');
   if(!custs?.length){ el.innerHTML='<div class="empty-state">No customers found</div>'; return; }
   el.innerHTML=`<div class="section-card"><div style="font-size:11px;color:var(--sub);margin-bottom:11px;">${custs.length} customers</div>`+
-    custs.map(c=>`<div class="cust-row">
-      <div><div class="cust-row-name">${c.first_name} ${c.last_name}</div><div class="cust-row-sub">${(c.phone||'').replace('+234','0')}</div></div>
-      <div class="cust-row-right"><div style="font-size:11px;color:var(--sub);">${fmtDate(c.created_at)}</div>
-        <button class="btn btn-ghost" onclick="suspendCustomer('${c.id}','${c.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;">Suspend</button>
-      </div>
-    </div>`).join('')+'</div>';
+    custs.map(c=>{
+      const suspended=c.status==='suspended';
+      const btns=suspended
+        ?`<button class="btn btn-green" onclick="restoreCustomer('${c.id}','${c.first_name}')" style="font-size:10px;padding:4px 9px;margin-top:4px;margin-right:3px;">Restore</button><button class="btn btn-red" onclick="maybeDeleteCustomer('${c.id}','${c.first_name}')" style="font-size:10px;padding:4px 9px;margin-top:4px;">Delete</button>`
+        :`<button class="btn btn-ghost" onclick="suspendCustomer('${c.id}','${c.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;">Suspend</button>`;
+      return `<div class="cust-row"><div><div class="cust-row-name">${c.first_name} ${c.last_name}${suspended?' <span style="color:var(--red);font-size:9px;font-weight:700;">[SUSPENDED]</span>':''}</div><div class="cust-row-sub">${(c.phone||'').replace('+234','0')}</div></div><div class="cust-row-right"><div style="font-size:11px;color:var(--sub);">${fmtDate(c.created_at)}</div><div style="display:flex;gap:4px;justify-content:flex-end;">${btns}</div></div></div>`;
+    }).join('')+'</div>';
 }
 
 function filterCustomersPage(){
@@ -909,8 +948,26 @@ async function suspendCustomer(id, name){
   showLoading('Suspending…');
   await db.from('customers').update({status:'suspended'}).eq('id',id);
   await audit('flag',`Admin suspended customer ${name} (${id})`);
+  hideLoading(); await renderCustomersPage();
+}
+async function restoreCustomer(id, name){
+  if(!confirm(`Restore ${name}? They will regain full access.`)) return;
+  showLoading('Restoring…');
+  await db.from('customers').update({status:'active'}).eq('id',id);
+  await audit('flag',`Admin restored customer ${name} (${id})`);
+  hideLoading(); await renderCustomersPage();
+}
+async function maybeDeleteCustomer(id, name){
+  showLoading('Checking balances…');
+  const {data:plans}=await db.from('plan_balances').select('balance').eq('customer_id',id);
+  const totalBal=(plans||[]).reduce((s,p)=>s+Number(p.balance||0),0);
   hideLoading();
-  await renderCustomersPage();
+  if(totalBal>0){ alert(`Cannot delete ${name}: they still have ₦${totalBal.toLocaleString('en-NG',{minimumFractionDigits:2})} in their plans. Balance must be ₦0 first.`); return; }
+  if(!confirm(`Permanently delete ${name}? This cannot be undone.`)) return;
+  showLoading('Deleting…');
+  await db.from('customers').update({status:'deleted'}).eq('id',id);
+  await audit('delete',`Admin deleted customer ${name} (${id})`);
+  hideLoading(); await renderCustomersPage();
 }
 
 // ═══════════════════════════════════════════════
@@ -920,17 +977,18 @@ async function renderAgentsPage(){
   const {data:reps} = await db.from('representatives').select('*').order('created_at',{ascending:false});
   const el = document.getElementById('agentsPageList');
   if(!reps?.length){ el.innerHTML='<div class="empty-state">No agents registered</div>'; return; }
-  el.innerHTML=`<div class="section-card"><div style="font-size:11px;color:var(--sub);margin-bottom:11px;">${reps.length} agents</div>`+
-    reps.map(r=>`<div class="agent-row">
-      <div>
-        <div class="agent-row-name">${r.first_name} ${r.last_name}</div>
-        <div class="agent-row-sub">${(r.phone||'').replace('+234','0')} · Since ${fmtDate(r.created_at)}</div>
-      </div>
-      <div class="agent-row-right">
-        <div class="agent-row-id">${r.rep_id}</div>
-        <button class="btn btn-red" onclick="suspendAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;">Suspend</button>
-      </div>
-    </div>`).join('')+'</div>';
+  // Fetch collections per agent for reliability score
+  const repRows = await Promise.all((reps||[]).map(async r=>{
+    const {data:txs}=await db.from('transactions').select('amount').eq('agent_id',r.id).eq('type','deposit');
+    const totalCol=(txs||[]).reduce((s,t)=>s+Number(t.amount),0);
+    const score=r.reliability_score||r.confirmed_count||0;
+    const suspended=r.status==='suspended';
+    const btns=suspended
+      ?`<button class="btn btn-green" onclick="restoreAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 9px;margin-top:4px;margin-right:3px;">Restore</button><button class="btn btn-red" onclick="deleteAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 9px;margin-top:4px;">Delete</button>`
+      :`<button class="btn btn-red" onclick="suspendAgent('${r.id}','${r.first_name}')" style="font-size:10px;padding:4px 10px;margin-top:4px;">Suspend</button>`;
+    return `<div class="agent-row"><div><div class="agent-row-name">${r.first_name} ${r.last_name}${suspended?' <span style="color:var(--red);font-size:9px;font-weight:700;">[SUSPENDED]</span>':''}</div><div class="agent-row-sub">${(r.phone||'').replace('+234','0')} · Since ${fmtDate(r.created_at)}</div><div style="font-size:10px;color:var(--sub);margin-top:2px;">Collections: <span style="color:var(--green);font-weight:700;">${fmt(totalCol)}</span> · Reliability: <span style="color:var(--yellow);font-weight:700;">${score}</span></div></div><div class="agent-row-right"><div class="agent-row-id">${r.rep_id}</div><div style="display:flex;gap:4px;justify-content:flex-end;">${btns}</div></div></div>`;
+  }));
+  el.innerHTML=`<div class="section-card"><div style="font-size:11px;color:var(--sub);margin-bottom:11px;">${reps.length} agents</div>${repRows.join('')}</div>`;
 }
 
 async function suspendAgent(id, name){
@@ -938,8 +996,21 @@ async function suspendAgent(id, name){
   showLoading('Suspending…');
   await db.from('representatives').update({status:'suspended'}).eq('id',id);
   await audit('flag',`Admin suspended agent ${name} (${id})`);
-  hideLoading();
-  await renderAgentsPage();
+  hideLoading(); await renderAgentsPage();
+}
+async function restoreAgent(id, name){
+  if(!confirm(`Restore agent ${name}? They will regain access.`)) return;
+  showLoading('Restoring…');
+  await db.from('representatives').update({status:'active'}).eq('id',id);
+  await audit('flag',`Admin restored agent ${name} (${id})`);
+  hideLoading(); await renderAgentsPage();
+}
+async function deleteAgent(id, name){
+  if(!confirm(`Permanently delete agent ${name}? This cannot be undone.`)) return;
+  showLoading('Deleting…');
+  await db.from('representatives').update({status:'deleted'}).eq('id',id);
+  await audit('delete',`Admin deleted agent ${name} (${id})`);
+  hideLoading(); await renderAgentsPage();
 }
 
 // ═══════════════════════════════════════════════
@@ -978,12 +1049,22 @@ async function adminDoSearch(){
   } else {
     const {data:rep}=await db.from('representatives').select('*').eq('rep_id',val).single();
     if(!rep){ hideLoading(); setMsg('adminSearchResult','<div class="msg-err">Agent not found</div>'); return; }
-    const {data:colTx}=await db.from('transactions').select('amount').eq('agent_id',rep.id).eq('type','deposit');
-    const {data:payTx}=await db.from('transactions').select('amount').eq('agent_id',rep.id).eq('type','payout');
-    const totalCol=(colTx||[]).reduce((s,t)=>s+Number(t.amount),0);
-    const totalPay=(payTx||[]).reduce((s,t)=>s+Number(t.amount),0);
+    const {data:allRepTx}=await db.from('transactions').select('*,customers(first_name,last_name)').eq('agent_id',rep.id).order('created_at',{ascending:false});
+    const colTx=(allRepTx||[]).filter(t=>t.type==='deposit'||t.type==='opening');
+    const payTx=(allRepTx||[]).filter(t=>t.type==='payout');
+    const totalCol=colTx.reduce((s,t)=>s+Number(t.amount),0);
+    const totalPay=payTx.reduce((s,t)=>s+Number(t.amount),0);
+    const score=rep.reliability_score||rep.confirmed_count||0;
+    const txRows=(allRepTx||[]).map(tx=>{
+      const isIn=tx.type==='deposit'||tx.type==='opening';
+      const custName=tx.customers?tx.customers.first_name+' '+tx.customers.last_name:'—';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;">
+        <div><div style="font-weight:600;">${custName}</div><div style="color:var(--sub);font-size:10px;">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${tx.type}</div></div>
+        <div style="font-weight:700;color:${isIn?'var(--green)':'var(--red)'};">${isIn?'+':'-'}${fmt(tx.amount)}</div>
+      </div>`;
+    }).join('') || '<div style="color:var(--sub);text-align:center;padding:14px;font-size:12px;">No transactions yet</div>';
     hideLoading();
-    setMsg('adminSearchResult',`<div class="section-card"><div class="adr-name" style="margin-bottom:6px;">${rep.first_name} ${rep.last_name}</div><div class="adr-phone">${(rep.phone||'').replace('+234','0')}</div><div class="adr-since">Agent ID: ${rep.rep_id} · Since ${fmtDate(rep.created_at)}</div><div style="display:flex;gap:10px;margin-top:12px;"><div style="flex:1;background:rgba(5,150,105,.1);border-radius:9px;padding:10px;text-align:center;"><div style="font-size:10px;color:var(--sub);">Total Collected</div><div style="font-size:16px;font-weight:800;color:var(--green);">${fmt(totalCol)}</div></div><div style="flex:1;background:rgba(220,38,38,.1);border-radius:9px;padding:10px;text-align:center;"><div style="font-size:10px;color:var(--sub);">Total Paid Out</div><div style="font-size:16px;font-weight:800;color:var(--red);">${fmt(totalPay)}</div></div></div></div>`);
+    setMsg('adminSearchResult',`<div class="section-card"><div class="adr-name" style="margin-bottom:6px;">${rep.first_name} ${rep.last_name}</div><div class="adr-phone">${(rep.phone||'').replace('+234','0')}</div><div class="adr-since">Agent ID: ${rep.rep_id} · Since ${fmtDate(rep.created_at)}</div><div style="display:flex;gap:10px;margin-top:12px;margin-bottom:14px;"><div style="flex:1;background:rgba(5,150,105,.1);border-radius:9px;padding:10px;text-align:center;"><div style="font-size:10px;color:var(--sub);">Total Collected</div><div style="font-size:16px;font-weight:800;color:var(--green);">${fmt(totalCol)}</div></div><div style="flex:1;background:rgba(220,38,38,.1);border-radius:9px;padding:10px;text-align:center;"><div style="font-size:10px;color:var(--sub);">Total Paid Out</div><div style="font-size:16px;font-weight:800;color:var(--red);">${fmt(totalPay)}</div></div><div style="flex:1;background:rgba(255,186,9,.1);border-radius:9px;padding:10px;text-align:center;"><div style="font-size:10px;color:var(--sub);">Reliability</div><div style="font-size:16px;font-weight:800;color:var(--yellow);">${score}</div></div></div><div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:8px;">All Transactions (${(allRepTx||[]).length})</div>${txRows}</div>`);
   }
 }
 
@@ -1080,7 +1161,12 @@ function filterAuditLog(){
 function renderAuditRows(containerId, logs){
   const el=document.getElementById(containerId);
   if(!logs?.length){ if(el) el.innerHTML='<div class="empty-state">No entries</div>'; return; }
-  el.innerHTML=logs.slice(0,20).map(e=>`<div class="audit-item"><div class="audit-action ${e.action}">${e.action?.toUpperCase()}${e.amount?' — '+fmt(e.amount):''}</div><div class="audit-desc">${e.description}</div><div class="audit-time">${fmtDate(e.created_at)} · ${fmtTime(e.created_at)} · ${e.user_role}</div></div>`).join('');
+  el.innerHTML=logs.slice(0,20).map(e=>{
+    // Show agent name if present (stored in user_id field for rep actions, or in description)
+    const agentNote = (e.action==='deposit'||e.action==='collection') && e.agent_name
+      ? ` · Agent: <span style="color:var(--yellow);font-weight:700;">${e.agent_name}</span>` : '';
+    return `<div class="audit-item"><div class="audit-action ${e.action}">${e.action?.toUpperCase()}${e.amount?' — '+fmt(e.amount):''}</div><div class="audit-desc">${e.description}${agentNote}</div><div class="audit-time">${fmtDate(e.created_at)} · ${fmtTime(e.created_at)} · ${e.user_role||'—'}${e.user_id&&e.user_id!=='admin'?' · ID: '+e.user_id:''}</div></div>`;
+  }).join('');
 }
 
 function renderAuditEntries(logs){
@@ -1146,6 +1232,7 @@ function showConfirm(title, msg, onOk){
 // INIT
 // ═══════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', ()=>{
+  initAdminTheme();
   // Check for existing session
   try {
     const saved=JSON.parse(sessionStorage.getItem('wagAdmin'));
