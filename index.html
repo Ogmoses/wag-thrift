@@ -283,8 +283,14 @@ body.dark .bt-row{border-color:#2a2a2a;}
 .bt-val{color:var(--blue);font-size:14px;font-weight:700;}
 body.dark .bt-val{color:var(--yellow);}
 .bt-val-s{color:var(--sub);font-size:14px;font-weight:700;}
-.collect-btn{width:100%;background:var(--yellow);color:#111;border:none;padding:13px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s;}
-.collect-btn:hover{background:#e6a800;}
+/* ── SAVE MONEY (deposit) button — green, safe ── */
+.collect-btn{width:100%;background:var(--green);color:#fff;border:none;padding:13px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s;box-shadow:0 3px 10px rgba(5,150,105,.25);}
+.collect-btn:hover{background:#047857;transform:translateY(-1px);}
+.collect-btn:active{transform:scale(.97);}
+/* ── WITHDRAW MONEY button — bold red/orange, clearly distinct ── */
+.cbtn-emg{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;box-shadow:0 3px 10px rgba(220,38,38,.3);}
+.cbtn-emg:hover{background:linear-gradient(135deg,#b91c1c,#991b1b);transform:translateY(-1px);}
+body.dark .cbtn-emg{background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fca5a5;box-shadow:0 3px 10px rgba(220,38,38,.2);}
 .dis-card{background:#fff;border-radius:13px;padding:14px;box-shadow:0 2px 7px rgba(0,0,0,.06);margin-bottom:9px;animation:fadeUp .28s ease;transition:background .3s;}
 body.dark .dis-card{background:#1c1c1c;}
 .dis-type{font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
@@ -654,7 +660,7 @@ button .ic, a .ic{vertical-align:middle;}
  </div>
  </div>
  <div id="planActionBtns" class="cust-btns">
- <button class="cbtn cbtn-emg" onclick="openEmgModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Request Disbursement</button>
+ <button class="cbtn cbtn-emg" onclick="openEmgModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M12 2v13M5 9l7-7 7 7"/><path d="M4 22h16"/></svg>Withdraw Money</button>
  <button class="cbtn cbtn-del" onclick="closePlan()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Close Plan</button>
  </div>
  <div id="planClosedNotice" style="display:none;margin:0 13px 11px;">
@@ -758,11 +764,11 @@ button .ic, a .ic{vertical-align:middle;}
  </div>
  <div style="padding-bottom:80px;">
  <div class="rep-stats">
- <div class="stat-dark"><div class="sl">Today's Collections</div><div class="sa" id="repTodayAmt">₦0.00</div><div class="ss" id="repTodayCnt">0 transactions</div></div>
+ <div class="stat-dark"><div class="sl">Today's Deposits</div><div class="sa" id="repTodayAmt">₦0.00</div><div class="ss" id="repTodayCnt">0 transactions</div></div>
  <div class="stat-light"><div class="sl">Reliability Score</div><div class="sa" id="repScoreVal">—%</div><div class="ss" id="repScoreLbl">calculating…</div></div>
  </div>
  <div class="rep-stats" style="margin-top:10px;">
- <div class="stat-light"><div class="sl">All-Time Collected</div><div class="sa" id="repAllAmt">₦0.00</div><div class="ss">total</div></div>
+ <div class="stat-light"><div class="sl">Total Saved</div><div class="sa" id="repAllAmt">₦0.00</div><div class="ss">total</div></div>
  <div class="stat-light"><div class="sl">Confirmations</div><div class="sa" id="repConfirmed">0</div><div class="ss">approved</div></div>
  </div>
  <div class="search-card">
@@ -779,10 +785,10 @@ button .ic, a .ic{vertical-align:middle;}
  <div class="bt-row"><span class="bt-lbl">Balance</span><span class="bt-val" id="rpBal">₦0.00</span></div>
  <div class="bt-row" style="border-bottom:none;"><span class="bt-lbl">Regular Contribution</span><span class="bt-val-s" id="rpTgt">₦0.00</span></div>
  </div>
- <button class="collect-btn" onclick="openCollectModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Record Collection</button>
+ <button class="collect-btn" onclick="openCollectModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M12 22V9M5 15l7 7 7-7"/><path d="M4 2h16"/></svg>Save Money</button>
  </div>
  <div style="padding:0 13px;">
- <div style="font-size:14px;font-weight:700;color:var(--blue);margin-bottom:9px;">Pending Disbursements</div>
+ <div style="font-size:14px;font-weight:700;color:var(--blue);margin-bottom:9px;">Pending Withdrawals</div>
  <div id="repDisbList"></div>
  </div>
  </div>
@@ -790,11 +796,11 @@ button .ic, a .ic{vertical-align:middle;}
  <!-- Rep Transactions — always visible, outside repCustCard -->
  <div style="padding:11px 13px 32px;">
  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;">
- <div class="search-card-title">My Recent Collections</div>
+ <div class="search-card-title">My Recent Deposits</div>
  <button class="tx-viewall" onclick="openRepTxHistory()" style="background:none;border:none;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;">View all →</button>
  </div>
  <div id="repTxPreview" class="wcard" style="padding:8px;">
- <div class="tx-empty">No collections yet</div>
+ <div class="tx-empty">No deposits yet</div>
  </div>
  </div>
  </div>
@@ -819,12 +825,12 @@ button .ic, a .ic{vertical-align:middle;}
 <div class="subpage" id="repTxSubpage">
  <div class="dash-header">
   <button onclick="repTab('home')" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
-  <div class="hdr-info"><div class="hdr-name">All Collections</div></div>
+  <div class="hdr-info"><div class="hdr-name">All Deposits</div></div>
  </div>
  <div style="padding:12px 13px 0;">
   <select id="repTxCatFilter" onchange="renderRepTxSubpage()" style="width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-size:14px;background:#fff;color:var(--text);margin-bottom:10px;">
    <option value="all">All Types</option>
-   <option value="deposit">Collections</option>
+   <option value="deposit">Deposits</option>
    <option value="payout">Payouts</option>
   </select>
  </div>
@@ -873,7 +879,7 @@ button .ic, a .ic{vertical-align:middle;}
 <div id="repTxHistoryView" class="view">
  <div class="dash-header">
  <button onclick="showView('repView')" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
- <div class="hdr-info"><div class="hdr-name">All My Collections</div></div>
+ <div class="hdr-info"><div class="hdr-name">All My Deposits</div></div>
  <div class="hdr-right"></div>
  </div>
  <div id="repAllTxList" style="padding:13px 13px 40px;"></div>
@@ -988,10 +994,10 @@ button .ic, a .ic{vertical-align:middle;}
 <div id="agentIdModal" class="modal"><div class="msheet" style="max-width:480px;text-align:center;"><div class="m-handle"></div><div style="font-size:36px;margin-bottom:7px;"></div><div class="m-title" style="text-align:center;">Account Created!</div><p style="color:var(--sub);font-size:13px;margin-bottom:4px;">Save or screenshot your Agent ID — you'll use it to log in.</p><div class="agentid-card"><div class="agentid-lbl">Your Agent ID</div><div class="agentid-val" id="newRepId">------</div></div><div class="msg-info">! This is your login credential. Keep it safe!</div><button class="btn btn-blue" onclick="closeModal('agentIdModal');setAuthTab('signin')">I've Saved My Agent ID</button></div></div>
 <div id="forgotModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('forgotModal')">×</button><div class="m-handle"></div><div class="m-title">Reset Password</div><div class="msg-info">Enter your email and we'll send you a password reset link.</div><div class="mform-group"><label class="form-lbl">Email Address</label><input type="email" id="resetEmail" class="form-inp"></div><div id="resetMsg"></div><button class="btn btn-blue" onclick="doForgotPin()">Send Password Reset Link</button></div></div>
 <div id="newPlanModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('newPlanModal')">×</button><div class="m-handle"></div><div class="m-title">New Savings Plan</div><div class="mform-group"><label class="form-lbl">Plan Name</label><input type="text" id="npName" class="form-inp" placeholder="e.g. School Fees"></div><div class="mform-group"><label class="form-lbl">Savings Frequency</label><select id="npFreq" class="form-inp"><option value="Daily" selected>Daily</option></select></div><div class="mform-group"><label class="form-lbl">Regular Contribution (₦)</label><input type="number" id="npContrib" class="form-inp" placeholder="2000" min="1"></div><div id="npMsg"></div><button class="btn btn-blue" onclick="doCreatePlan()" style="margin-top:8px;">Create Plan</button></div></div>
-<div id="emgModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('emgModal')">×</button><div class="m-handle"></div><div class="m-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Request Disbursement</div><div class="msg-info">A representative will review and approve your request.</div><div class="mform-group"><label class="form-lbl">Plan</label><select id="emgPlan" class="form-inp"><option value="">— Select plan —</option></select></div><div class="mform-group"><label class="form-lbl">Amount Requested (₦)</label><input type="number" id="emgAmt" class="form-inp" placeholder="5000" min="1"></div><div class="mform-group"><label class="form-lbl">Reason (Optional)</label><textarea id="emgReason" class="form-inp" style="resize:vertical;min-height:70px;"></textarea></div><div id="emgMsg"></div><button class="btn btn-blue" onclick="doEmgRequest()" style="margin-top:8px;">Submit Request</button></div></div>
-<div id="milestoneModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('milestoneModal')">×</button><div class="m-handle"></div><div class="mile-body"><div class="mile-ico"></div><div class="mile-title" id="mileTitle">Plan Complete!</div><div class="mile-msg" id="mileMsg">Your savings plan has reached its target.</div><div style="display:flex;flex-direction:column;gap:9px;"><button class="btn btn-blue" onclick="milAct('payout')">Request Payout / Disbursement</button><button class="btn btn-outline" onclick="milAct('extend')">Extend Target Date</button><button class="btn btn-outline" onclick="milAct('increase')">Start New Plan</button></div></div></div></div>
-<div id="collectModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('collectModal')">×</button><div class="m-handle"></div><div class="m-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Record Collection</div><div class="mform-group"><label class="form-lbl">Amount Received (₦)</label><input type="number" id="colAmt" class="form-inp" placeholder="5000" min="1"></div><div class="mform-group"><label class="form-lbl">Payment Method</label><select id="colMethod" class="form-inp"><option value="">Select method</option><option value="Cash">Cash</option><option value="Bank Transfer">Bank Transfer</option><option value="Mobile Money">Mobile Money</option></select></div><div class="mform-group"><label class="form-lbl">Notes (Optional)</label><textarea id="colNotes" class="form-inp" style="resize:vertical;min-height:55px;"></textarea></div><div id="colMsg"></div><button class="btn btn-blue" onclick="doCollection()" style="margin-top:8px;">Confirm Collection</button></div></div>
-<div id="receiptModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('receiptModal')">×</button><div class="m-handle"></div><div class="m-title">Collection Receipt</div><div id="receiptContent"></div><button class="btn btn-blue" onclick="closeModal('receiptModal')" style="margin-top:6px;">Done</button></div></div>
+<div id="emgModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('emgModal')">×</button><div class="m-handle"></div><div class="m-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;color:var(--red);"><path d="M12 2v13M5 9l7-7 7 7"/><path d="M4 22h16"/></svg>Withdraw Money</div><div class="msg-warn">Your agent will review and process your withdrawal.</div><div class="mform-group"><label class="form-lbl">Plan</label><select id="emgPlan" class="form-inp"><option value="">— Select plan —</option></select></div><div class="mform-group"><label class="form-lbl">Amount to Withdraw (₦)</label><input type="number" id="emgAmt" class="form-inp" placeholder="5000" min="1"></div><div class="mform-group"><label class="form-lbl">Reason (Optional)</label><textarea id="emgReason" class="form-inp" style="resize:vertical;min-height:70px;"></textarea></div><div id="emgMsg"></div><button class="btn" style="background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;margin-top:8px;box-shadow:0 3px 10px rgba(220,38,38,.3);" onclick="doEmgRequest()">Submit Withdrawal</button></div></div>
+<div id="milestoneModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('milestoneModal')">×</button><div class="m-handle"></div><div class="mile-body"><div class="mile-ico"></div><div class="mile-title" id="mileTitle">Plan Complete!</div><div class="mile-msg" id="mileMsg">Your savings plan has reached its target.</div><div style="display:flex;flex-direction:column;gap:9px;"><button class="btn btn-blue" onclick="milAct('payout')">Withdraw Money</button><button class="btn btn-outline" onclick="milAct('extend')">Extend Target Date</button><button class="btn btn-outline" onclick="milAct('increase')">Start New Plan</button></div></div></div></div>
+<div id="collectModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('collectModal')">×</button><div class="m-handle"></div><div class="m-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;color:var(--green);"><path d="M12 22V9M5 15l7 7 7-7"/><path d="M4 2h16"/></svg>Save Money</div><div class="mform-group"><label class="form-lbl">Amount (₦)</label><input type="number" id="colAmt" class="form-inp" placeholder="5000" min="1"></div><div class="mform-group"><label class="form-lbl">Payment Method</label><select id="colMethod" class="form-inp"><option value="">Select method</option><option value="Cash">Cash</option><option value="Bank Transfer">Bank Transfer</option><option value="Mobile Money">Mobile Money</option></select></div><div class="mform-group"><label class="form-lbl">Notes (Optional)</label><textarea id="colNotes" class="form-inp" style="resize:vertical;min-height:55px;"></textarea></div><div id="colMsg"></div><button class="btn" style="background:var(--green);color:#fff;margin-top:8px;box-shadow:0 3px 10px rgba(5,150,105,.25);" onclick="doCollection()">Confirm Deposit</button></div></div>
+<div id="receiptModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('receiptModal')">×</button><div class="m-handle"></div><div class="m-title">Deposit Receipt</div><div id="receiptContent"></div><button class="btn btn-blue" onclick="closeModal('receiptModal')" style="margin-top:6px;">Done</button></div></div>
 
 <div id="payPinModal" class="modal">
  <div class="msheet" style="max-width:480px;position:relative;">
@@ -1398,7 +1404,7 @@ const allTxs=[
 ].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
  const txList=document.getElementById('txList');
  if(!allTxs||!allTxs.length){ txList.innerHTML='<div class="tx-empty">No transactions yet</div>'; }
- else{ txList.innerHTML=allTxs.slice(0,3).map(tx=>{ const isIn=tx.type==='deposit'||tx.type==='opening'; const label=tx.type==='opening'?'Opening Contribution':tx.type==='deposit'?'Collection Deposit':tx.type==='rejected'?'Rejected Disbursement':'Payout'; return `<div class="tx-row"><div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div><div class="tx-body"><div class="tx-name">${label}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${tx.ref||'—'}</div></div><div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div></div>`; }).join(''); }
+ else{ txList.innerHTML=allTxs.slice(0,3).map(tx=>{ const isIn=tx.type==='deposit'||tx.type==='opening'; const label=tx.type==='opening'?'Opening Contribution':tx.type==='deposit'?'Deposit':tx.type==='rejected'?'Rejected Withdrawal':'Payout'; return `<div class="tx-row"><div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div><div class="tx-body"><div class="tx-name">${label}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${tx.ref||'—'}</div></div><div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div></div>`; }).join(''); }
  if(false&&!plan.milestone_shown){ document.getElementById('mileTitle').textContent=plan.name+' Goal Reached! '; document.getElementById('mileMsg').textContent='Your "'+plan.name+'" plan hit its target of '+fmt(plan.target_amount)+'. What would you like to do?'; showModal('milestoneModal'); }
 }
 
@@ -1441,7 +1447,7 @@ async function closePlan(){
  if(!activePlanId) return;
  const { data:pb } = await db.from('plan_balances').select('balance,name').eq('plan_id',activePlanId).single();
  const bal=Number(pb?.balance||0);
- if(bal>0){ alert('× Cannot close "'+pb.name+'"\n\nBalance remaining: '+fmt(bal)+'\n\nPlease request a full disbursement first. Once your balance is ₦0.00, you can close this plan.'); return; }
+ if(bal>0){ alert('× Cannot close "'+pb.name+'"\n\nBalance remaining: '+fmt(bal)+'\n\nPlease withdraw all your money first. Once your balance is ₦0.00, you can close this plan.'); return; }
  if(!confirm('Close "'+pb.name+'"? This will make it inactive. You can reactivate later.')) return;
  showLoading('Closing plan…');
  await db.from('plans').update({status:'closed'}).eq('id',activePlanId);
@@ -1476,7 +1482,7 @@ async function deleteActivePlan(){
  await renderCustDash();
 }
 
-function openEmgModal(){ requirePayPin('Payment PIN','Enter your payment PIN to request a disbursement.',()=>_openEmgModal()); }
+function openEmgModal(){ requirePayPin('Payment PIN','Enter your payment PIN to withdraw money.',()=>_openEmgModal()); }
 async function _openEmgModal(){
  const user=getUser();
  const { data:plans } = await db.from('plan_balances').select('*').eq('customer_id',user.id).eq('status','active').neq('status','deleted');
@@ -1553,7 +1559,7 @@ async function repDoSearch(){
  if(plans?.length===1){ dd.value=plans[0].plan_id; repOnPlanChange(); } else document.getElementById('repPlanDetails').style.display='none';
  const { data:disbs } = await db.from('disbursements').select('*').eq('customer_id',cust.id).in('status',['pending','reviewed','approved']);
  const dList=document.getElementById('repDisbList');
- if(!disbs?.length){ dList.innerHTML='<div style="text-align:center;color:var(--sub);padding:16px;font-size:12px;">No pending disbursements</div>'; }
+ if(!disbs?.length){ dList.innerHTML='<div style="text-align:center;color:var(--sub);padding:16px;font-size:12px;">No pending withdrawals</div>'; }
  else {
  const stages=['pending','reviewed','approved','paid'];
  dList.innerHTML=(disbs||[]).map(d=>{
@@ -1588,7 +1594,7 @@ async function repOnPlanChange(){
  det.style.display='block';
 }
 
-function openCollectModal(){ if(!repFoundCust){ alert('Search for a customer first'); return; } if(!repSelectedPlan){ alert('Please select a plan first'); return; } requirePayPin('Payment PIN','Enter your payment PIN to record this collection.',()=>showModal('collectModal')); }
+function openCollectModal(){ if(!repFoundCust){ alert('Search for a customer first'); return; } if(!repSelectedPlan){ alert('Please select a plan first'); return; } requirePayPin('Payment PIN','Enter your payment PIN to save this deposit.',()=>showModal('collectModal')); }
 
 async function doCollection(){
  const amtVal=document.getElementById('colAmt').value.trim(), method=document.getElementById('colMethod').value, notes=document.getElementById('colNotes').value.trim();
@@ -1603,7 +1609,7 @@ async function doCollection(){
   setMsg('colMsg',`<div class="msg-err">Amount must be a multiple of the regular contribution (${fmt(regContrib)}).<br>e.g. ${multiples}…</div>`);
   return;
  }
- showLoading('Recording collection…');
+ showLoading('Saving deposit…');
  const { count:txCount } = await db.from('transactions').select('*',{count:'exact',head:true}).eq('plan_id',repSelectedPlan.id);
  const txType = (txCount===0) ? 'opening' : 'deposit';
  await db.from('transactions').insert({ ref, type:txType, amount:amt, plan_id:repSelectedPlan.id, customer_id:repFoundCust.id, agent_id:rep.id, method, notes });
@@ -1623,7 +1629,7 @@ function showReceipt(amount,plan,rep,cust,ref,method,newBal){
  document.getElementById('receiptContent').innerHTML=`
  <div class="receipt-wrap">
  <div class="receipt-logo"></div>
- <div class="receipt-title">WAG Collection Receipt</div>
+ <div class="receipt-title">WAG Deposit Receipt</div>
  <div class="receipt-amount">${fmt(amount)}</div>
  <div class="receipt-plan">${plan.name||'Savings Plan'}</div>
  <div class="receipt-row"><span class="receipt-lbl">Date</span><span class="receipt-val">${fmtDate(now.toISOString())}</span></div>
@@ -1640,12 +1646,12 @@ function showReceipt(amount,plan,rep,cust,ref,method,newBal){
 async function doApproveDisb(disbId,planId,amount){
  const rep=getUser();
  const { data:disbCheck } = await db.from('disbursements').select('status').eq('id',disbId).single();
- if(!disbCheck||disbCheck.status!=='reviewed'){ alert('This disbursement must be reviewed by a Super Admin before you can approve it.'); return; }
+ if(!disbCheck||disbCheck.status!=='reviewed'){ alert('This withdrawal must be reviewed by a Super Admin before you can approve it.'); return; }
  const { data:bal } = await db.from('plan_balances').select('balance').eq('plan_id',planId).single();
  if((bal?.balance||0)<amount){ alert(`Insufficient plan balance.\nAvailable: ${fmt(bal?.balance)}`); return; }
- showLoading('Approving disbursement…');
+ showLoading('Processing withdrawal…');
  const ref=genRef();
- await db.from('transactions').insert({ ref, type:'payout', amount, plan_id:planId, customer_id:repFoundCust.id, agent_id:rep.id, method:'Cash', notes:'Approved disbursement' });
+ await db.from('transactions').insert({ ref, type:'payout', amount, plan_id:planId, customer_id:repFoundCust.id, agent_id:rep.id, method:'Cash', notes:'Approved withdrawal' });
  await db.from('disbursements').update({ status:'paid', confirmed_by:rep.id, confirmed_at:new Date().toISOString() }).eq('id',disbId);
  await db.from('representatives').update({ confirmed_count:(rep.confirmed_count||0)+1 }).eq('id',rep.id);
  await audit('approve',rep.id,'representative',`Approved & paid ${fmt(amount)} to ${repFoundCust.first_name} ${repFoundCust.last_name} — Ref: ${ref}`,amount,planId);
@@ -1658,7 +1664,7 @@ async function doRejectDisb(disbId){
  const rep=getUser();
  await db.from('disbursements').update({ status:'rejected' }).eq('id',disbId);
  await audit('reject',rep.id,'representative',`Rejected disbursement`,null,null);
- alert('Disbursement rejected'); await repDoSearch();
+ alert('Withdrawal rejected'); await repDoSearch();
 }
 
 // ═══════════════════════════════════════════════
@@ -1980,7 +1986,7 @@ async function loadRepTxPreview(){
  const isPayout=tx.type==='payout';
  const isRejected=tx.type==='rejected_disb';
  const isIn=!isPayout&&!isRejected;
- const label=tx.type==='opening'?'Opening':isPayout?'Payout':isRejected?'Rejected Disbursement':'Collection';
+ const label=tx.type==='opening'?'Opening':isPayout?'Payout':isRejected?'Rejected Withdrawal':'Deposit';
  return `<div class="tx-row">
  <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div>
  <div class="tx-body">
@@ -2020,7 +2026,7 @@ async function openRepTxHistory(){
     const isPayout=tx.type==='payout';
     const isRejected=tx.type==='rejected_disb';
     const isIn=!isPayout&&!isRejected;
-    const label=tx.type==='opening'?'Opening':isPayout?'Payout':isRejected?'Rejected Disbursement':'Collection';
+    const label=tx.type==='opening'?'Opening':isPayout?'Payout':isRejected?'Rejected Withdrawal':'Deposit';
     return `
     <div class="tx-row" style="background:var(--white);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:11px;">
       <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}" style="width:36px;height:36px;border-radius:10px;background:${isIn?'#d1fae5':'#fee2e2'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${isIn?'↓':'↑'}</div>
@@ -2156,7 +2162,7 @@ function drawCal(){
     let title='';
     if(isPayout){
       cls+=' c-payout';
-      title='Payout / Disbursement day';
+      title='Withdrawal day';
     } else if(isCovered){
       cls+=' c-green';
       title='Paid';
@@ -2230,7 +2236,7 @@ function renderFullTxList(txs){
  if(!txs||!txs.length){ el.innerHTML='<div class="tx-hist-empty">No transactions match your filters</div>'; return; }
  el.innerHTML=txs.map(tx=>{
  const isIn=tx.type==='deposit'||tx.type==='opening';
- const typeLabel=tx.type==='opening'?'Opening Contribution':tx.type==='deposit'?'Collection Deposit':'Payout';
+ const typeLabel=tx.type==='opening'?'Opening Contribution':tx.type==='deposit'?'Deposit':'Payout';
  return `<div class="tx-row" class="tx-full-row">
  <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div>
  <div class="tx-body">
@@ -2483,7 +2489,7 @@ async function renderRepTxSubpage(){
   if(!filtered.length){ el.innerHTML='<div class="tx-empty">No transactions yet</div>'; return; }
   el.innerHTML=filtered.map(tx=>{
     const isIn=tx.type!=='payout';
-    const lbl=tx.type==='opening'?'Opening':tx.type==='payout'?'Payout':'Collection';
+    const lbl=tx.type==='opening'?'Opening':tx.type==='payout'?'Payout':'Deposit';
     const badge=`<span style="background:${isIn?'#d1fae5':'#fee2e2'};color:${isIn?'#065f46':'#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${tx.type}</span>`;
     return `<div class="tx-row">
      <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div>
@@ -2647,7 +2653,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
    <svg viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
   </div>
   <div style="font-size:18px;font-weight:800;color:var(--blue);margin-bottom:7px;">Set Payment PIN</div>
-  <div style="font-size:13px;color:var(--sub);margin-bottom:20px;line-height:1.6;">Create a 4–6 digit PIN you'll use to confirm disbursements and withdrawals.</div>
+  <div style="font-size:13px;color:var(--sub);margin-bottom:20px;line-height:1.6;">Create a 4–6 digit PIN you'll use to confirm withdrawals and deposits.</div>
   <div class="pin-wrap" style="margin-bottom:14px;">
    <input type="password" id="setupPinInp" class="form-inp" placeholder="e.g. 1234" maxlength="6" inputmode="numeric" style="text-align:center;letter-spacing:8px;font-size:24px;">
    <button type="button" class="pw-eye" onclick="togglePw('setupPinInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>

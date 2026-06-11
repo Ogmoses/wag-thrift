@@ -424,7 +424,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
           <div class="ov-card"><div class="ov-lbl">Field Agents</div><div class="ov-val" id="ovReps">—</div><div class="ov-sub">active</div></div>
           <div class="ov-card green"><div class="ov-lbl">Total Deposits</div><div class="ov-val" id="ovDeposits">—</div><div class="ov-sub">all time</div></div>
           <div class="ov-card red"><div class="ov-lbl">Total Payouts</div><div class="ov-val" id="ovPayouts">—</div><div class="ov-sub">disbursed</div></div>
-          <div class="ov-card orange"><div class="ov-lbl">Pending Disbursements</div><div class="ov-val" id="ovPendingDisb">—</div><div class="ov-sub">awaiting review</div></div>
+          <div class="ov-card orange"><div class="ov-lbl">Pending Withdrawals</div><div class="ov-val" id="ovPendingDisb">—</div><div class="ov-sub">awaiting review</div></div>
           <div class="ov-card"><div class="ov-lbl">Active Plans</div><div class="ov-val" id="ovPlans">—</div><div class="ov-sub">in progress</div></div>
         </div>
 
@@ -506,7 +506,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
     <div class="page" id="page-analytics">
       <div class="page-inner">
         <div class="overview-grid" id="analyticsGrid"></div>
-        <div class="bar-chart-wrap"><div class="bar-chart-title">Daily Collections (Last 7 Days)</div><div class="bar-chart" id="barChart"></div></div>
+        <div class="bar-chart-wrap"><div class="bar-chart-title">Daily Deposits (Last 7 Days)</div><div class="bar-chart" id="barChart"></div></div>
         <div class="section-card"><div class="section-card-title">Top Performing Agents</div><div id="topAgentsList"></div></div>
         <button onclick="deleteInactiveUsers()" class="btn btn-red" style="width:100%;justify-content:center;margin-top:4px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></svg>
@@ -798,7 +798,7 @@ function closeSidebar(){
 }
 
 const PAGE_TITLES = {
-  overview:'Overview', disbursements:'Disbursements', customers:'Customers',
+  overview:'Overview', disbursements:'Withdrawals', customers:'Customers',
   agents:'Field Agents', search:'Search', analytics:'Analytics',
   flags:'Fraud Flags', tokens:'Tokens', auditlog:'Audit Log', settings:'Settings'
 };
@@ -865,7 +865,7 @@ async function renderOverview(){
 
   // Pending disbursements in overview
   if(!pendDisb?.length){
-    document.getElementById('ovDisbList').innerHTML='<div class="empty-state">No pending disbursements</div>';
+    document.getElementById('ovDisbList').innerHTML='<div class="empty-state">No pending withdrawals</div>';
   } else {
     document.getElementById('ovDisbList').innerHTML=pendDisb.map(d=>renderDisbCard(d, true)).join('');
   }
@@ -889,7 +889,7 @@ async function renderDisbPage(){
   if(statusFilter) q = q.eq('status',statusFilter);
   const {data:disbs} = await q;
   const el = document.getElementById('disbPageList');
-  if(!disbs?.length){ el.innerHTML='<div class="empty-state">No disbursements found</div>'; return; }
+  if(!disbs?.length){ el.innerHTML='<div class="empty-state">No withdrawals found</div>'; return; }
   el.innerHTML = disbs.map(d=>renderDisbCard(d, false)).join('');
 }
 
@@ -932,10 +932,10 @@ function renderDisbCard(d, compact){
 }
 
 async function reviewDisb(disbId){
-  if(!confirm('Mark this disbursement as REVIEWED?\nThis will allow the representative to proceed with approval.')) return;
+  if(!confirm('Mark this withdrawal as REVIEWED?\nThis allows the representative to proceed with approval.')) return;
   showLoading('Updating…');
   await db.from('disbursements').update({ status:'reviewed', reviewed_at:new Date().toISOString(), reviewed_by:'admin' }).eq('id',disbId);
-  await audit('review', `Admin marked disbursement ${disbId} as reviewed`);
+  await audit('review', `Admin marked withdrawal ${disbId} as reviewed`);
   hideLoading();
   // Refresh both overview badge and current page
   await renderOverview();
@@ -943,10 +943,10 @@ async function reviewDisb(disbId){
 }
 
 async function rejectDisb(disbId){
-  if(!confirm('Reject this disbursement? This action cannot be undone.')) return;
+  if(!confirm('Reject this withdrawal? This action cannot be undone.')) return;
   showLoading('Rejecting…');
   await db.from('disbursements').update({ status:'rejected' }).eq('id',disbId);
-  await audit('reject', `Admin rejected disbursement ${disbId}`);
+  await audit('reject', `Admin rejected withdrawal ${disbId}`);
   hideLoading();
   await renderOverview();
   if(currentPage==='disbursements') await renderDisbPage();
