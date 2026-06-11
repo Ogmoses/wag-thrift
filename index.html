@@ -1072,10 +1072,28 @@ function setUser(u){ sessionStorage.setItem('wagUser',JSON.stringify(u)); }
 // Views & theme
 const VIEWS = ['landingView','customerView','repView','txHistoryView','repTxHistoryView'];
 function showView(id){
- VIEWS.forEach(v=>{ const el=document.getElementById(v); el.classList.remove('active'); el.style.display='none'; });
- const t=document.getElementById(id); t.style.display=id==='landingView'?'flex':'block';
+ // Close any open subpages and hide both bnavs first
+ document.querySelectorAll('.subpage').forEach(el=>el.classList.remove('active'));
+ ['custBnav','repBnav'].forEach(bid=>{ const b=document.getElementById(bid); if(b) b.style.display='none'; });
+ // Switch the main view
+ VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el){ el.classList.remove('active'); el.style.display='none'; } });
+ const t=document.getElementById(id);
+ if(!t) return;
+ t.style.display=id==='landingView'?'flex':'block';
  setTimeout(()=>t.classList.add('active'),10);
  window.scrollTo(0,0); t.scrollTop=0;
+ // Show the right bottom nav and reset its tab state
+ if(id==='customerView'){
+   const nav=document.getElementById('custBnav'); if(nav) nav.style.display='flex';
+   _custTab='home';
+   ['bnCH','bnCT','bnCP'].forEach(b=>{ const el=document.getElementById(b); if(el) el.classList.remove('active'); });
+   const h=document.getElementById('bnCH'); if(h) h.classList.add('active');
+ } else if(id==='repView'){
+   const nav=document.getElementById('repBnav'); if(nav) nav.style.display='flex';
+   _repTab='home';
+   ['bnRH','bnRT','bnRP'].forEach(b=>{ const el=document.getElementById(b); if(el) el.classList.remove('active'); });
+   const h=document.getElementById('bnRH'); if(h) h.classList.add('active');
+ }
 }
 function toggleTheme(){
   document.body.classList.toggle('dark');
@@ -1286,7 +1304,7 @@ async function doLogout(){
  closeAllSubpages();
  const u=getUser(); if(u) await audit('login',u.id,u.role||'unknown',`${u.first_name} ${u.last_name} signed out`);
  sessionStorage.removeItem('wagUser'); localStorage.removeItem('wagActiveUser'); _payPinCallback=null; closeModal('payPinModal'); closeModal('emgModal'); closeModal('newPlanModal');
- _origShowView('landingView');
+ showView('landingView');
 }
 
 function showForgotModal(){ showModal('forgotModal'); }
@@ -2605,26 +2623,7 @@ async function saveSetupPayPin(){
   closeModal('payPinSetupModal');
 }
 
-// ════════════════════════════════════════════════════════════
-// OVERRIDE showView — also close subpages & bnavs when leaving
-// ════════════════════════════════════════════════════════════
-const _origShowView = showView;
-function showView(id){
-  closeAllSubpages();
-  _origShowView(id);
-  // show the right bnav if entering a dashboard view
-  if(id==='customerView'){
-    const el=document.getElementById('custBnav'); if(el){el.style.display='flex';}
-    _custTab='home';
-    ['bnCH','bnCT','bnCP'].forEach(b=>{ const el=document.getElementById(b);if(el)el.classList.remove('active'); });
-    const h=document.getElementById('bnCH');if(h)h.classList.add('active');
-  } else if(id==='repView'){
-    const el=document.getElementById('repBnav'); if(el){el.style.display='flex';}
-    _repTab='home';
-    ['bnRH','bnRT','bnRP'].forEach(b=>{ const el=document.getElementById(b);if(el)el.classList.remove('active'); });
-    const h=document.getElementById('bnRH');if(h)h.classList.add('active');
-  }
-}
+
 
 // ═══════════════════════════════════════════════
 // INIT
