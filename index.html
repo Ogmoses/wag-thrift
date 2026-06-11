@@ -49,8 +49,8 @@ body.dark{background:#0f0f0f;color:#f0f0f0;}
 .dash-header{background:var(--blue);padding:13px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:200;box-shadow:0 2px 16px rgba(0,0,0,.25);}
 .avatar-c{width:40px;height:40px;min-width:40px;background:var(--yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#111;flex-shrink:0;}
 .hdr-info{flex:1;min-width:0;}
-.hdr-name{color:var(--yellow);font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;}
-.hdr-sub{color:rgba(255,255,255,.6);font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;}
+.hdr-name{color:var(--yellow);font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;}
+.hdr-sub{color:rgba(255,255,255,.6);font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;}
 .hdr-right{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:auto;}
 .role-badge{background:var(--yellow);color:#111;font-size:10px;font-weight:800;padding:4px 9px;border-radius:6px;letter-spacing:.5px;white-space:nowrap;}
 .theme-btn{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;}
@@ -151,7 +151,6 @@ body.dark .audit-item{border-color:#2a2a2a;}
 .audit-action.login{color:var(--sub);}
 .audit-action.delete{color:var(--red);}
 .audit-action.flag{color:var(--red);}
-.audit-action.plan{color:var(--purple);}
 .audit-desc{font-size:12px;color:var(--sub);}
 .audit-time{font-size:11px;color:var(--sub);margin-top:2px;}
 /* ANALYTICS */
@@ -424,29 +423,46 @@ body.dark .verify-code-inp{background:#111;color:#f0f0f0;border-color:#2a2a2a;}
 .footer{padding:28px 18px;text-align:center;font-size:11px;color:var(--sub);cursor:pointer;user-select:none;}
 .footer:hover{color:var(--blue);}
 
-/* ─── BOTTOM NAV ─── */
-.bnav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);display:flex;align-items:stretch;z-index:300;height:58px;max-width:480px;margin:0 auto;}
-body.dark .bnav{background:#151515;border-color:#2a2a2a;}
+/* ── BOTTOM NAV ── */
+.bnav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1.5px solid var(--border);display:none;align-items:stretch;z-index:400;height:60px;max-width:480px;margin:0 auto;}
+body.dark .bnav{background:#111;border-color:#2a2a2a;}
+.bnav.visible{display:flex;}
 .bnav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:transparent;cursor:pointer;padding:6px 0;color:var(--sub);font-size:10px;font-weight:700;letter-spacing:.3px;transition:color .18s;-webkit-tap-highlight-color:transparent;}
+.bnav-tab svg{flex-shrink:0;}
 .bnav-tab.active{color:var(--blue);}
 body.dark .bnav-tab.active{color:var(--yellow);}
-.bnav-tab svg{transition:color .18s;}
 .bnav-tab.active svg{stroke:var(--blue);}
 body.dark .bnav-tab.active svg{stroke:var(--yellow);}
-/* make dashboards not overlap footer */
-.dash-body{padding-bottom:68px;}
-/* Profile page */
-.profile-page{padding:16px 13px 80px;}
-.profile-section{background:#fff;border-radius:15px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:13px;transition:background .3s;}
-body.dark .profile-section{background:#1c1c1c;}
-.profile-section-title{font-size:14px;font-weight:700;color:var(--blue);margin-bottom:13px;display:flex;align-items:center;gap:7px;}
-body.dark .profile-section-title{color:var(--yellow);}
-.profile-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);}
+
+/* ── SUB-PAGES (hidden by default, fullscreen overlay) ── */
+.subpage{display:none;position:fixed;inset:0;background:var(--bg);z-index:350;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.subpage.active{display:block;}
+body.dark .subpage{background:#0f0f0f;}
+
+/* ── PROFILE PAGE STYLES ── */
+.profile-wrap{padding:16px 13px 80px;}
+.profile-card{background:#fff;border-radius:15px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:13px;}
+body.dark .profile-card{background:#1c1c1c;}
+.profile-card-title{font-size:14px;font-weight:700;color:var(--blue);margin-bottom:13px;display:flex;align-items:center;gap:7px;}
+body.dark .profile-card-title{color:var(--yellow);}
+.profile-row{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);}
 body.dark .profile-row{border-color:#2a2a2a;}
 .profile-row:last-child{border-bottom:none;}
-.profile-lbl{font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;}
-.profile-val{font-size:13px;font-weight:600;color:var(--text);text-align:right;max-width:200px;word-break:break-all;}
+.profile-lbl{font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;margin-right:12px;}
+.profile-val{font-size:13px;font-weight:600;color:var(--text);text-align:right;word-break:break-all;}
+body.dark .profile-val{color:#f0f0f0;}
 
+/* ── THEME SELECTOR ── */
+.theme-selector{display:flex;gap:8px;margin-top:4px;}
+.theme-opt{flex:1;padding:10px 6px;border:2px solid var(--border);border-radius:10px;background:#fff;color:var(--sub);font-size:12px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;}
+body.dark .theme-opt{background:#1c1c1c;border-color:#333;color:#aaa;}
+.theme-opt.active{border-color:var(--blue);color:var(--blue);background:rgba(1,31,123,.06);}
+body.dark .theme-opt.active{border-color:var(--yellow);color:var(--yellow);background:rgba(255,186,9,.08);}
+
+/* ── PAYMENT PIN SETUP MODAL (post-registration) ── */
+.paypin-setup-wrap{text-align:center;padding:10px 0 4px;}
+.paypin-setup-ico{width:56px;height:56px;background:rgba(1,31,123,.1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;}
+body.dark .paypin-setup-ico{background:rgba(255,186,9,.12);}
 
 body:not(.dark) .admin-wrap{background:#f0f2f7;}
 body:not(.dark) .admin-tab:not(.active){background:#e5e7eb;color:var(--sub);border-color:var(--border);}
@@ -497,8 +513,8 @@ body.dark .cal-cell{border-color:#fff;color:#fff;}
 body.dark .cal-cell.c-green{background:#064e3b;color:#fff;border-color:#fff;}
 .cal-cell.c-red{background:#fee2e2;color:#111;border-color:#111;}
 body.dark .cal-cell.c-red{background:#450a0a;color:#fff;border-color:#fff;}
-.cal-cell.c-grey{color:#111;border-color:#111;}
-body.dark .cal-cell.c-grey{color:#fff;border-color:#fff;}
+.cal-cell.c-grey{color:#111;border-color:#111;opacity:.25;}
+body.dark .cal-cell.c-grey{color:#fff;border-color:#fff;opacity:.2;}
 .cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:900;border-width:2px;}
 body.dark .cal-cell.c-today{border-color:var(--yellow);color:var(--yellow);}
 .cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#111;font-weight:900;}
@@ -608,9 +624,8 @@ button .ic, a .ic{vertical-align:middle;}
  <div class="dash-header">
  <div class="avatar-c" id="custAv">?</div>
  <div class="hdr-info"><div class="hdr-name" id="custName">—</div><div class="hdr-sub" id="custPhone">—</div></div>
- <div class="hdr-right"><button class="theme-btn" onclick="toggleTheme()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button><button class="signout-btn" onclick="doLogout()" title="Sign Out" style="width:32px;height:32px;padding:0;border-radius:8px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button></div>
+ <div class="hdr-right"></div>
  </div>
- <div id="custHomePage" class="dash-body">
  <div class="plan-tabs-bar" id="planTabsBar"><div class="plan-tab add-tab" onclick="openNewPlanModal()">+ New Plan</div></div>
  <div id="noPlanMsg" class="no-plan"><div class="no-plan-ico"></div><div style="font-size:16px;font-weight:700;margin-bottom:7px;">No savings plans yet</div><div style="font-size:12px;color:var(--sub);">Tap "+ New Plan" to get started</div></div>
  <div id="planArea" style="display:none;">
@@ -653,7 +668,7 @@ button .ic, a .ic{vertical-align:middle;}
  </div>
  </div>
  <div class="wcard" style="margin:0 13px 11px;padding:13px;" id="scheduleBlock"></div>
- <div class="tx-section" style="margin-bottom:22px;">
+ <div class="tx-section" style="margin-bottom:80px;">
  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;">
  <div class="tx-title" style="margin-bottom:0;">Recent Transactions</div>
  <button class="tx-viewall" onclick="openTxHistory()">View all →</button>
@@ -661,73 +676,76 @@ button .ic, a .ic{vertical-align:middle;}
  <div id="txList"><div class="tx-empty">No transactions yet</div></div>
  </div>
  </div>
- </div><!-- /custHomePage -->
- <!-- Customer Profile & Transactions Pages (hidden by default, shown via bottom nav) -->
- <div id="custTxPage" class="dash-body" style="display:none;padding:16px 13px 80px;">
-   <div class="section-heading" style="margin-bottom:13px;">All Transactions</div>
-   <div id="custTxPageFilters" style="display:flex;gap:8px;margin-bottom:13px;">
-     <select id="custTxPageCat" class="tx-hist-select" onchange="filterCustTxPage()" style="flex:1;padding:9px 11px;border:2px solid var(--border);border-radius:9px;font-size:13px;background:#fff;color:var(--text);">
-       <option value="all">All Categories</option>
-       <option value="opening">Opening</option>
-       <option value="deposit">Deposits</option>
-       <option value="payout">Payouts</option>
-     </select>
-   </div>
-   <div id="custTxPageList"><div class="tx-empty">No transactions yet</div></div>
- </div>
- <div id="custProfilePage" class="dash-body" style="display:none;">
-   <div class="profile-page">
-     <div class="profile-section">
-       <div class="profile-section-title">
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-         My Profile
-       </div>
-       <div class="profile-row"><span class="profile-lbl">Full Name</span><span class="profile-val" id="cpName">—</span></div>
-       <div class="profile-row"><span class="profile-lbl">Phone</span><span class="profile-val" id="cpPhone">—</span></div>
-       <div class="profile-row"><span class="profile-lbl">Email</span><span class="profile-val" id="cpEmail">—</span></div>
-       <div class="profile-row"><span class="profile-lbl">Address</span><span class="profile-val" id="cpAddress">—</span></div>
-       <div class="profile-row"><span class="profile-lbl">Member Since</span><span class="profile-val" id="cpSince">—</span></div>
-     </div>
-     <div class="profile-section">
-       <div class="profile-section-title">
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-         Change Login Password
-       </div>
-       <div class="mform-group"><label class="form-lbl">Current Password</label>
-         <div class="pin-wrap"><input type="password" id="cpCurPw" class="form-inp" placeholder="Current password" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('cpCurPw')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
-       </div>
-       <div class="mform-group"><label class="form-lbl">New Password</label>
-         <div class="pin-wrap"><input type="password" id="cpNewPw" class="form-inp" placeholder="New password (min 6)" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('cpNewPw')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
-       </div>
-       <div id="cpPwMsg"></div>
-       <button class="btn btn-blue" style="margin-top:4px;margin-bottom:0;" onclick="changeCustPassword()">Update Password</button>
-     </div>
-     <div class="profile-section">
-       <div class="profile-section-title">
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg>
-         Sign Out
-       </div>
-       <button class="btn" style="background:#fee2e2;color:var(--red);margin-bottom:0;" onclick="doLogout()">
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:6px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-         Sign Out
-       </button>
-     </div>
-   </div>
- </div>
- <!-- Bottom Nav -->
+ <!-- Customer bottom nav — shown only when customerView is active -->
  <nav class="bnav" id="custBnav">
-   <button class="bnav-tab active" id="bnav-cust-home" onclick="custNavTo('home')">
-     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-     Home
-   </button>
-   <button class="bnav-tab" id="bnav-cust-tx" onclick="custNavTo('tx')">
-     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-     Transactions
-   </button>
-   <button class="bnav-tab" id="bnav-cust-profile" onclick="custNavTo('profile')">
-     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-     Profile
-   </button>
+  <button class="bnav-tab active" id="bnCH" onclick="custTab('home')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+   Home
+  </button>
+  <button class="bnav-tab" id="bnCT" onclick="custTab('tx')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+   Transactions
+  </button>
+  <button class="bnav-tab" id="bnCP" onclick="custTab('profile')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   Profile
+  </button>
+ </nav>
+</div>
+
+<!-- CUSTOMER TX SUBPAGE (fixed overlay, shown above customerView) -->
+<div class="subpage" id="custTxSubpage">
+ <div class="dash-header">
+  <button onclick="custTab('home')" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
+  <div class="hdr-info"><div class="hdr-name">All Transactions</div></div>
+ </div>
+ <div style="padding:12px 13px 0;">
+  <select id="custTxCatFilter" onchange="renderCustTxSubpage()" style="width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-size:14px;background:#fff;color:var(--text);margin-bottom:10px;">
+   <option value="all">All Types</option>
+   <option value="opening">Opening</option>
+   <option value="deposit">Deposits</option>
+   <option value="payout">Payouts</option>
+  </select>
+ </div>
+ <div id="custTxSubList" style="padding:0 13px 80px;"></div>
+ <nav class="bnav visible" style="position:fixed;">
+  <button class="bnav-tab" onclick="custTab('home')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+   Home
+  </button>
+  <button class="bnav-tab active">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+   Transactions
+  </button>
+  <button class="bnav-tab" onclick="custTab('profile')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   Profile
+  </button>
+ </nav>
+</div>
+
+<!-- CUSTOMER PROFILE SUBPAGE -->
+<div class="subpage" id="custProfileSubpage">
+ <div class="dash-header">
+  <button onclick="custTab('home')" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
+  <div class="hdr-info"><div class="hdr-name">My Profile</div></div>
+ </div>
+ <div class="profile-wrap" id="custProfileContent">
+  <!-- filled by JS -->
+ </div>
+ <nav class="bnav visible" style="position:fixed;">
+  <button class="bnav-tab" onclick="custTab('home')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+   Home
+  </button>
+  <button class="bnav-tab" onclick="custTab('tx')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+   Transactions
+  </button>
+  <button class="bnav-tab active">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   Profile
+  </button>
  </nav>
 </div>
 
@@ -736,9 +754,9 @@ button .ic, a .ic{vertical-align:middle;}
  <div class="dash-header">
  <div class="avatar-c" id="repAv">?</div>
  <div class="hdr-info"><div class="hdr-name" id="repName">—</div><div class="hdr-sub" id="repCode">Code: —</div></div>
- <div class="hdr-right"><button class="theme-btn" onclick="toggleTheme()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button><button class="signout-btn" onclick="doLogout()" title="Sign Out" style="width:32px;height:32px;padding:0;border-radius:8px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button></div>
+ <div class="hdr-right"></div>
  </div>
- <div id="repHomePage" class="dash-body">
+ <div style="padding-bottom:80px;">
  <div class="rep-stats">
  <div class="stat-dark"><div class="sl">Today's Collections</div><div class="sa" id="repTodayAmt">₦0.00</div><div class="ss" id="repTodayCnt">0 transactions</div></div>
  <div class="stat-light"><div class="sl">Reliability Score</div><div class="sa" id="repScoreVal">—%</div><div class="ss" id="repScoreLbl">calculating…</div></div>
@@ -773,93 +791,82 @@ button .ic, a .ic{vertical-align:middle;}
  <div style="padding:11px 13px 32px;">
  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;">
  <div class="search-card-title">My Recent Collections</div>
- <button class="tx-viewall" onclick="repNavTo('tx')" style="background:none;border:none;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;">View all →</button>
+ <button class="tx-viewall" onclick="openRepTxHistory()" style="background:none;border:none;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;">View all →</button>
  </div>
  <div id="repTxPreview" class="wcard" style="padding:8px;">
  <div class="tx-empty">No collections yet</div>
  </div>
  </div>
- </div><!-- /repHomePage -->
  </div>
- <!-- Rep Transactions (inline tab) -->
- <div id="repTxInlinePage" class="dash-body" style="display:none;padding:16px 13px 80px;">
-   <div class="section-heading" style="margin-bottom:13px;">All Collections</div>
-   <div style="display:flex;gap:8px;margin-bottom:13px;">
-     <select id="repTxInlineCat" class="tx-hist-select" onchange="filterRepTxInline()" style="flex:1;padding:9px 11px;border:2px solid var(--border);border-radius:9px;font-size:13px;background:#fff;color:var(--text);">
-       <option value="all">All Types</option>
-       <option value="deposit">Deposits</option>
-       <option value="payout">Payouts</option>
-     </select>
-   </div>
-   <div id="repTxInlineList"><div class="tx-empty">No collections yet</div></div>
- </div>
- <div id="repProfilePage" class="dash-body" style="display:none;">
-   <div class="profile-page">
-     <div class="profile-section">
-       <div class="profile-section-title">
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
-         Agent Profile
-       </div>
-       <div class="profile-row"><span class="profile-lbl">Full Name</span><span class="profile-val" id="rpName">—</span></div>
-       <div class="profile-row"><span class="profile-lbl">Agent ID</span><span class="profile-val" id="rpAgentId">—</span></div>
-       <div class="profile-row"><span class="profile-lbl">Phone</span><span class="profile-val" id="rpPhone">—</span></div>
-       <div class="profile-row"><span class="profile-lbl">Email</span><span class="profile-val" id="rpEmail">—</span></div>
-       <div class="profile-row"><span class="profile-lbl">Member Since</span><span class="profile-val" id="rpSince">—</span></div>
-     </div>
-     <div class="profile-section">
-       <div class="profile-section-title">
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-         Change Login Password
-       </div>
-       <div class="mform-group"><label class="form-lbl">Current Password</label>
-         <div class="pin-wrap"><input type="password" id="rpCurPw" class="form-inp" placeholder="Current password" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('rpCurPw')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
-       </div>
-       <div class="mform-group"><label class="form-lbl">New Password</label>
-         <div class="pin-wrap"><input type="password" id="rpNewPw" class="form-inp" placeholder="New password (min 6)" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('rpNewPw')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
-       </div>
-       <div id="rpPwMsg"></div>
-       <button class="btn btn-blue" style="margin-top:4px;margin-bottom:10px;" onclick="changeRepPassword()">Update Password</button>
-     </div>
-     <div class="profile-section">
-       <div class="profile-section-title">
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M19.07 19.07l-1.41-1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M21 12h-2M5 12H3M12 21v-2M12 5V3"/></svg>
-         Change Payment PIN
-       </div>
-       <div class="mform-group"><label class="form-lbl">Current Payment PIN</label>
-         <div class="pin-wrap"><input type="password" id="rpCurPayPin" class="form-inp" placeholder="Current PIN" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('rpCurPayPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
-       </div>
-       <div class="mform-group"><label class="form-lbl">New Payment PIN</label>
-         <div class="pin-wrap"><input type="password" id="rpNewPayPin" class="form-inp" placeholder="New PIN (4–6 digits)" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('rpNewPayPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
-       </div>
-       <div id="rpPayPinMsg"></div>
-       <button class="btn btn-blue" style="margin-top:4px;margin-bottom:10px;" onclick="changeRepPayPin()">Update Payment PIN</button>
-     </div>
-     <div class="profile-section">
-       <div class="profile-section-title">
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-         Sign Out
-       </div>
-       <button class="btn" style="background:#fee2e2;color:var(--red);margin-bottom:0;" onclick="doLogout()">
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:6px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-         Sign Out
-       </button>
-     </div>
-   </div>
- </div>
- <!-- Rep Bottom Nav -->
+ <!-- Rep bottom nav -->
  <nav class="bnav" id="repBnav">
-   <button class="bnav-tab active" id="bnav-rep-home" onclick="repNavTo('home')">
-     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-     Home
-   </button>
-   <button class="bnav-tab" id="bnav-rep-tx" onclick="repNavTo('tx')">
-     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-     Transactions
-   </button>
-   <button class="bnav-tab" id="bnav-rep-profile" onclick="repNavTo('profile')">
-     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-     Profile
-   </button>
+  <button class="bnav-tab active" id="bnRH" onclick="repTab('home')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+   Home
+  </button>
+  <button class="bnav-tab" id="bnRT" onclick="repTab('tx')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+   Transactions
+  </button>
+  <button class="bnav-tab" id="bnRP" onclick="repTab('profile')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   Profile
+  </button>
+ </nav>
+</div>
+
+<!-- REP TX SUBPAGE -->
+<div class="subpage" id="repTxSubpage">
+ <div class="dash-header">
+  <button onclick="repTab('home')" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
+  <div class="hdr-info"><div class="hdr-name">All Collections</div></div>
+ </div>
+ <div style="padding:12px 13px 0;">
+  <select id="repTxCatFilter" onchange="renderRepTxSubpage()" style="width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-size:14px;background:#fff;color:var(--text);margin-bottom:10px;">
+   <option value="all">All Types</option>
+   <option value="deposit">Collections</option>
+   <option value="payout">Payouts</option>
+  </select>
+ </div>
+ <div id="repTxSubList" style="padding:0 13px 80px;"></div>
+ <nav class="bnav visible" style="position:fixed;">
+  <button class="bnav-tab" onclick="repTab('home')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+   Home
+  </button>
+  <button class="bnav-tab active">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+   Transactions
+  </button>
+  <button class="bnav-tab" onclick="repTab('profile')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   Profile
+  </button>
+ </nav>
+</div>
+
+<!-- REP PROFILE SUBPAGE -->
+<div class="subpage" id="repProfileSubpage">
+ <div class="dash-header">
+  <button onclick="repTab('home')" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
+  <div class="hdr-info"><div class="hdr-name">My Profile</div></div>
+ </div>
+ <div class="profile-wrap" id="repProfileContent">
+  <!-- filled by JS -->
+ </div>
+ <nav class="bnav visible" style="position:fixed;">
+  <button class="bnav-tab" onclick="repTab('home')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+   Home
+  </button>
+  <button class="bnav-tab" onclick="repTab('tx')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+   Transactions
+  </button>
+  <button class="bnav-tab active">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   Profile
+  </button>
  </nav>
 </div>
 
@@ -867,7 +874,7 @@ button .ic, a .ic{vertical-align:middle;}
  <div class="dash-header">
  <button onclick="showView('repView')" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
  <div class="hdr-info"><div class="hdr-name">All My Collections</div></div>
- <div class="hdr-right"><button class="theme-btn" onclick="toggleTheme()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button></div>
+ <div class="hdr-right"></div>
  </div>
  <div id="repAllTxList" style="padding:13px 13px 40px;"></div>
 </div>
@@ -1276,8 +1283,10 @@ async function doLogin(){
 
 async function doLogout(){
  stopSuspendCheck();
+ closeAllSubpages();
  const u=getUser(); if(u) await audit('login',u.id,u.role||'unknown',`${u.first_name} ${u.last_name} signed out`);
- sessionStorage.removeItem('wagUser'); localStorage.removeItem('wagActiveUser'); _payPinCallback=null; closeModal('payPinModal'); closeModal('emgModal'); closeModal('newPlanModal'); showView('landingView');
+ sessionStorage.removeItem('wagUser'); localStorage.removeItem('wagActiveUser'); _payPinCallback=null; closeModal('payPinModal'); closeModal('emgModal'); closeModal('newPlanModal');
+ _origShowView('landingView');
 }
 
 function showForgotModal(){ showModal('forgotModal'); }
@@ -1403,7 +1412,11 @@ async function doCreatePlan(){
   setMsg('npMsg','<div class="msg-ok">Plan created!</div>');
   setTimeout(async()=>{ closeModal('newPlanModal'); setMsg('npMsg','');
     ['npName','npContrib'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-    await renderCustDash(); },1200);
+    await renderCustDash();
+    // Prompt for payment PIN if not yet set
+    const {data:fresh}=await db.from('customers').select('payment_pin_hash').eq('id',user.id).single();
+    if(!fresh?.payment_pin_hash){ openPayPinSetupModal(); }
+  },1200);
 }
 
 async function closePlan(){
@@ -2246,49 +2259,155 @@ function renderAuditEntries(logs){
 }
 
 
-// ═══════════════════════════════════════════════
-// BOTTOM NAV — CUSTOMER
-// ═══════════════════════════════════════════════
-let custCurrentTab = 'home';
+// ════════════════════════════════════════════════════════════
+// THEME — System default + manual override
+// ════════════════════════════════════════════════════════════
+let _themePref = 'system'; // 'system' | 'light' | 'dark'
 
-function custNavTo(tab){
-  custCurrentTab = tab;
-  ['home','tx','profile'].forEach(t=>{
-    const btn=document.getElementById('bnav-cust-'+t);
-    if(btn) btn.classList.toggle('active', t===tab);
+function applyTheme(pref){
+  _themePref = pref;
+  const isDark = pref==='dark' || (pref==='system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.body.classList.toggle('dark', isDark);
+  // update moon/sun icon everywhere
+  const moonSVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>';
+  const sunSVG  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+  ['landThemeBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=isDark?moonSVG:sunSVG;});
+  // refresh theme selector buttons in profile pages
+  document.querySelectorAll('.theme-opt').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.theme===pref);
   });
-  document.getElementById('custHomePage').style.display = tab==='home' ? '' : 'none';
-  document.getElementById('custTxPage').style.display   = tab==='tx'   ? '' : 'none';
-  document.getElementById('custProfilePage').style.display = tab==='profile' ? '' : 'none';
-  if(tab==='profile') loadCustProfile();
-  if(tab==='tx') loadCustTxPage();
+  localStorage.setItem('wagTheme', pref);
+}
+function initTheme(){
+  const saved = localStorage.getItem('wagTheme')||'system';
+  applyTheme(saved);
+  // listen for system preference change
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
+    if(_themePref==='system') applyTheme('system');
+  });
+}
+function toggleTheme(){ applyTheme(document.body.classList.contains('dark')?'light':'dark'); }
+function setThemePref(p){ applyTheme(p); }
+
+// ════════════════════════════════════════════════════════════
+// SUBPAGE SYSTEM — customer
+// ════════════════════════════════════════════════════════════
+let _custTab = 'home';
+let _custTxAll = [];
+
+function custTab(tab){
+  _custTab = tab;
+  // hide all subpages
+  ['custTxSubpage','custProfileSubpage'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.classList.remove('active');
+  });
+  // reset main bnav active state
+  ['bnCH','bnCT','bnCP'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.classList.remove('active');
+  });
+  const custBnav = document.getElementById('custBnav');
+
+  if(tab==='home'){
+    if(custBnav) custBnav.style.display='flex';
+    const bh=document.getElementById('bnCH'); if(bh) bh.classList.add('active');
+    window.scrollTo(0,0);
+  } else if(tab==='tx'){
+    if(custBnav) custBnav.style.display='none'; // subpage has its own nav
+    const sp=document.getElementById('custTxSubpage');
+    if(sp){ sp.classList.add('active'); sp.scrollTop=0; }
+    renderCustTxSubpage();
+  } else if(tab==='profile'){
+    if(custBnav) custBnav.style.display='none';
+    const sp=document.getElementById('custProfileSubpage');
+    if(sp){ sp.classList.add('active'); sp.scrollTop=0; }
+    buildCustProfilePage();
+  }
 }
 
-async function loadCustProfile(){
-  const u = getUser();
-  if(!u) return;
-  // Fetch fresh from DB in case admin updated something
-  const { data:fresh } = await db.from('customers').select('*').eq('id',u.id).single();
-  const d = fresh || u;
-  document.getElementById('cpName').textContent    = d.first_name+' '+d.last_name;
-  document.getElementById('cpPhone').textContent   = (d.phone||'').replace('+234','0');
-  document.getElementById('cpEmail').textContent   = d.email||'—';
-  document.getElementById('cpAddress').textContent = d.address||'—';
-  document.getElementById('cpSince').textContent   = fmtDate(d.created_at);
+function showCustBnav(){
+  const el=document.getElementById('custBnav');
+  if(el){ el.style.display='flex'; }
+}
+function hideCustSubpages(){
+  ['custTxSubpage','custProfileSubpage'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.classList.remove('active');
+  });
+  showCustBnav();
+}
+
+async function renderCustTxSubpage(){
+  if(!activePlanId){ document.getElementById('custTxSubList').innerHTML='<div class="tx-empty">No plan selected</div>'; return; }
+  const el=document.getElementById('custTxSubList');
+  el.innerHTML='<div class="tx-empty">Loading…</div>';
+  const {data:txs}=await db.from('transactions').select('*').eq('plan_id',activePlanId).order('created_at',{ascending:false});
+  const {data:rDbs}=await db.from('disbursements').select('*').eq('plan_id',activePlanId).eq('status','rejected');
+  _custTxAll=[...(txs||[]),...(rDbs||[]).map(d=>({...d,type:'rejected',created_at:d.requested_at}))].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const cat=document.getElementById('custTxCatFilter')?.value||'all';
+  const filtered=cat==='all'?_custTxAll:_custTxAll.filter(t=>t.type===cat);
+  if(!filtered.length){ el.innerHTML='<div class="tx-empty">No transactions yet</div>'; return; }
+  el.innerHTML=filtered.map(tx=>{
+    const isIn=tx.type==='deposit'||tx.type==='opening';
+    const lbl=tx.type==='opening'?'Opening':tx.type==='deposit'?'Deposit':tx.type==='payout'?'Payout':'Rejected';
+    const badge=`<span style="background:${isIn?'#d1fae5':'#fee2e2'};color:${isIn?'#065f46':'#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${tx.type}</span>`;
+    return `<div class="tx-row">
+     <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div>
+     <div class="tx-body"><div class="tx-name">${lbl}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${tx.ref||'—'}</div><div style="margin-top:3px;">${badge}</div></div>
+     <div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div>
+    </div>`;
+  }).join('');
+}
+
+function buildCustProfilePage(){
+  const u=getUser(); if(!u) return;
+  const el=document.getElementById('custProfileContent'); if(!el) return;
+  el.innerHTML=`
+   <div class="profile-card">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> My Profile</div>
+    <div class="profile-row"><span class="profile-lbl">Full Name</span><span class="profile-val">${u.first_name||''} ${u.last_name||''}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Phone</span><span class="profile-val">${(u.phone||'').replace('+234','0')}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Email</span><span class="profile-val">${u.email||'—'}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Address</span><span class="profile-val">${u.address||'—'}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Member Since</span><span class="profile-val">${fmtDate(u.created_at)}</span></div>
+   </div>
+   <div class="profile-card">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M21 12h-2M5 12H3M12 21v-2M12 5V3"/></svg> Appearance</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:10px;">Choose how WAG looks on this device</div>
+    <div class="theme-selector">
+     <button class="theme-opt${_themePref==='light'?' active':''}" data-theme="light" onclick="setThemePref('light')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;margin:0 auto 4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>Light</button>
+     <button class="theme-opt${_themePref==='dark'?' active':''}" data-theme="dark" onclick="setThemePref('dark')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;margin:0 auto 4px;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>Dark</button>
+     <button class="theme-opt${_themePref==='system'?' active':''}" data-theme="system" onclick="setThemePref('system')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;margin:0 auto 4px;"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>System</button>
+    </div>
+   </div>
+   <div class="profile-card">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Change Password</div>
+    <div class="mform-group"><label class="form-lbl">Current Password</label>
+     <div class="pin-wrap"><input type="password" id="cpCurPw" class="form-inp" placeholder="Current password" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('cpCurPw')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div class="mform-group"><label class="form-lbl">New Password</label>
+     <div class="pin-wrap"><input type="password" id="cpNewPw" class="form-inp" placeholder="New password (min 6)" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('cpNewPw')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div id="cpPwMsg"></div>
+    <button class="btn btn-blue" style="margin-bottom:0;" onclick="changeCustPassword()">Update Password</button>
+   </div>
+   <div class="profile-card">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Account</div>
+    <button class="btn" style="background:#fee2e2;color:var(--red);margin-bottom:0;" onclick="doLogout()">
+     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:6px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+     Sign Out
+    </button>
+   </div>`;
 }
 
 async function changeCustPassword(){
-  const u = getUser();
-  const curPw = document.getElementById('cpCurPw').value;
-  const newPw = document.getElementById('cpNewPw').value;
-  if(!curPw||!newPw){ setMsg('cpPwMsg','<div class="msg-err">Fill in both fields</div>'); return; }
-  if(newPw.length<6){ setMsg('cpPwMsg','<div class="msg-err">Password must be at least 6 characters</div>'); return; }
+  const u=getUser();
+  const cur=document.getElementById('cpCurPw').value;
+  const nw=document.getElementById('cpNewPw').value;
+  if(!cur||!nw){ setMsg('cpPwMsg','<div class="msg-err">Fill in both fields</div>'); return; }
+  if(nw.length<6){ setMsg('cpPwMsg','<div class="msg-err">New password must be at least 6 characters</div>'); return; }
   showLoading('Verifying…');
-  const curHash = await hashPin(curPw);
-  const { data:check } = await db.from('customers').select('id').eq('id',u.id).eq('pin_hash',curHash).single();
-  if(!check){ hideLoading(); setMsg('cpPwMsg','<div class="msg-err">Current password is incorrect</div>'); return; }
-  const newHash = await hashPin(newPw);
-  await db.from('customers').update({ pin_hash:newHash }).eq('id',u.id);
+  const curHash=await hashPin(cur);
+  const {data:chk}=await db.from('customers').select('id').eq('id',u.id).eq('pin_hash',curHash).single();
+  if(!chk){ hideLoading(); setMsg('cpPwMsg','<div class="msg-err">Current password is incorrect</div>'); return; }
+  const newHash=await hashPin(nw);
+  await db.from('customers').update({pin_hash:newHash}).eq('id',u.id);
   await audit('login',u.id,'customer',`Customer ${u.first_name} ${u.last_name} changed their password`);
   hideLoading();
   setMsg('cpPwMsg','<div class="msg-ok">Password updated successfully</div>');
@@ -2296,74 +2415,112 @@ async function changeCustPassword(){
   document.getElementById('cpNewPw').value='';
 }
 
-async function loadCustTxPage(){
-  if(!activePlanId){ document.getElementById('custTxPageList').innerHTML='<div class="tx-empty">No plan selected</div>'; return; }
-  showLoading('Loading…');
-  const [r1,r2] = await Promise.all([
-    db.from('transactions').select('*').eq('plan_id',activePlanId).order('created_at',{ascending:false}),
-    db.from('disbursements').select('*').eq('plan_id',activePlanId).eq('status','rejected')
-  ]);
-  hideLoading();
-  const txs = [...(r1.data||[]), ...(r2.data||[]).map(d=>({...d,type:'rejected',created_at:d.requested_at}))].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-  const cat = document.getElementById('custTxPageCat').value;
-  renderCustTxPageList(cat==='all' ? txs : txs.filter(t=>t.type===cat), document.getElementById('custTxPageList'));
+// ════════════════════════════════════════════════════════════
+// SUBPAGE SYSTEM — representative
+// ════════════════════════════════════════════════════════════
+let _repTab = 'home';
+let _repTxAll = [];
+
+function repTab(tab){
+  _repTab = tab;
+  ['repTxSubpage','repProfileSubpage'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.classList.remove('active');
+  });
+  ['bnRH','bnRT','bnRP'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.classList.remove('active');
+  });
+  const repBnav=document.getElementById('repBnav');
+
+  if(tab==='home'){
+    if(repBnav) repBnav.style.display='flex';
+    const bh=document.getElementById('bnRH'); if(bh) bh.classList.add('active');
+    window.scrollTo(0,0);
+  } else if(tab==='tx'){
+    if(repBnav) repBnav.style.display='none';
+    const sp=document.getElementById('repTxSubpage');
+    if(sp){ sp.classList.add('active'); sp.scrollTop=0; }
+    renderRepTxSubpage();
+  } else if(tab==='profile'){
+    if(repBnav) repBnav.style.display='none';
+    const sp=document.getElementById('repProfileSubpage');
+    if(sp){ sp.classList.add('active'); sp.scrollTop=0; }
+    buildRepProfilePage();
+  }
 }
 
-function filterCustTxPage(){
-  const cat=document.getElementById('custTxPageCat').value;
-  const allRows = document.getElementById('custTxPageList').__allTxs||[];
-  if(!allRows.length){ loadCustTxPage(); return; }
-  renderCustTxPageList(cat==='all'?allRows:allRows.filter(t=>t.type===cat), document.getElementById('custTxPageList'));
-}
-
-function renderCustTxPageList(txs, el){
-  if(!el) return;
-  el.__allTxs = txs;
-  if(!txs.length){ el.innerHTML='<div class="tx-empty">No transactions</div>'; return; }
-  el.innerHTML = txs.map(tx=>{
-    const isIn=tx.type==='deposit'||tx.type==='opening';
-    const label=tx.type==='opening'?'Opening':tx.type==='deposit'?'Deposit':tx.type==='payout'?'Payout':'Rejected';
+async function renderRepTxSubpage(){
+  const u=getUser(); if(!u) return;
+  const el=document.getElementById('repTxSubList');
+  el.innerHTML='<div class="tx-empty">Loading…</div>';
+  const {data:allTx}=await db.from('transactions').select('*').eq('agent_id',u.id).order('created_at',{ascending:false});
+  const custIds=[...new Set((allTx||[]).map(t=>t.customer_id).filter(Boolean))];
+  let cMap={};
+  if(custIds.length&&db){
+    const {data:custs}=await db.from('customers').select('id,first_name,last_name').in('id',custIds);
+    (custs||[]).forEach(cu=>cMap[cu.id]=cu.first_name+' '+cu.last_name);
+  }
+  _repTxAll=allTx||[];
+  const cat=document.getElementById('repTxCatFilter')?.value||'all';
+  const filtered=cat==='all'?_repTxAll:_repTxAll.filter(t=>t.type===cat);
+  if(!filtered.length){ el.innerHTML='<div class="tx-empty">No transactions yet</div>'; return; }
+  el.innerHTML=filtered.map(tx=>{
+    const isIn=tx.type!=='payout';
+    const lbl=tx.type==='opening'?'Opening':tx.type==='payout'?'Payout':'Collection';
+    const badge=`<span style="background:${isIn?'#d1fae5':'#fee2e2'};color:${isIn?'#065f46':'#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${tx.type}</span>`;
     return `<div class="tx-row">
-      <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><${isIn?'polyline points="17 11 12 6 7 11"/>':'polyline points="7 13 12 18 17 13"/>'}<<polyline points="${isIn?'17 11 12 6 7 11':'7 13 12 18 17 13'}"/><line x1="12" y1="6" x2="12" y2="18"/></svg></div>
-      <div class="tx-body">
-        <div class="tx-name">${label}</div>
-        <div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div>
-        <div class="tx-ref">${tx.ref||'—'}</div>
-        <span style="background:${isIn?'#d1fae5':'#fee2e2'};color:${isIn?'#065f46':'#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;margin-top:3px;display:inline-block;">${tx.type}</span>
-      </div>
-      <div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div>
+     <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div>
+     <div class="tx-body"><div class="tx-name">${cMap[tx.customer_id]||'Customer'}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${lbl}</div><div class="tx-ref">${tx.ref||'—'}</div><div style="margin-top:3px;">${badge}</div></div>
+     <div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div>
     </div>`;
   }).join('');
 }
 
-// ═══════════════════════════════════════════════
-// BOTTOM NAV — REPRESENTATIVE
-// ═══════════════════════════════════════════════
-let repCurrentTab = 'home';
-
-function repNavTo(tab){
-  repCurrentTab = tab;
-  ['home','tx','profile'].forEach(t=>{
-    const btn=document.getElementById('bnav-rep-'+t);
-    if(btn) btn.classList.toggle('active', t===tab);
-  });
-  document.getElementById('repHomePage').style.display     = tab==='home' ? '' : 'none';
-  document.getElementById('repTxInlinePage').style.display = tab==='tx'   ? '' : 'none';
-  document.getElementById('repProfilePage').style.display  = tab==='profile' ? '' : 'none';
-  if(tab==='profile') loadRepProfile();
-  if(tab==='tx') loadRepTxInline();
-}
-
-async function loadRepProfile(){
-  const u = getUser();
-  if(!u) return;
-  const { data:fresh } = await db.from('representatives').select('*').eq('id',u.id).single();
-  const d = fresh || u;
-  document.getElementById('rpName').textContent    = d.first_name+' '+d.last_name;
-  document.getElementById('rpAgentId').textContent = d.rep_id||'—';
-  document.getElementById('rpPhone').textContent   = (d.phone||'').replace('+234','0');
-  document.getElementById('rpEmail').textContent   = d.email||'—';
-  document.getElementById('rpSince').textContent   = fmtDate(d.created_at);
+function buildRepProfilePage(){
+  const u=getUser(); if(!u) return;
+  const el=document.getElementById('repProfileContent'); if(!el) return;
+  el.innerHTML=`
+   <div class="profile-card">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg> Agent Profile</div>
+    <div class="profile-row"><span class="profile-lbl">Full Name</span><span class="profile-val">${u.first_name||''} ${u.last_name||''}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Agent ID</span><span class="profile-val">${u.rep_id||'—'}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Phone</span><span class="profile-val">${(u.phone||'').replace('+234','0')}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Email</span><span class="profile-val">${u.email||'—'}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Member Since</span><span class="profile-val">${fmtDate(u.created_at)}</span></div>
+   </div>
+   <div class="profile-card">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M21 12h-2M5 12H3M12 21v-2M12 5V3"/></svg> Appearance</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:10px;">Choose how WAG looks on this device</div>
+    <div class="theme-selector">
+     <button class="theme-opt${_themePref==='light'?' active':''}" data-theme="light" onclick="setThemePref('light')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;margin:0 auto 4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>Light</button>
+     <button class="theme-opt${_themePref==='dark'?' active':''}" data-theme="dark" onclick="setThemePref('dark')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;margin:0 auto 4px;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>Dark</button>
+     <button class="theme-opt${_themePref==='system'?' active':''}" data-theme="system" onclick="setThemePref('system')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;margin:0 auto 4px;"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>System</button>
+    </div>
+   </div>
+   <div class="profile-card">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Change Password</div>
+    <div class="mform-group"><label class="form-lbl">Current Password</label>
+     <div class="pin-wrap"><input type="password" id="rpCurPw" class="form-inp" placeholder="Current password" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('rpCurPw')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div class="mform-group"><label class="form-lbl">New Password</label>
+     <div class="pin-wrap"><input type="password" id="rpNewPw" class="form-inp" placeholder="New password (min 6)" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('rpNewPw')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div id="rpPwMsg"></div>
+    <button class="btn btn-blue" style="margin-bottom:10px;" onclick="changeRepPassword()">Update Password</button>
+   </div>
+   <div class="profile-card">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg> Change Payment PIN</div>
+    <div class="mform-group"><label class="form-lbl">Current Payment PIN</label>
+     <div class="pin-wrap"><input type="password" id="rpCurPin" class="form-inp" placeholder="Current PIN" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('rpCurPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div class="mform-group"><label class="form-lbl">New Payment PIN</label>
+     <div class="pin-wrap"><input type="password" id="rpNewPin" class="form-inp" placeholder="4–6 digits" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('rpNewPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div id="rpPinMsg"></div>
+    <button class="btn btn-blue" style="margin-bottom:10px;" onclick="changeRepPayPin()">Update Payment PIN</button>
+   </div>
+   <div class="profile-card">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Account</div>
+    <button class="btn" style="background:#fee2e2;color:var(--red);margin-bottom:0;" onclick="doLogout()">
+     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:6px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+     Sign Out
+    </button>
+   </div>`;
 }
 
 async function changeRepPassword(){
@@ -2371,95 +2528,103 @@ async function changeRepPassword(){
   const cur=document.getElementById('rpCurPw').value;
   const nw=document.getElementById('rpNewPw').value;
   if(!cur||!nw){ setMsg('rpPwMsg','<div class="msg-err">Fill in both fields</div>'); return; }
-  if(nw.length<6){ setMsg('rpPwMsg','<div class="msg-err">Password must be at least 6 characters</div>'); return; }
+  if(nw.length<6){ setMsg('rpPwMsg','<div class="msg-err">New password must be at least 6 characters</div>'); return; }
   showLoading('Verifying…');
   const curHash=await hashPin(cur);
-  const { data:check }=await db.from('representatives').select('id').eq('id',u.id).eq('pin_hash',curHash).single();
-  if(!check){ hideLoading(); setMsg('rpPwMsg','<div class="msg-err">Current password is incorrect</div>'); return; }
-  const newHash=await hashPin(nw);
-  await db.from('representatives').update({ pin_hash:newHash }).eq('id',u.id);
+  const {data:chk}=await db.from('representatives').select('id').eq('id',u.id).eq('pin_hash',curHash).single();
+  if(!chk){ hideLoading(); setMsg('rpPwMsg','<div class="msg-err">Current password is incorrect</div>'); return; }
+  await db.from('representatives').update({pin_hash:await hashPin(nw)}).eq('id',u.id);
   await audit('login',u.id,'representative',`Agent ${u.first_name} ${u.last_name} changed their password`);
-  hideLoading();
-  setMsg('rpPwMsg','<div class="msg-ok">Password updated successfully</div>');
-  document.getElementById('rpCurPw').value='';
-  document.getElementById('rpNewPw').value='';
+  hideLoading(); setMsg('rpPwMsg','<div class="msg-ok">Password updated</div>');
+  document.getElementById('rpCurPw').value=''; document.getElementById('rpNewPw').value='';
 }
 
 async function changeRepPayPin(){
   const u=getUser();
-  const cur=document.getElementById('rpCurPayPin').value;
-  const nw=document.getElementById('rpNewPayPin').value;
-  if(!cur||!nw){ setMsg('rpPayPinMsg','<div class="msg-err">Fill in both fields</div>'); return; }
-  if(nw.length<4||nw.length>6||!/^\d+$/.test(nw)){ setMsg('rpPayPinMsg','<div class="msg-err">PIN must be 4–6 digits</div>'); return; }
+  const cur=document.getElementById('rpCurPin').value;
+  const nw=document.getElementById('rpNewPin').value;
+  if(!cur||!nw){ setMsg('rpPinMsg','<div class="msg-err">Fill in both fields</div>'); return; }
+  if(!/^\d{4,6}$/.test(nw)){ setMsg('rpPinMsg','<div class="msg-err">PIN must be 4–6 digits</div>'); return; }
   showLoading('Verifying…');
   const curHash=await hashPin(cur);
-  const { data:check }=await db.from('representatives').select('id').eq('id',u.id).eq('payment_pin_hash',curHash).single();
-  if(!check){ hideLoading(); setMsg('rpPayPinMsg','<div class="msg-err">Current payment PIN is incorrect</div>'); return; }
-  const newHash=await hashPin(nw);
-  await db.from('representatives').update({ payment_pin_hash:newHash }).eq('id',u.id);
-  await audit('login',u.id,'representative',`Agent ${u.first_name} ${u.last_name} changed their payment PIN`);
-  hideLoading();
-  setMsg('rpPayPinMsg','<div class="msg-ok">Payment PIN updated successfully</div>');
-  document.getElementById('rpCurPayPin').value='';
-  document.getElementById('rpNewPayPin').value='';
+  const {data:chk}=await db.from('representatives').select('id').eq('id',u.id).eq('payment_pin_hash',curHash).single();
+  if(!chk){ hideLoading(); setMsg('rpPinMsg','<div class="msg-err">Current PIN is incorrect</div>'); return; }
+  await db.from('representatives').update({payment_pin_hash:await hashPin(nw)}).eq('id',u.id);
+  hideLoading(); setMsg('rpPinMsg','<div class="msg-ok">Payment PIN updated</div>');
+  document.getElementById('rpCurPin').value=''; document.getElementById('rpNewPin').value='';
 }
 
-async function loadRepTxInline(){
-  const u=getUser();
-  showLoading('Loading…');
-  const { data:txs }=await db.from('transactions').select('*').eq('agent_id',u.id).order('created_at',{ascending:false});
-  hideLoading();
-  const cat=document.getElementById('repTxInlineCat').value;
-  const filtered = cat==='all' ? (txs||[]) : (txs||[]).filter(t=>t.type===cat);
-  const el=document.getElementById('repTxInlineList');
-  el.__allTxs = txs||[];
-  if(!filtered.length){ el.innerHTML='<div class="tx-empty">No collections yet</div>'; return; }
-  el.innerHTML = filtered.map(tx=>{
-    const isIn=tx.type==='deposit'||tx.type==='opening';
-    return `<div class="tx-row">
-      <div class="tx-ico ${isIn?'tx-ico-g':'tx-ico-r'}">${isIn?'↓':'↑'}</div>
-      <div class="tx-body">
-        <div class="tx-name">${tx.type==='deposit'?'Collection':'Payout'}</div>
-        <div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div>
-        <div class="tx-ref">${tx.ref||'—'}</div>
-        <span style="background:${isIn?'#d1fae5':'#fee2e2'};color:${isIn?'#065f46':'#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;margin-top:3px;display:inline-block;">${tx.type}</span>
-      </div>
-      <div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div>
-    </div>`;
-  }).join('');
+// ════════════════════════════════════════════════════════════
+// SUBPAGE CLEANUP — called on logout / view switch so nothing leaks
+// ════════════════════════════════════════════════════════════
+function closeAllSubpages(){
+  document.querySelectorAll('.subpage').forEach(el=>el.classList.remove('active'));
+  // also hide both bnavs
+  ['custBnav','repBnav'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
 }
 
-function filterRepTxInline(){
-  loadRepTxInline();
-}
-
-// ═══════════════════════════════════════════════
-// FIX 1: SUSPENSION CHECK — poll every 30s
-// If the logged-in user gets suspended, log them out
-// ═══════════════════════════════════════════════
-let _suspendCheckInterval = null;
-
+// ════════════════════════════════════════════════════════════
+// SUSPENSION CHECK — poll every 30s after login
+// ════════════════════════════════════════════════════════════
+let _suspendInterval=null;
 function startSuspendCheck(){
   stopSuspendCheck();
-  _suspendCheckInterval = setInterval(async()=>{
-    const u=getUser();
-    if(!u||!db) return;
-    try {
-      const table = u.role==='representative'?'representatives':'customers';
-      const { data } = await db.from(table).select('status').eq('id',u.id).single();
-      if(data && (data.status==='suspended'||data.status==='deleted')){
+  _suspendInterval=setInterval(async()=>{
+    const u=getUser(); if(!u||!db) return;
+    try{
+      const tbl=u.role==='representative'?'representatives':'customers';
+      const {data}=await db.from(tbl).select('status').eq('id',u.id).single();
+      if(data&&(data.status==='suspended'||data.status==='deleted')){
         stopSuspendCheck();
-        alert('Your account has been suspended by an administrator. You will be signed out now.');
+        alert('Your account has been suspended. You will be signed out now.');
         doLogout();
       }
-    } catch(e){}
-  }, 30000); // check every 30 seconds
+    }catch(e){}
+  },30000);
+}
+function stopSuspendCheck(){ if(_suspendInterval){clearInterval(_suspendInterval);_suspendInterval=null;} }
+
+// ════════════════════════════════════════════════════════════
+// PAYMENT PIN SETUP MODAL (post first-plan creation)
+// ════════════════════════════════════════════════════════════
+function openPayPinSetupModal(){
+  document.getElementById('setupPinInp').value='';
+  document.getElementById('setupPinMsg').innerHTML='';
+  showModal('payPinSetupModal');
+}
+async function saveSetupPayPin(){
+  const u=getUser();
+  const pin=document.getElementById('setupPinInp').value.trim();
+  if(!/^\d{4,6}$/.test(pin)){ setMsg('setupPinMsg','<div class="msg-err">PIN must be 4–6 digits</div>'); return; }
+  showLoading('Saving PIN…');
+  const hash=await hashPin(pin);
+  await db.from('customers').update({payment_pin_hash:hash}).eq('id',u.id);
+  setUser({...u,payment_pin_hash:hash});
+  await audit('login',u.id,'customer',`Customer ${u.first_name} ${u.last_name} set their payment PIN`);
+  hideLoading();
+  closeModal('payPinSetupModal');
 }
 
-function stopSuspendCheck(){
-  if(_suspendCheckInterval){ clearInterval(_suspendCheckInterval); _suspendCheckInterval=null; }
+// ════════════════════════════════════════════════════════════
+// OVERRIDE showView — also close subpages & bnavs when leaving
+// ════════════════════════════════════════════════════════════
+const _origShowView = showView;
+function showView(id){
+  closeAllSubpages();
+  _origShowView(id);
+  // show the right bnav if entering a dashboard view
+  if(id==='customerView'){
+    const el=document.getElementById('custBnav'); if(el){el.style.display='flex';}
+    _custTab='home';
+    ['bnCH','bnCT','bnCP'].forEach(b=>{ const el=document.getElementById(b);if(el)el.classList.remove('active'); });
+    const h=document.getElementById('bnCH');if(h)h.classList.add('active');
+  } else if(id==='repView'){
+    const el=document.getElementById('repBnav'); if(el){el.style.display='flex';}
+    _repTab='home';
+    ['bnRH','bnRT','bnRP'].forEach(b=>{ const el=document.getElementById(b);if(el)el.classList.remove('active'); });
+    const h=document.getElementById('bnRH');if(h)h.classList.add('active');
+  }
 }
-
 
 // ═══════════════════════════════════════════════
 // INIT
@@ -2470,10 +2635,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
  const rsi=document.getElementById('repSearchInp'); if(rsi) rsi.addEventListener('keypress',e=>{ if(e.key==='Enter') repDoSearch(); });
  const savedUser=getUser();
  if(savedUser && db){
- if(savedUser.role==='representative'){ showView('repView'); renderRepDash(); startSuspendCheck(); }
- else{ showView('customerView'); renderCustDash(); startSuspendCheck(); }
+  if(savedUser.role==='representative'){ showView('repView'); renderRepDash(); startSuspendCheck(); }
+  else{ showView('customerView'); renderCustDash(); startSuspendCheck(); }
  } else { showView('landingView'); }
 });
 </script>
+
+<!-- PAYMENT PIN SETUP MODAL -->
+<div class="modal" id="payPinSetupModal">
+ <div class="modal-sheet" style="text-align:center;">
+  <div style="width:56px;height:56px;background:rgba(1,31,123,.1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+   <svg viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+  </div>
+  <div style="font-size:18px;font-weight:800;color:var(--blue);margin-bottom:7px;">Set Payment PIN</div>
+  <div style="font-size:13px;color:var(--sub);margin-bottom:20px;line-height:1.6;">Create a 4–6 digit PIN you'll use to confirm disbursements and withdrawals.</div>
+  <div class="pin-wrap" style="margin-bottom:14px;">
+   <input type="password" id="setupPinInp" class="form-inp" placeholder="e.g. 1234" maxlength="6" inputmode="numeric" style="text-align:center;letter-spacing:8px;font-size:24px;">
+   <button type="button" class="pw-eye" onclick="togglePw('setupPinInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+  </div>
+  <div id="setupPinMsg"></div>
+  <button class="btn btn-blue" style="margin-bottom:8px;" onclick="saveSetupPayPin()">Save Payment PIN</button>
+  <button class="btn" style="background:#f3f4f6;color:var(--sub);margin-bottom:0;" onclick="closeModal('payPinSetupModal')">Skip for now</button>
+ </div>
+</div>
+
 </body>
 </html>

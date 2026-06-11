@@ -188,7 +188,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .audit-action.approve{color:var(--green);}
 .audit-action.reject{color:var(--red);}
 .audit-action.review{color:#60a5fa;}
-.audit-action.plan{color:var(--purple);}
 .audit-action.login{color:var(--sub);}
 .audit-action.delete{color:var(--red);}
 .audit-desc{font-size:12px;color:var(--sub);}
@@ -410,9 +409,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
       </button>
       <div class="topbar-title" id="topbarTitle">Overview</div>
       <span class="topbar-badge">SUPER ADMIN</span>
-      <button id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:var(--text);width:32px;height:32px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;">
-        <span id="themeIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:block;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
-      </button>
+
       <button onclick="doAdminLogout()" title="Exit Portal" style="background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.3);color:#fca5a5;padding:6px 11px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Exit
@@ -553,6 +550,22 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
     <div class="page" id="page-settings">
       <div class="page-inner">
         <div class="section-card">
+          <div class="section-card-title">Appearance</div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:12px;">Choose how the admin portal looks on this device</div>
+          <div style="display:flex;gap:8px;">
+            <button id="aThemeLight" onclick="adminSetTheme('light')" style="flex:1;padding:12px 6px;border:2px solid var(--border);border-radius:10px;background:var(--card);color:var(--sub);font-size:12px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;margin:0 auto 4px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>Light
+            </button>
+            <button id="aThemeDark" onclick="adminSetTheme('dark')" style="flex:1;padding:12px 6px;border:2px solid var(--border);border-radius:10px;background:var(--card);color:var(--sub);font-size:12px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;margin:0 auto 4px;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>Dark
+            </button>
+            <button id="aThemeSystem" onclick="adminSetTheme('system')" style="flex:1;padding:12px 6px;border:2px solid var(--border);border-radius:10px;background:var(--card);color:var(--sub);font-size:12px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;margin:0 auto 4px;"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>System
+            </button>
+          </div>
+        </div>
+
+        <div class="section-card">
           <div class="section-card-title">Admin PIN Management</div>
           <div class="settings-group">
             <label class="settings-label">Current PIN (required)</label>
@@ -635,25 +648,27 @@ const EYE_OPEN=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const EYE_CLOSED=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
 function togglePw(id){ const e=document.getElementById(id); const h=e.type==='password'; e.type=h?'text':'password'; const b=e.parentElement.querySelector('.pw-eye'); if(b) b.innerHTML=h?EYE_CLOSED:EYE_OPEN; }
 
-// ─── THEME ───
-let isLightMode = false;
-function toggleTheme(){
-  isLightMode = !isLightMode;
-  document.body.classList.toggle('light-mode', isLightMode);
-  document.getElementById('themeIcon').innerHTML = isLightMode
-    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:block;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>'
-    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:block;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
-  localStorage.setItem('wagAdminTheme', isLightMode ? 'light' : 'dark');
+// ─── THEME (system-aware) ───
+let _adminThemePref = 'system';
+function adminSetTheme(pref){
+  _adminThemePref = pref;
+  const isDark = pref==='dark' || (pref==='system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.body.classList.toggle('light-mode', !isDark);
+  localStorage.setItem('wagAdminTheme', pref);
+  // update button active state
+  ['light','dark','system'].forEach(t=>{
+    const el=document.getElementById('aTheme'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(el){ el.style.borderColor=t===pref?'var(--yellow)':'var(--border)'; el.style.color=t===pref?'var(--yellow)':'var(--sub)'; }
+  });
 }
 function initTheme(){
-  const saved = localStorage.getItem('wagAdminTheme');
-  if(saved === 'light'){
-    isLightMode = true;
-    document.body.classList.add('light-mode');
-    const icon = document.getElementById('themeIcon');
-    if(icon) icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:block;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>';
-  }
+  const saved = localStorage.getItem('wagAdminTheme')||'system';
+  adminSetTheme(saved);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{
+    if(_adminThemePref==='system') adminSetTheme('system');
+  });
 }
+function toggleTheme(){ adminSetTheme(document.body.classList.contains('light-mode')?'dark':'light'); }
 
 // ═══════════════════════════════════════════════
 // SESSION / AUTH
