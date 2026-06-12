@@ -511,7 +511,8 @@ body.dark .cal-month-name{color:#f0f0f0;}
 .cal-year-lbl{font-size:14px;font-weight:700;color:var(--sub);}
 .mini-cal-days-hdr{display:grid;grid-template-columns:repeat(7,1fr);border:1.5px solid var(--border);border-radius:10px;padding:8px 0;margin-bottom:8px;}
 body.dark .mini-cal-days-hdr{border-color:#2a2a2a;}
-.cal-day-hdr{font-size:10px;font-weight:700;color:var(--sub);text-align:center;}
+.cal-day-hdr{font-size:10px;font-weight:700;color:#111;text-align:center;}
+body.dark .cal-day-hdr{color:#fff;}
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
 .cal-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:12px;font-weight:700;border:1px solid #111;color:#111;}
 body.dark .cal-cell{border-color:#fff;color:#fff;}
@@ -548,7 +549,7 @@ button .ic, a .ic{vertical-align:middle;}
 <div id="landingView" class="view active">
  <div class="land-hero">
  <button class="land-theme-btn" onclick="toggleTheme()" id="landThemeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
- <div class="land-logo">WAG</div>
+ <div class="land-logo"><svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:42px;height:42px;"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9v.01M18 15v.01"/></svg></div>
  <h1 class="land-title">Wonderful & Able God</h1>
  <p class="land-title" style="margin-bottom:6px;font-size:28px;">Enterprises</p>
  <p class="land-sub" style="font-size:10px;letter-spacing:3px;margin-bottom:26px;">Thrift Savings</p>
@@ -2088,6 +2089,12 @@ async function deleteInactiveUsers(){
 //   • Advance-payment (paid ahead) = streak extends beyond today — those future
 //     dates show Green, not missed.
 // ═══════════════════════════════════════════════
+// Returns YYYY-MM-DD using LOCAL date components (avoids UTC-shift off-by-one
+// bugs that toISOString() introduces in timezones ahead of UTC, e.g. Lagos +1)
+function dateKey(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 let calState={yr:0,mo:0,covered:new Set(),missed:new Set(),payouts:new Set()};
 
 async function renderCalendar(plan, balance){
@@ -2124,14 +2131,14 @@ async function renderCalendar(plan, balance){
   // Mark every confirmed-payout date as Yellow
   paidDisbs.forEach(d => {
     if(d.confirmed_at) {
-      calState.payouts.add(d.confirmed_at.split('T')[0]);
+      calState.payouts.add(dateKey(new Date(d.confirmed_at)));
     }
   });
 
   // Walk the streak
   const streakWalker = new Date(planStart);
   for(let i = 0; i < totalDaysCovered; i++){
-    const ds = streakWalker.toISOString().split('T')[0];
+    const ds = dateKey(streakWalker);
     // A payout day stays Yellow — it is NOT also marked Green
     // (covered set only matters for non-payout days in drawCal)
     calState.covered.add(ds);
@@ -2143,7 +2150,7 @@ async function renderCalendar(plan, balance){
   //    If streak is ahead of today, there are NO missed days.
   const missWalker = new Date(streakWalker);
   while(missWalker < today){
-    calState.missed.add(missWalker.toISOString().split('T')[0]);
+    calState.missed.add(dateKey(missWalker));
     missWalker.setDate(missWalker.getDate() + 1);
   }
 
@@ -2157,7 +2164,7 @@ function drawCal(){
   const {yr,mo,covered,missed,payouts}=calState;
   const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const DN=['Su','Mo','Tu','We','Th','Fr','Sa'];
-  const todayStr=new Date().toISOString().split('T')[0];
+  const todayStr=dateKey(new Date());
   const firstDay=new Date(yr,mo,1).getDay();
   const daysInMonth=new Date(yr,mo+1,0).getDate();
   const lbl=document.getElementById('calMonthLbl');
