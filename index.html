@@ -519,8 +519,8 @@ body.dark .cal-cell{border-color:#fff;color:#fff;}
 body.dark .cal-cell.c-green{background:#064e3b;color:#fff;border-color:#fff;}
 .cal-cell.c-red{background:#fee2e2;color:#111;border-color:#111;}
 body.dark .cal-cell.c-red{background:#450a0a;color:#fff;border-color:#fff;}
-.cal-cell.c-grey{color:#111;border-color:#111;opacity:.25;}
-body.dark .cal-cell.c-grey{color:#fff;border-color:#fff;opacity:.2;}
+.cal-cell.c-grey{color:#111;border-color:#111;}
+body.dark .cal-cell.c-grey{color:#fff;border-color:#fff;}
 .cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:900;border-width:2px;}
 body.dark .cal-cell.c-today{border-color:var(--yellow);color:var(--yellow);}
 .cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#111;font-weight:900;}
@@ -630,7 +630,7 @@ button .ic, a .ic{vertical-align:middle;}
  <div class="dash-header">
  <div class="avatar-c" id="custAv">?</div>
  <div class="hdr-info"><div class="hdr-name" id="custName">—</div><div class="hdr-sub" id="custPhone">—</div></div>
- <div class="hdr-right"></div>
+ <div class="hdr-right"><button class="signout-btn" onclick="doLogout()" title="Sign Out" style="width:32px;height:32px;border-radius:8px;padding:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.25);color:#fff;cursor:pointer;flex-shrink:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button></div>
  </div>
  <div class="plan-tabs-bar" id="planTabsBar"><div class="plan-tab add-tab" onclick="openNewPlanModal()">+ New Plan</div></div>
  <div id="noPlanMsg" class="no-plan"><div class="no-plan-ico"></div><div style="font-size:16px;font-weight:700;margin-bottom:7px;">No savings plans yet</div><div style="font-size:12px;color:var(--sub);">Tap "+ New Plan" to get started</div></div>
@@ -677,7 +677,7 @@ button .ic, a .ic{vertical-align:middle;}
  <div class="tx-section" style="margin-bottom:80px;">
  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;">
  <div class="tx-title" style="margin-bottom:0;">Recent Transactions</div>
- <button class="tx-viewall" onclick="openTxHistory()">View all →</button>
+ <button class="tx-viewall" onclick="custTab('tx')">View all →</button>
  </div>
  <div id="txList"><div class="tx-empty">No transactions yet</div></div>
  </div>
@@ -760,7 +760,7 @@ button .ic, a .ic{vertical-align:middle;}
  <div class="dash-header">
  <div class="avatar-c" id="repAv">?</div>
  <div class="hdr-info"><div class="hdr-name" id="repName">—</div><div class="hdr-sub" id="repCode">Code: —</div></div>
- <div class="hdr-right"></div>
+ <div class="hdr-right"><button class="signout-btn" onclick="doLogout()" title="Sign Out" style="width:32px;height:32px;border-radius:8px;padding:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.25);color:#fff;cursor:pointer;flex-shrink:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button></div>
  </div>
  <div style="padding-bottom:80px;">
  <div class="rep-stats">
@@ -797,7 +797,7 @@ button .ic, a .ic{vertical-align:middle;}
  <div style="padding:11px 13px 32px;">
  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;">
  <div class="search-card-title">My Recent Deposits</div>
- <button class="tx-viewall" onclick="openRepTxHistory()" style="background:none;border:none;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;">View all →</button>
+ <button class="tx-viewall" onclick="repTab('tx')" style="background:none;border:none;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;">View all →</button>
  </div>
  <div id="repTxPreview" class="wcard" style="padding:8px;">
  <div class="tx-empty">No deposits yet</div>
@@ -1013,6 +1013,17 @@ button .ic, a .ic{vertical-align:middle;}
 
 <div id="adminPinModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('adminPinModal')">×</button><div class="m-handle"></div><div class="m-title">System Access</div><div class="msg-info">Enter the master PIN to access the control centre.</div><div class="mform-group"><label class="form-lbl">Master PIN</label><div class="pin-wrap"><input type="password" id="adminPinInp" class="form-inp field-input" placeholder="••••••••"><button type="button" class="pw-eye" onclick="togglePw('adminPinInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div><div id="adminPinMsg"></div><button class="btn btn-blue" onclick="doAdminPin()" style="margin-top:8px;">Access System</button></div></div>
 <script>
+// ═══════════════════════════════════════════════
+// DOUBLE-TAP GUARD — prevents duplicate submissions
+// ═══════════════════════════════════════════════
+const _actionLocks = {};
+function acquireActionLock(key){ if(_actionLocks[key]) return false; _actionLocks[key]=true; return true; }
+function releaseActionLock(key){ _actionLocks[key]=false; }
+async function guardedAction(key, fn){
+  if(!acquireActionLock(key)){ console.warn('Action "'+key+'" already in progress — duplicate tap ignored'); return; }
+  try{ await fn(); } finally{ releaseActionLock(key); }
+}
+
 // ═══════════════════════════════════════════════
 // SUPABASE CLIENT INITIALISATION
 // ═══════════════════════════════════════════════
@@ -1417,7 +1428,8 @@ function toggleBalVis(){
 
 async function openNewPlanModal(){ showModal('newPlanModal'); }
 
-async function doCreatePlan(){
+async function doCreatePlan(){ await guardedAction('createPlan', _doCreatePlan); }
+async function _doCreatePlan(){
   if(!dbReady()) return;
   const name=(document.getElementById('npName')?.value||'').trim();
   const contribVal=(document.getElementById('npContrib')?.value||'').trim();
@@ -1494,7 +1506,8 @@ async function _openEmgModal(){
  showModal('emgModal');
 }
 
-async function doEmgRequest(){
+async function doEmgRequest(){ await guardedAction('emgRequest', _doEmgRequest); }
+async function _doEmgRequest(){
  const planId=document.getElementById('emgPlan').value, amtVal=document.getElementById('emgAmt').value.trim(), reason=document.getElementById('emgReason').value.trim();
  if(!planId){ setMsg('emgMsg','<div class="msg-err">Please select a plan</div>'); return; }
  if(!amtVal||+amtVal<=0){ setMsg('emgMsg','<div class="msg-err">Enter a valid amount</div>'); return; }
@@ -1596,7 +1609,8 @@ async function repOnPlanChange(){
 
 function openCollectModal(){ if(!repFoundCust){ alert('Search for a customer first'); return; } if(!repSelectedPlan){ alert('Please select a plan first'); return; } requirePayPin('Payment PIN','Enter your payment PIN to save this deposit.',()=>showModal('collectModal')); }
 
-async function doCollection(){
+async function doCollection(){ await guardedAction('collection', _doCollection); }
+async function _doCollection(){
  const amtVal=document.getElementById('colAmt').value.trim(), method=document.getElementById('colMethod').value, notes=document.getElementById('colNotes').value.trim();
  if(!amtVal||+amtVal<=0){ setMsg('colMsg','<div class="msg-err">Enter a valid amount</div>'); return; }
  if(!method){ setMsg('colMsg','<div class="msg-err">Select a payment method</div>'); return; }
@@ -1643,7 +1657,8 @@ function showReceipt(amount,plan,rep,cust,ref,method,newBal){
  showModal('receiptModal');
 }
 
-async function doApproveDisb(disbId,planId,amount){
+async function doApproveDisb(disbId,planId,amount){ await guardedAction('approveDisb_'+disbId, ()=>_doApproveDisb(disbId,planId,amount)); }
+async function _doApproveDisb(disbId,planId,amount){
  const rep=getUser();
  const { data:disbCheck } = await db.from('disbursements').select('status').eq('id',disbId).single();
  if(!disbCheck||disbCheck.status!=='reviewed'){ alert('This withdrawal must be reviewed by a Super Admin before you can approve it.'); return; }
@@ -1660,7 +1675,8 @@ async function doApproveDisb(disbId,planId,amount){
  await repDoSearch(); await renderRepDash();
 }
 
-async function doRejectDisb(disbId){
+async function doRejectDisb(disbId){ await guardedAction('rejectDisb_'+disbId, ()=>_doRejectDisb(disbId)); }
+async function _doRejectDisb(disbId){
  const rep=getUser();
  await db.from('disbursements').update({ status:'rejected' }).eq('id',disbId);
  await audit('reject',rep.id,'representative',`Rejected disbursement`,null,null);
@@ -1997,7 +2013,7 @@ async function loadRepTxPreview(){
  <div class="${isIn?'tx-amt-g':'tx-amt-r'}">${isIn?'+':'-'}${fmt(tx.amount)}</div>
  </div>`;
  }).join('');
- if(_repTxCache.length>3) el.innerHTML+=`<div style="text-align:center;padding:8px 0;"><button onclick="openRepTxHistory()" style="background:none;border:none;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;">+ ${_repTxCache.length-3} more →</button></div>`;
+ if(_repTxCache.length>3) el.innerHTML+=`<div style="text-align:center;padding:8px 0;"><button onclick="repTab('tx')" style="background:none;border:none;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;">+ ${_repTxCache.length-3} more →</button></div>`;
 }
 async function openRepTxHistory(){
   if(!_repTxCache.length) await loadRepTxPreview();
@@ -2412,6 +2428,15 @@ function buildCustProfilePage(){
     <button class="btn btn-blue" style="margin-bottom:0;" onclick="changeCustPassword()">Update Password</button>
    </div>
    <div class="profile-card">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg> Update Withdrawal PIN</div>
+    <div class="mform-group"><label class="form-lbl">Current Withdrawal PIN</label>
+     <div class="pin-wrap"><input type="password" id="cpCurPin" class="form-inp" placeholder="Current PIN" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('cpCurPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div class="mform-group"><label class="form-lbl">New Withdrawal PIN</label>
+     <div class="pin-wrap"><input type="password" id="cpNewPin" class="form-inp" placeholder="4–6 digits" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('cpNewPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div id="cpPinMsg"></div>
+    <button class="btn btn-blue" style="margin-bottom:0;" onclick="changeCustPayPin()">Update Withdrawal PIN</button>
+   </div>
+   <div class="profile-card">
     <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Account</div>
     <button class="btn" style="background:#fee2e2;color:var(--red);margin-bottom:0;" onclick="doLogout()">
      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:6px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -2437,6 +2462,22 @@ async function changeCustPassword(){
   setMsg('cpPwMsg','<div class="msg-ok">Password updated successfully</div>');
   document.getElementById('cpCurPw').value='';
   document.getElementById('cpNewPw').value='';
+}
+
+async function changeCustPayPin(){
+  const u=getUser();
+  const cur=document.getElementById('cpCurPin').value;
+  const nw=document.getElementById('cpNewPin').value;
+  if(!cur||!nw){ setMsg('cpPinMsg','<div class="msg-err">Fill in both fields</div>'); return; }
+  if(!/^\d{4,6}$/.test(nw)){ setMsg('cpPinMsg','<div class="msg-err">PIN must be 4–6 digits</div>'); return; }
+  showLoading('Verifying…');
+  const curHash=await hashPin(cur);
+  const {data:chk}=await db.from('customers').select('id').eq('id',u.id).eq('payment_pin_hash',curHash).single();
+  if(!chk){ hideLoading(); setMsg('cpPinMsg','<div class="msg-err">Current PIN is incorrect</div>'); return; }
+  await db.from('customers').update({payment_pin_hash:await hashPin(nw)}).eq('id',u.id);
+  await audit('login',u.id,'customer',`Customer ${u.first_name} ${u.last_name} changed their withdrawal PIN`);
+  hideLoading(); setMsg('cpPinMsg','<div class="msg-ok">Withdrawal PIN updated</div>');
+  document.getElementById('cpCurPin').value=''; document.getElementById('cpNewPin').value='';
 }
 
 // ════════════════════════════════════════════════════════════
