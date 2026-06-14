@@ -220,12 +220,19 @@ async function _doWithdrawalRequest() {
   if (+amtVal > (planBal?.balance || 0)) { setMsg('wdMsg', `<div class="msg-err">Amount exceeds plan balance of ${fmt(planBal?.balance)}</div>`); return; }
   const user = getUser(); const ref = genRef();
   showLoading('Submitting request…');
-  await db.from('disbursements').insert({ customer_id: user.id, plan_id: planId, type: 'withdrawal', amount: +amtVal, reason, ref, status: 'pending', stage_history: [{ stage: 'pending', timestamp: new Date().toISOString(), by: user.id }] });
-  await checkExcessWithdrawal(user.id);
-  await audit('payout', user.id, 'customer', `Withdrawal request of ${fmt(+amtVal)} — PENDING — Ref: ${ref}`, +amtVal, planId);
-  hideLoading();
-  setMsg('wdMsg', '<div class="msg-ok"> Request submitted! A representative will approve it shortly.</div>');
-  setTimeout(() => { closeModal('withdrawalModal'); setMsg('wdMsg', ''); document.getElementById('wdAmt').value = ''; document.getElementById('wdReason').value = ''; }, 2500);
+  try {
+    const { error: insErr } = await db.from('disbursements').insert({ customer_id: user.id, plan_id: planId, type: 'withdrawal', amount: +amtVal, reason, ref, status: 'pending', stage_history: [{ stage: 'pending', timestamp: new Date().toISOString(), by: user.id }] });
+    if (insErr) throw insErr;
+    await checkExcessWithdrawal(user.id);
+    await audit('payout', user.id, 'customer', `Withdrawal request of ${fmt(+amtVal)} — PENDING — Ref: ${ref}`, +amtVal, planId);
+    setMsg('wdMsg', '<div class="msg-ok"> Request submitted! A representative will approve it shortly.</div>');
+    setTimeout(() => { closeModal('withdrawalModal'); setMsg('wdMsg', ''); document.getElementById('wdAmt').value = ''; document.getElementById('wdReason').value = ''; }, 2500);
+  } catch (e) {
+    console.error('Withdrawal request failed:', e);
+    setMsg('wdMsg', `<div class="msg-err">Could not submit request: ${e.message || 'Unknown error. Please try again.'}</div>`);
+  } finally {
+    hideLoading();
+  }
 }
 
 function milAct(act) { closeModal('milestoneModal'); if (act === 'payout') openWithdrawalModal(); else if (act === 'extend') alert('Contact your representative to extend the plan date.'); else if (act === 'increase') openNewPlanModal(); }
