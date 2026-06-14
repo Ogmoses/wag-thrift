@@ -1,0 +1,6 @@
+/* representative.css
+   Role-specific stylesheet for Representative pages.
+   shared.css must be linked BEFORE this file in every representative/*.html page.
+   All current rep styles already live in shared.css (selectors like
+   #repView, .rep-*, etc.) so this file is intentionally empty for now.
+   Add representative-only overrides/additions here as the app evolves. */
