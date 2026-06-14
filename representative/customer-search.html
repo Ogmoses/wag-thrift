@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Customer Search – WAG Enterprises</title>
+<link rel="stylesheet" href="../css/shared.css">
+<link rel="stylesheet" href="../css/representative.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/representative.js"></script>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+ <div class="loading-spinner"></div>
+ <div class="loading-text" id="loadingText">Please wait…</div>
+</div>
+
+<div class="subpage active" id="repSearchPage" style="position:relative;min-height:100vh;">
+ <div class="dash-header">
+  <button onclick="window.location.href='dashboard.html'" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
+  <div class="hdr-info"><div class="hdr-name">Customer Search</div></div>
+ </div>
+ <div style="padding-bottom:90px;">
+ <div class="search-card">
+ <div class="search-card-title">Search Customer</div>
+ <div class="search-row"><input type="tel" id="repSearchInp" class="search-inp" placeholder="e.g. 09012345678" maxlength="11"><button class="search-btn" onclick="repDoSearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Search</button></div>
+ <div id="repSearchMsg"></div>
+ </div>
+ <div id="repCustCard" style="display:none;">
+ <div class="cust-result-card">
+ <div class="crc-top"><div class="crc-av" id="repCustAv">P</div><div><div class="crc-nm" id="repCustNm">—</div><div class="crc-ph" id="repCustPh">—</div></div></div>
+ <div class="plan-sel-lbl">Select Plan</div>
+ <select class="plan-sel-dd" id="repPlanDd" onchange="repOnPlanChange()"><option value="">— Select a plan —</option></select>
+ <div id="repPlanDetails" style="display:none;">
+ <div class="bt-row"><span class="bt-lbl">Balance</span><span class="bt-val" id="rpBal">₦0.00</span></div>
+ <div class="bt-row" style="border-bottom:none;"><span class="bt-lbl">Regular Contribution</span><span class="bt-val-s" id="rpTgt">₦0.00</span></div>
+ </div>
+ <button class="collect-btn" onclick="openCollectModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M12 22V9M5 15l7 7 7-7"/><path d="M4 2h16"/></svg>Save Money</button>
+ </div>
+ <div style="padding:0 13px;">
+ <div style="font-size:14px;font-weight:700;color:var(--blue);margin-bottom:9px;">Pending Withdrawals</div>
+ <div id="repDisbList"></div>
+ </div>
+ </div>
+ </div>
+ <nav class="bnav visible" style="position:fixed;">
+  <button class="bnav-tab" onclick="window.location.href='dashboard.html'">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+   Home
+  </button>
+  <button class="bnav-tab active">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+   Search
+  </button>
+  <button class="bnav-tab" onclick="window.location.href='requests.html'">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M12 2v13M5 9l7-7 7 7"/><path d="M4 22h16"/></svg>
+   Requests
+  </button>
+  <button class="bnav-tab" onclick="window.location.href='settings.html'">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   Profile
+  </button>
+ </nav>
+</div>
+
+<!-- MODALS -->
+<div id="collectModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('collectModal')">×</button><div class="m-handle"></div><div class="m-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;color:var(--green);"><path d="M12 22V9M5 15l7 7 7-7"/><path d="M4 2h16"/></svg>Save Money</div><div class="mform-group"><label class="form-lbl">Amount (₦)</label><input type="number" id="colAmt" class="form-inp" placeholder="5000" min="1"></div><div class="mform-group"><label class="form-lbl">Payment Method</label><select id="colMethod" class="form-inp"><option value="">Select method</option><option value="Cash">Cash</option><option value="Bank Transfer">Bank Transfer</option><option value="Mobile Money">Mobile Money</option></select></div><div class="mform-group"><label class="form-lbl">Notes (Optional)</label><textarea id="colNotes" class="form-inp" style="resize:vertical;min-height:55px;"></textarea></div><div id="colMsg"></div><button class="btn" style="background:var(--green);color:#fff;margin-top:8px;box-shadow:0 3px 10px rgba(5,150,105,.25);" onclick="doCollection()">Confirm Deposit</button></div></div>
+
+<div id="receiptModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('receiptModal')">×</button><div class="m-handle"></div><div class="m-title">Deposit Receipt</div><div id="receiptContent"></div><button class="btn btn-blue" onclick="closeModal('receiptModal')" style="margin-top:6px;">Done</button></div></div>
+
+<div id="payPinModal" class="modal">
+ <div class="msheet" style="max-width:480px;position:relative;">
+ <button class="m-close" onclick="closeModal('payPinModal')">×</button>
+ <div class="m-handle"></div>
+ <div class="m-title" id="payPinTitle">Enter Payment PIN</div>
+ <p style="color:var(--sub);font-size:13px;margin-bottom:16px;" id="payPinDesc">Enter your 4–6 digit payment PIN to continue.</p>
+ <div class="pin-wrap"><input type="password" id="payPinInp" class="field-input" placeholder="····" maxlength="6" inputmode="numeric" style="font-size:24px;letter-spacing:8px;text-align:center;width:100%;"><button type="button" class="pw-eye" onclick="togglePw('payPinInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+ <div id="payPinMsg" style="margin-top:8px;"></div>
+ <button class="btn btn-blue" onclick="confirmPayPin()" style="margin-top:14px;">Confirm</button>
+ </div>
+</div>
+
+<script>
+requireRole(['representative']);
+initTheme();
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+startSuspendCheck();
+</script>
+</body>
+</html>

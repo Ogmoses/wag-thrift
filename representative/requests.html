@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Withdrawal Requests – WAG Enterprises</title>
+<link rel="stylesheet" href="../css/shared.css">
+<link rel="stylesheet" href="../css/representative.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/representative.js"></script>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+ <div class="loading-spinner"></div>
+ <div class="loading-text" id="loadingText">Please wait…</div>
+</div>
+
+<div class="subpage active" id="repRequestsPage" style="position:relative;min-height:100vh;">
+ <div class="dash-header">
+  <button onclick="window.location.href='dashboard.html'" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
+  <div class="hdr-info"><div class="hdr-name">Withdrawal Requests</div></div>
+ </div>
+ <div style="padding:13px 13px 90px;">
+  <div class="msg-info" style="margin-bottom:12px;">Showing all pending, admin-reviewed and approved withdrawal requests across customers. Reviewed requests can be approved & paid or rejected.</div>
+  <div id="repAllRequestsList"><div class="tx-empty">Loading…</div></div>
+ </div>
+ <nav class="bnav visible" style="position:fixed;">
+  <button class="bnav-tab" onclick="window.location.href='dashboard.html'">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+   Home
+  </button>
+  <button class="bnav-tab" onclick="window.location.href='customer-search.html'">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+   Search
+  </button>
+  <button class="bnav-tab active">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M12 2v13M5 9l7-7 7 7"/><path d="M4 22h16"/></svg>
+   Requests
+  </button>
+  <button class="bnav-tab" onclick="window.location.href='settings.html'">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   Profile
+  </button>
+ </nav>
+</div>
+
+<script>
+requireRole(['representative']);
+initTheme();
+loadAllRepRequests();
+startSuspendCheck();
+</script>
+</body>
+</html>
