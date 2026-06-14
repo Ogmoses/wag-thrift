@@ -145,7 +145,7 @@ function renderDisbCards(disbs) {
     } else if (isApproved) {
       actionHtml = `<div style="background:#d1fae5;border:1px solid #059669;border-radius:8px;padding:9px 12px;font-size:11px;color:#065f46;display:flex;align-items:center;gap:6px;">✓ Approved — awaiting payment confirmation</div>`;
     }
-    return `<div class="dis-card"><div class="dis-type">${d.type === 'emergency' ? 'Emergency' : 'Milestone'}</div><div class="dis-amt">${fmt(d.amount)}</div><div class="dis-stage-bar">${stages.map((s, i) => `<div class="stage-step"><div class="stage-dot ${i < curIdx ? 'done' : i === curIdx ? 'active' : ''}"></div><div class="stage-label">${s}</div></div>`).join('')}</div><div class="dis-reason">${d.reason || 'No reason provided'}</div>${actionHtml}</div>`;
+    return `<div class="dis-card"><div class="dis-type">${d.type === 'withdrawal' ? 'Withdrawal' : 'Milestone'}</div><div class="dis-amt">${fmt(d.amount)}</div><div class="dis-stage-bar">${stages.map((s, i) => `<div class="stage-step"><div class="stage-dot ${i < curIdx ? 'done' : i === curIdx ? 'active' : ''}"></div><div class="stage-label">${s}</div></div>`).join('')}</div><div class="dis-reason">${d.reason || 'No reason provided'}</div>${actionHtml}</div>`;
   }).join('');
 }
 
@@ -268,7 +268,7 @@ async function loadAllRepRequests() {
     const cu = custMap[d.customer_id] || {};
     const cards = renderDisbCards([d]);
     return `<div class="wcard" style="margin-bottom:10px;padding:10px;">
-      <div style="font-weight:700;font-size:13px;color:var(--blue);margin-bottom:4px;">${cu.first_name || 'Customer'} ${cu.last_name || ''}</div>
+      <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:4px;">${cu.first_name || 'Customer'} ${cu.last_name || ''}</div>
       <div style="font-size:11px;color:var(--sub);margin-bottom:8px;">${cu.phone || ''}</div>
       ${cards}
     </div>`;

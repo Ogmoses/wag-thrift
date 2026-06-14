@@ -63,10 +63,10 @@ async function flagFraud(type, severity, userId, description, planId = null) {
 async function checkLargeCollection(amount, agentId, planId) {
   if (amount > 50000) await flagFraud('LARGE_COLLECTION', 'medium', agentId, `Unusually large collection of ${fmt(amount)}`, planId);
 }
-async function checkExcessEmergency(customerId) {
+async function checkExcessWithdrawal(customerId) {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const { data } = await db.from('disbursements').select('id').eq('customer_id', customerId).eq('type', 'emergency').gte('requested_at', since);
-  if (data && data.length >= 3) await flagFraud('EXCESS_EMERGENCY', 'high', customerId, `${data.length} emergency requests in 30 days`);
+  const { data } = await db.from('disbursements').select('id').eq('customer_id', customerId).eq('type', 'withdrawal').gte('requested_at', since);
+  if (data && data.length >= 3) await flagFraud('EXCESS_WITHDRAWAL', 'high', customerId, `${data.length} withdrawal requests in 30 days`);
 }
 async function checkFailedPin(phone) {
   const { data } = await db.from('pin_attempts').select('attempts').eq('phone', phone).single();

@@ -54,6 +54,8 @@ async function renderPlanDetail(planId) {
   ]);
   if (!plan) return;
   plan.regular_contribution = planExtra?.regular_contribution || 0;
+  const nameEl = document.getElementById('planNameDisplay');
+  if (nameEl) nameEl.textContent = plan.name || '—';
   activePlanBalance = Number(plan.balance || 0);
   const regularAmt = Number(plan.regular_contribution) || 1000;
   const totalDeposited = (allDeposits || []).reduce((s, t) => s + Number(t.amount), 0);
@@ -166,38 +168,67 @@ async function permanentlyDeletePlan() {
 }
 
 // ═══════════════════════════════════════════════
-// EMERGENCY / WITHDRAWAL REQUEST (payment PIN protected)
+// RENAME PLAN
 // ═══════════════════════════════════════════════
-function openEmgModal() { requirePayPin('Payment PIN', 'Enter your payment PIN to withdraw money.', () => _openEmgModal()); }
-async function _openEmgModal() {
+function openRenamePlanModal() {
+  if (!activePlanId) return;
+  const current = document.getElementById('planNameDisplay')?.textContent || '';
+  document.getElementById('renamePlanInp').value = current === '—' ? '' : current;
+  setMsg('renamePlanMsg', '');
+  showModal('renamePlanModal');
+}
+
+async function doRenamePlan() { await guardedAction('renamePlan', _doRenamePlan); }
+async function _doRenamePlan() {
+  if (!activePlanId) return;
+  const newName = document.getElementById('renamePlanInp').value.trim();
+  if (!newName) { setMsg('renamePlanMsg', '<div class="msg-err">Please enter a plan name</div>'); return; }
+  if (newName.length > 40) { setMsg('renamePlanMsg', '<div class="msg-err">Name is too long (max 40 characters)</div>'); return; }
+  showLoading('Renaming…');
+  const { data: pb } = await db.from('plan_balances').select('name').eq('plan_id', activePlanId).single();
+  const oldName = pb?.name || '';
+  const { error } = await db.from('plans').update({ name: newName }).eq('id', activePlanId);
+  if (error) { hideLoading(); setMsg('renamePlanMsg', `<div class="msg-err">${error.message}</div>`); return; }
+  const user = getUser();
+  await audit('plan', user.id, 'customer', `${user.first_name} ${user.last_name} renamed plan "${oldName}" to "${newName}"`, null, activePlanId);
+  hideLoading();
+  closeModal('renamePlanModal');
+  await renderCustDash();
+}
+
+// ═══════════════════════════════════════════════
+// WITHDRAWAL REQUEST (payment PIN protected)
+// ═══════════════════════════════════════════════
+function openWithdrawalModal() { requirePayPin('Payment PIN', 'Enter your payment PIN to withdraw money.', () => _openWithdrawalModal()); }
+async function _openWithdrawalModal() {
   const user = getUser();
   const { data: plans } = await db.from('plan_balances').select('*').eq('customer_id', user.id).eq('status', 'active').neq('status', 'deleted');
   if (!plans?.length) { alert('No active plans to withdraw from'); return; }
-  const sel = document.getElementById('emgPlan');
+  const sel = document.getElementById('wdPlan');
   sel.innerHTML = '<option value="">— Select plan —</option>';
   plans.forEach(p => sel.innerHTML += `<option value="${p.plan_id}">${p.name} (${fmt(p.balance)})</option>`);
   if (activePlanId) sel.value = activePlanId;
-  showModal('emgModal');
+  showModal('withdrawalModal');
 }
 
-async function doEmgRequest() { await guardedAction('emgRequest', _doEmgRequest); }
-async function _doEmgRequest() {
-  const planId = document.getElementById('emgPlan').value, amtVal = document.getElementById('emgAmt').value.trim(), reason = document.getElementById('emgReason').value.trim();
-  if (!planId) { setMsg('emgMsg', '<div class="msg-err">Please select a plan</div>'); return; }
-  if (!amtVal || +amtVal <= 0) { setMsg('emgMsg', '<div class="msg-err">Enter a valid amount</div>'); return; }
+async function doWithdrawalRequest() { await guardedAction('withdrawalRequest', _doWithdrawalRequest); }
+async function _doWithdrawalRequest() {
+  const planId = document.getElementById('wdPlan').value, amtVal = document.getElementById('wdAmt').value.trim(), reason = document.getElementById('wdReason').value.trim();
+  if (!planId) { setMsg('wdMsg', '<div class="msg-err">Please select a plan</div>'); return; }
+  if (!amtVal || +amtVal <= 0) { setMsg('wdMsg', '<div class="msg-err">Enter a valid amount</div>'); return; }
   const { data: planBal } = await db.from('plan_balances').select('balance').eq('plan_id', planId).single();
-  if (+amtVal > (planBal?.balance || 0)) { setMsg('emgMsg', `<div class="msg-err">Amount exceeds plan balance of ${fmt(planBal?.balance)}</div>`); return; }
+  if (+amtVal > (planBal?.balance || 0)) { setMsg('wdMsg', `<div class="msg-err">Amount exceeds plan balance of ${fmt(planBal?.balance)}</div>`); return; }
   const user = getUser(); const ref = genRef();
   showLoading('Submitting request…');
-  await db.from('disbursements').insert({ customer_id: user.id, plan_id: planId, type: 'emergency', amount: +amtVal, reason, ref, status: 'pending', stage_history: [{ stage: 'pending', timestamp: new Date().toISOString(), by: user.id }] });
-  await checkExcessEmergency(user.id);
-  await audit('payout', user.id, 'customer', `Emergency payout request of ${fmt(+amtVal)} — PENDING — Ref: ${ref}`, +amtVal, planId);
+  await db.from('disbursements').insert({ customer_id: user.id, plan_id: planId, type: 'withdrawal', amount: +amtVal, reason, ref, status: 'pending', stage_history: [{ stage: 'pending', timestamp: new Date().toISOString(), by: user.id }] });
+  await checkExcessWithdrawal(user.id);
+  await audit('payout', user.id, 'customer', `Withdrawal request of ${fmt(+amtVal)} — PENDING — Ref: ${ref}`, +amtVal, planId);
   hideLoading();
-  setMsg('emgMsg', '<div class="msg-ok"> Request submitted! A representative will approve it shortly.</div>');
-  setTimeout(() => { closeModal('emgModal'); setMsg('emgMsg', ''); document.getElementById('emgAmt').value = ''; document.getElementById('emgReason').value = ''; }, 2500);
+  setMsg('wdMsg', '<div class="msg-ok"> Request submitted! A representative will approve it shortly.</div>');
+  setTimeout(() => { closeModal('withdrawalModal'); setMsg('wdMsg', ''); document.getElementById('wdAmt').value = ''; document.getElementById('wdReason').value = ''; }, 2500);
 }
 
-function milAct(act) { closeModal('milestoneModal'); if (act === 'payout') openEmgModal(); else if (act === 'extend') alert('Contact your representative to extend the plan date.'); else if (act === 'increase') openNewPlanModal(); }
+function milAct(act) { closeModal('milestoneModal'); if (act === 'payout') openWithdrawalModal(); else if (act === 'extend') alert('Contact your representative to extend the plan date.'); else if (act === 'increase') openNewPlanModal(); }
 
 // ═══════════════════════════════════════════════
 // PAYMENT PIN — generic verify-before-action (customer & representative)
@@ -359,6 +390,10 @@ async function loadCustTxPage() {
   const { data: plans } = await db.from('plan_balances').select('plan_id,name').eq('customer_id', user.id).neq('status', 'deleted');
   const planIds = (plans || []).map(p => p.plan_id);
   const planNameMap = {}; (plans || []).forEach(p => planNameMap[p.plan_id] = p.name);
+  const planSel = document.getElementById('custTxPlanFilter');
+  if (planSel) {
+    planSel.innerHTML = '<option value="all">All Plans</option>' + (plans || []).map(p => `<option value="${p.plan_id}">${p.name}</option>`).join('');
+  }
   if (!planIds.length) { el.innerHTML = '<div class="tx-empty">No plans yet</div>'; return; }
   const [{ data: txs }, { data: rDbs }] = await Promise.all([
     db.from('transactions').select('*').in('plan_id', planIds).order('created_at', { ascending: false }),
@@ -373,7 +408,9 @@ async function loadCustTxPage() {
 function renderCustTxList() {
   const el = document.getElementById('custTxSubList');
   const cat = document.getElementById('custTxCatFilter')?.value || 'all';
-  const filtered = cat === 'all' ? _custTxAll : _custTxAll.filter(t => t.type === cat);
+  const planFilter = document.getElementById('custTxPlanFilter')?.value || 'all';
+  let filtered = cat === 'all' ? _custTxAll : _custTxAll.filter(t => t.type === cat);
+  if (planFilter !== 'all') filtered = filtered.filter(t => t.plan_id === planFilter);
   if (!filtered.length) { el.innerHTML = '<div class="tx-empty">No transactions yet</div>'; return; }
   el.innerHTML = filtered.map(tx => {
     const isIn = tx.type === 'deposit' || tx.type === 'opening';

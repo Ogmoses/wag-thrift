@@ -88,6 +88,14 @@ function renderAdminShell(activePage, title) {
 
   updateBadges();
   setupRealtimeListeners();
+
+  // Expose the topbar's rendered height as a CSS var so sticky elements
+  // further down the page (e.g. the audit log search bar) can stick
+  // immediately below it with no gap/overlap, regardless of device.
+  requestAnimationFrame(() => {
+    const tb = document.querySelector('.topbar');
+    if (tb) document.documentElement.style.setProperty('--topbar-h', tb.offsetHeight + 'px');
+  });
 }
 
 // Change this to a secure PIN. In production this should be validated server-side.
