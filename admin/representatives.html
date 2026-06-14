@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Field Agents – WAG Admin</title>
+<link rel="stylesheet" href="../css/shared.css">
+<link rel="stylesheet" href="../css/admin.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/admin.js"></script>
+</head>
+<body>
+
+<div id="adminShellRoot"></div>
+
+<div id="appShell">
+  <main class="main-content" id="mainContent">
+
+    <!-- AGENTS -->
+    <div class="page active" id="page-agents">
+      <div class="page-inner">
+        <div id="agentsPageList"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- TOKENS -->
+    <div class="page" id="page-tokens">
+      <div class="page-inner">
+        <button class="btn btn-yellow" onclick="adminGenToken()" style="width:100%;justify-content:center;margin-bottom:14px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg>
+          Generate Activation Token
+        </button>
+        <div id="genTokMsg" style="margin-bottom:10px;"></div>
+        <div id="adminTokList"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const _a = requireAdmin();
+if (_a) {
+  initAdminTheme();
+  const initial = (location.hash === '#tokens') ? 'tokens' : 'agents';
+  renderAdminShell(initial, initial === 'tokens' ? 'Activation Tokens' : 'Field Agents');
+
+  function showAdminTab(page) {
+    currentPage = page;
+    document.getElementById('page-agents').classList.toggle('active', page === 'agents');
+    document.getElementById('page-tokens').classList.toggle('active', page === 'tokens');
+    document.querySelector('.topbar-title').textContent = page === 'tokens' ? 'Activation Tokens' : 'Field Agents';
+    document.querySelectorAll('.nav-item').forEach(n => {
+      n.classList.toggle('active', n.getAttribute('href') === (page === 'tokens' ? 'representatives.html#tokens' : 'representatives.html'));
+    });
+    history.replaceState(null, '', page === 'tokens' ? '#tokens' : location.pathname);
+    if (page === 'agents') renderAgentsPage(); else renderTokensList();
+  }
+
+  document.querySelectorAll('.nav-item').forEach(n => {
+    const href = n.getAttribute('href');
+    if (href === 'representatives.html' || href === 'representatives.html#tokens') {
+      n.addEventListener('click', e => { e.preventDefault(); showAdminTab(href.includes('#') ? 'tokens' : 'agents'); });
+    }
+  });
+
+  showAdminTab(initial);
+  closeSidebar();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Customers – WAG Admin</title>
+<link rel="stylesheet" href="../css/shared.css">
+<link rel="stylesheet" href="../css/admin.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/admin.js"></script>
+</head>
+<body>
+
+<div id="adminShellRoot"></div>
+
+<div id="appShell">
+  <main class="main-content" id="mainContent">
+
+    <!-- CUSTOMERS -->
+    <div class="page active" id="page-customers">
+      <div class="page-inner">
+        <div class="search-row">
+          <input type="text" id="custSearchInp" class="search-inp" placeholder="Search by name…" oninput="filterCustomersPage()">
+        </div>
+        <div id="custPageList"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="page" id="page-search">
+      <div class="page-inner">
+        <div class="section-card" style="margin-bottom:13px;">
+          <div style="display:flex;gap:8px;margin-bottom:11px;">
+            <button class="btn btn-ghost active" id="ssub-customer" onclick="setSearchSub('customer')" style="font-size:12px;padding:7px 13px;">Customer by Phone</button>
+            <button class="btn btn-ghost" id="ssub-agent" onclick="setSearchSub('agent')" style="font-size:12px;padding:7px 13px;">Agent by ID</button>
+          </div>
+          <div class="search-row">
+            <input type="text" id="adminSearchInp" class="search-inp" placeholder="Enter phone number">
+            <button class="search-btn" onclick="adminDoSearch()">Search</button>
+          </div>
+          <div id="adminSearchResult"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const _a = requireAdmin();
+if (_a) {
+  initAdminTheme();
+  const initial = (location.hash === '#search') ? 'search' : 'customers';
+  renderAdminShell(initial, initial === 'search' ? 'Search' : 'Customers');
+
+  function showAdminTab(page) {
+    currentPage = page;
+    document.getElementById('page-customers').classList.toggle('active', page === 'customers');
+    document.getElementById('page-search').classList.toggle('active', page === 'search');
+    document.querySelector('.topbar-title').textContent = page === 'search' ? 'Search' : 'Customers';
+    document.querySelectorAll('.nav-item').forEach(n => {
+      n.classList.toggle('active', n.getAttribute('href') === (page === 'search' ? 'users.html#search' : 'users.html'));
+    });
+    history.replaceState(null, '', page === 'search' ? '#search' : location.pathname);
+    if (page === 'customers') renderCustomersPage();
+  }
+
+  document.querySelectorAll('.nav-item').forEach(n => {
+    const href = n.getAttribute('href');
+    if (href === 'users.html' || href === 'users.html#search') {
+      n.addEventListener('click', e => { e.preventDefault(); showAdminTab(href.includes('#') ? 'search' : 'customers'); });
+    }
+  });
+
+  setSearchSub('customer');
+  showAdminTab(initial);
+  closeSidebar();
+}
+</script>
+</body>
+</html>

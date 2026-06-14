@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Analytics – WAG Admin</title>
+<link rel="stylesheet" href="../css/shared.css">
+<link rel="stylesheet" href="../css/admin.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/admin.js"></script>
+</head>
+<body>
+
+<div id="adminShellRoot"></div>
+
+<div id="appShell">
+  <main class="main-content" id="mainContent">
+
+    <!-- ANALYTICS -->
+    <div class="page active" id="page-analytics">
+      <div class="page-inner">
+        <div class="overview-grid" id="analyticsGrid"></div>
+        <div class="bar-chart-wrap"><div class="bar-chart-title">Daily Deposits (Last 7 Days)</div><div class="bar-chart" id="barChart"></div></div>
+        <div class="section-card"><div class="section-card-title">Top Performing Agents</div><div id="topAgentsList"></div></div>
+        <button onclick="deleteInactiveUsers()" class="btn btn-red" style="width:100%;justify-content:center;margin-top:4px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/></svg>
+          Remove Inactive Users
+        </button>
+      </div>
+    </div>
+
+    <!-- FRAUD FLAGS -->
+    <div class="page" id="page-flags">
+      <div class="page-inner">
+        <div id="fraudFlagsList"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const _a = requireAdmin();
+if (_a) {
+  initAdminTheme();
+  const initial = (location.hash === '#flags') ? 'flags' : 'analytics';
+  renderAdminShell(initial, initial === 'flags' ? 'Fraud Flags' : 'Analytics');
+
+  function showAdminTab(page) {
+    currentPage = page;
+    document.getElementById('page-analytics').classList.toggle('active', page === 'analytics');
+    document.getElementById('page-flags').classList.toggle('active', page === 'flags');
+    document.querySelector('.topbar-title').textContent = page === 'flags' ? 'Fraud Flags' : 'Analytics';
+    document.querySelectorAll('.nav-item').forEach(n => {
+      n.classList.toggle('active', n.getAttribute('href') === (page === 'flags' ? 'analytics.html#flags' : 'analytics.html'));
+    });
+    history.replaceState(null, '', page === 'flags' ? '#flags' : location.pathname);
+    if (page === 'analytics') renderAnalytics(); else renderFraudFlags();
+  }
+
+  document.querySelectorAll('.nav-item').forEach(n => {
+    const href = n.getAttribute('href');
+    if (href === 'analytics.html' || href === 'analytics.html#flags') {
+      n.addEventListener('click', e => { e.preventDefault(); showAdminTab(href.includes('#') ? 'flags' : 'analytics'); });
+    }
+  });
+
+  showAdminTab(initial);
+  closeSidebar();
+}
+</script>
+</body>
+</html>
