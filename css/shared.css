@@ -489,4 +489,29 @@ body.dark .cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#111;fon
 .ic{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
 .ic svg{width:1em;height:1em;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;}
 button .ic, a .ic{vertical-align:middle;}
+body.dark .mini-cal-days-hdr{border-color:#fff;}
+.cal-day-hdr{font-size:10px;font-weight:700;color:#111;text-align:center;}
+body.dark .cal-day-hdr{color:#fff;}
+.mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.cal-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:12px;font-weight:700;border:1px solid #111;color:#111;}
+body.dark .cal-cell{border-color:#fff;color:#fff;}
+.cal-cell.c-green{background:#d1fae5;color:#111;border-color:#111;}
+body.dark .cal-cell.c-green{background:#064e3b;color:#fff;border-color:#fff;}
+.cal-cell.c-red{background:#fee2e2;color:#111;border-color:#111;}
+body.dark .cal-cell.c-red{background:#450a0a;color:#fff;border-color:#fff;}
+.cal-cell.c-grey{color:#111;border-color:#111;}
+body.dark .cal-cell.c-grey{color:#fff;border-color:#fff;}
+.cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:900;border-width:2px;}
+body.dark .cal-cell.c-today{border-color:var(--yellow);color:var(--yellow);}
+.cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#111;font-weight:900;}
+body.dark .cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#111;font-weight:900;}
+.cal-legend{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;}
+.cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub);}
+.cal-dot{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0;}
+
+
+.ic{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ic svg{width:1em;height:1em;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+button .ic, a .ic{vertical-align:middle;}
+
 
