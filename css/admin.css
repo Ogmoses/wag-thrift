@@ -55,8 +55,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .msg-info{background:rgba(59,130,246,.12);border-left:3px solid #3b82f6;padding:10px 12px;border-radius:7px;font-size:13px;color:#93c5fd;margin:8px 0;}
 
 /* ─── APP SHELL ─── */
-#appShell{display:none;min-height:100vh;}
-#appShell.active{display:flex;}
+#appShell{display:flex;min-height:100vh;}
 
 /* ─── SIDEBAR ─── */
 .sidebar{width:var(--sidebar-w);background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:300;transform:translateX(-100%);transition:transform .3s ease;}
