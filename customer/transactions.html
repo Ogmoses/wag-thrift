@@ -21,20 +21,25 @@
 </div>
 
 <div class="subpage active" id="custTxSubpage" style="position:relative;min-height:100vh;">
- <div class="dash-header">
-  <button onclick="window.location.href='dashboard.html'" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
-  <div class="hdr-info"><div class="hdr-name">All Transactions</div></div>
+ <div style="position:sticky;top:0;z-index:200;">
+  <div class="dash-header" style="position:static;">
+   <button onclick="window.location.href='dashboard.html'" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
+   <div class="hdr-info"><div class="hdr-name">All Transactions</div></div>
+  </div>
+  <div style="background:var(--bg);padding:10px 13px;display:flex;gap:8px;border-bottom:1px solid var(--border);">
+   <select id="custTxPlanFilter" onchange="renderCustTxList()" style="flex:1;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-size:13px;background:#fff;color:var(--text);min-width:0;">
+    <option value="all">All Plans</option>
+   </select>
+   <select id="custTxCatFilter" onchange="renderCustTxList()" style="flex:1;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-size:13px;background:#fff;color:var(--text);min-width:0;">
+    <option value="all">All Types</option>
+    <option value="opening">Opening</option>
+    <option value="deposit">Deposits</option>
+    <option value="payout">Payouts</option>
+    <option value="rejected">Rejected</option>
+   </select>
+  </div>
  </div>
- <div style="padding:12px 13px 0;">
-  <select id="custTxCatFilter" onchange="renderCustTxList()" style="width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-size:14px;background:#fff;color:var(--text);margin-bottom:10px;">
-   <option value="all">All Types</option>
-   <option value="opening">Opening</option>
-   <option value="deposit">Deposits</option>
-   <option value="payout">Payouts</option>
-   <option value="rejected">Rejected</option>
-  </select>
- </div>
- <div id="custTxSubList" style="padding:0 13px 90px;"><div class="tx-empty">Loading…</div></div>
+ <div id="custTxSubList" style="padding:13px 13px 90px;"><div class="tx-empty">Loading…</div></div>
  <nav class="bnav visible" style="position:fixed;">
   <button class="bnav-tab" onclick="window.location.href='dashboard.html'">
    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
