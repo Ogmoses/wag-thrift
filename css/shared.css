@@ -14,6 +14,7 @@ body.dark{background:#0f0f0f;color:#f0f0f0;}
 @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.03);}}
 @keyframes shimmer{0%,100%{opacity:.75;}50%{opacity:1;}}
 @keyframes spin{to{transform:rotate(360deg);}}
+@keyframes paypinPop{from{opacity:0;transform:scale(.4);}to{opacity:1;transform:scale(1);}}
 .view{display:none;min-height:100vh;}
 .view.active{display:block;animation:fadeUp .35s ease;}
 #landingView.active{display:flex;flex-direction:column;min-height:100vh;animation:fadeIn .4s ease;}
@@ -26,8 +27,8 @@ body.dark{background:#0f0f0f;color:#f0f0f0;}
 .dash-header{background:var(--blue);padding:13px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:200;box-shadow:0 2px 16px rgba(0,0,0,.25);}
 .avatar-c{width:40px;height:40px;min-width:40px;background:var(--yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#111;flex-shrink:0;}
 .hdr-info{flex:1;min-width:0;}
-.hdr-name{color:var(--yellow);font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;}
-.hdr-sub{color:rgba(255,255,255,.6);font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;}
+.hdr-name{color:var(--yellow);font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hdr-sub{color:rgba(255,255,255,.6);font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hdr-right{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:auto;}
 .role-badge{background:var(--yellow);color:#111;font-size:10px;font-weight:800;padding:4px 9px;border-radius:6px;letter-spacing:.5px;white-space:nowrap;}
 .theme-btn{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;}
@@ -103,6 +104,8 @@ body.dark .wcard{background:#1c1c1c;}
 body.dark .stage-dot{background:#1c1c1c;}
 .stage-dot.done{background:var(--green);border-color:var(--green);}
 .stage-dot.active{background:var(--yellow);border-color:var(--yellow);}
+body.dark .stage-dot.done{background:var(--green);border-color:var(--green);}
+body.dark .stage-dot.active{background:var(--yellow);border-color:var(--yellow);}
 .stage-label{font-size:9px;color:var(--sub);font-weight:600;text-transform:uppercase;}
 /* RECEIPT */
 .receipt-wrap{background:linear-gradient(135deg,var(--blue) 0%,#023396 100%);border-radius:16px;padding:22px;color:#fff;text-align:center;margin:14px 0;}
@@ -196,9 +199,9 @@ body.dark .icard-val{color:var(--yellow);}
 .cbtn{padding:12px;border-radius:11px;border:none;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .2s;}
 .cbtn:hover{transform:translateY(-1px);}
 .cbtn:active{transform:scale(.97);}
-.cbtn-emg{background:#fee2e2;color:var(--red);}
+.cbtn-wd{background:#fee2e2;color:var(--red);}
 .cbtn-del{background:#f3f4f6;color:#374151;border:2px solid var(--border);}
-body.dark .cbtn-emg{background:rgba(220,38,38,.18);}
+body.dark .cbtn-wd{background:rgba(220,38,38,.18);}
 body.dark .cbtn-del{background:#222;border-color:#333;color:#aaa;}
 .tx-section{background:#fff;border-radius:15px;padding:16px;margin:0 13px 22px;box-shadow:0 2px 7px rgba(0,0,0,.05);transition:background .3s;}
 body.dark .tx-section{background:#1c1c1c;}
@@ -265,9 +268,9 @@ body.dark .bt-val{color:var(--yellow);}
 .collect-btn:hover{background:#047857;transform:translateY(-1px);}
 .collect-btn:active{transform:scale(.97);}
 /* ── WITHDRAW MONEY button — bold red/orange, clearly distinct ── */
-.cbtn-emg{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;box-shadow:0 3px 10px rgba(220,38,38,.3);}
-.cbtn-emg:hover{background:linear-gradient(135deg,#b91c1c,#991b1b);transform:translateY(-1px);}
-body.dark .cbtn-emg{background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fca5a5;box-shadow:0 3px 10px rgba(220,38,38,.2);}
+.cbtn-wd{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;box-shadow:0 3px 10px rgba(220,38,38,.3);}
+.cbtn-wd:hover{background:linear-gradient(135deg,#b91c1c,#991b1b);transform:translateY(-1px);}
+body.dark .cbtn-wd{background:linear-gradient(135deg,#7f1d1d,#991b1b);color:#fca5a5;box-shadow:0 3px 10px rgba(220,38,38,.2);}
 .dis-card{background:#fff;border-radius:13px;padding:14px;box-shadow:0 2px 7px rgba(0,0,0,.06);margin-bottom:9px;animation:fadeUp .28s ease;transition:background .3s;}
 body.dark .dis-card{background:#1c1c1c;}
 .dis-type{font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
@@ -447,37 +450,12 @@ body.dark .theme-opt.active{border-color:var(--yellow);color:var(--yellow);backg
 .paypin-setup-ico{width:56px;height:56px;background:rgba(1,31,123,.1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;}
 body.dark .paypin-setup-ico{background:rgba(255,186,9,.12);}
 
-body:not(.dark) .admin-wrap{background:#f0f2f7;}
-body:not(.dark) .admin-tab:not(.active){background:#e5e7eb;color:var(--sub);border-color:var(--border);}
-body:not(.dark) .admin-tabs-row{background:#f0f2f7;}
-body:not(.dark) .agent-card{background:#fff;border-color:var(--border);}
-body:not(.dark) .agent-card-name{color:var(--text);}
-body:not(.dark) .agent-card-sub{color:var(--sub);}
-body:not(.dark) .tok-row{background:#fff;border-color:var(--border);}
-body:not(.dark) .tok-val{color:var(--text);}
-body:not(.dark) .elevate-card{background:#fff;border-color:var(--border);}
-body:not(.dark) .elevate-title{color:var(--sub);}
-body:not(.dark) .admin-inp{background:#fff;color:var(--text);border-color:var(--border);}
-body:not(.dark) .admin-inp::placeholder{color:var(--sub);}
-body:not(.dark) .admin-section-lbl{color:var(--sub);}
-body:not(.dark) .fraud-flag-card{background:#fff5f5;border-color:#fecaca;}
-body:not(.dark) .ff-desc{color:#991b1b;}
-body:not(.dark) .audit-item{border-color:var(--border);}
-body:not(.dark) .audit-desc{color:var(--sub);}
-body:not(.dark) .audit-time{color:var(--sub);}
-body:not(.dark) .adr-profile{background:#fff;border-color:var(--border);}
-body:not(.dark) .adr-name{color:var(--text);}
-body:not(.dark) .adr-phone,.adr-since{color:var(--sub);}
-body:not(.dark) .adr-plan-card{background:#fff;border-color:var(--border);}
-body:not(.dark) .adr-plan-name{color:var(--text);}
-body:not(.dark) .adr-plan-meta,.adr-tx-info{color:var(--sub);}
-body:not(.dark) .aar-wrap{background:#fff;border-color:var(--border);}
-body:not(.dark) .aar-name{color:var(--text);}
-body:not(.dark) .aar-phone,.aar-audit-title,.aar-audit-desc,.aar-score-lbl,.aar-score-sub,.aar-stat-lbl{color:var(--sub);}
-body:not(.dark) .aar-stat{background:#f3f4f6;}
-body:not(.dark) .aar-score-row{background:#f3f4f6;}
-body:not(.dark) .aar-audit-item{border-color:var(--border);}
-body:not(.dark) .admin-sub-btn:not(.active){background:#f3f4f6;color:var(--sub);border-color:var(--border);}
+/* NOTE: admin-portal theming (fraud-flag-card, tok-row, adr-*, audit-*, etc.)
+   is fully handled by css/admin.css via :root + body.light-mode. The old
+   body:not(.dark) overrides that used to live here belonged to the legacy
+   single-SPA admin (which used the .dark convention) and conflicted with
+   admin.css's .light-mode convention, forcing white/light backgrounds with
+   unreadable text on admin's dark theme. Removed.
 body:not(.dark) .adr-elevate-section{background:rgba(255,186,9,.08);border-color:rgba(255,186,9,.3);}
 
 
@@ -486,8 +464,8 @@ body:not(.dark) .adr-elevate-section{background:rgba(255,186,9,.08);border-color
 .cal-month-name{font-size:22px;font-weight:800;color:var(--text);}
 body.dark .cal-month-name{color:#f0f0f0;}
 .cal-year-lbl{font-size:14px;font-weight:700;color:var(--sub);}
-.mini-cal-days-hdr{display:grid;grid-template-columns:repeat(7,1fr);border:1.5px solid var(--border);border-radius:10px;padding:8px 0;margin-bottom:8px;}
-body.dark .mini-cal-days-hdr{border-color:#2a2a2a;}
+.mini-cal-days-hdr{display:grid;grid-template-columns:repeat(7,1fr);border:1.5px solid #111;border-radius:10px;padding:8px 0;margin-bottom:8px;}
+body.dark .mini-cal-days-hdr{border-color:#fff;}
 .cal-day-hdr{font-size:10px;font-weight:700;color:#111;text-align:center;}
 body.dark .cal-day-hdr{color:#fff;}
 .mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
