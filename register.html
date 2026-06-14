@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Create Account – WAG Enterprises</title>
+<link rel="stylesheet" href="css/shared.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/auth.js"></script>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loadingOverlay">
+ <div class="loading-spinner"></div>
+ <div class="loading-text" id="loadingText">Please wait…</div>
+</div>
+
+<div id="landingView" class="view active">
+ <div class="land-hero">
+ <button class="land-theme-btn" onclick="toggleTheme()" id="landThemeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
+ <a href="index.html" style="text-decoration:none;"><div class="land-logo"><svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:42px;height:42px;"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9v.01M18 15v.01"/></svg></div></a>
+ <h1 class="land-title">Wonderful & Able God</h1>
+ <p class="land-title" style="margin-bottom:6px;font-size:28px;">Enterprises</p>
+ <p class="land-sub" style="font-size:10px;letter-spacing:3px;margin-bottom:26px;">Thrift Savings</p>
+ <div class="land-role-row">
+ <button class="land-role-btn active" id="landRoleCust" onclick="setLandRole('customer')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Customer</button>
+ <button class="land-role-btn" id="landRoleRep" onclick="setLandRole('representative')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>Representative</button>
+ </div>
+ </div>
+ <div class="land-card-wrap">
+ <div class="auth-tab-row">
+ <button class="auth-tab-btn" id="authSignIn" onclick="window.location.href='login.html'">Sign In</button>
+ <button class="auth-tab-btn active" id="authCreate" onclick="">Create Account</button>
+ </div>
+ <!-- Customer Create -->
+ <div id="custCreate">
+ <div class="form-group"><span class="field-label">First Name</span><input type="text" id="regFn" class="field-input"></div>
+ <div class="form-group"><span class="field-label">Last Name</span><input type="text" id="regLn" class="field-input"></div>
+ <div class="form-group"><span class="field-label">Email Address</span><input type="email" id="regEm" class="field-input"></div>
+ <div class="form-group"><span class="field-label">Phone Number</span><input type="tel" id="regPh" class="field-input" placeholder="08012345678" maxlength="11"></div>
+ <div class="form-group"><span class="field-label">Home Address</span><input type="text" id="regAddr" class="field-input" placeholder="Your residential address"></div>
+ <div class="form-group"><span class="field-label">Password</span><div class="pin-wrap"><input type="password" id="regPin" class="field-input" placeholder="····" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('regPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+ <div id="regMsg"></div>
+ <div id="custCreateFormBtns">
+ <button class="land-submit-btn" id="regBtn" onclick="doRegister()">Create Customer Account</button>
+ </div>
+ <div class="verify-section" id="verifySection">
+ <div class="msg-info" id="verifyInfo"> Enter the 6-digit code sent to your email.</div>
+ <div class="form-group" style="margin-top:14px;">
+ <span class="field-label">Verification Code</span>
+ <input type="text" id="verifyCodeInp" class="verify-code-inp" placeholder="000000" maxlength="6" inputmode="numeric">
+ </div>
+ <div id="verifyMsg"></div>
+ <button class="land-submit-btn" onclick="doVerifyCode()">Confirm & Create Account</button>
+ <p style="text-align:center;margin-top:10px;font-size:12px;color:var(--sub);">
+ <a href="#" onclick="cancelVerification();return false;" style="color:var(--red);">Cancel</a>
+ </p>
+ </div>
+ </div>
+ <!-- Rep Create -->
+ <div id="repCreate" style="display:none;">
+ <div class="form-group"><span class="field-label">First Name</span><input type="text" id="repRegFn" class="field-input"></div>
+ <div class="form-group"><span class="field-label">Last Name</span><input type="text" id="repRegLn" class="field-input"></div>
+ <div class="form-group"><span class="field-label">Email Address</span><input type="email" id="repRegEm" class="field-input"></div>
+ <div class="form-group"><span class="field-label">Phone Number</span><input type="tel" id="repRegPh" class="field-input" placeholder="08012345678" maxlength="11"></div>
+ <div class="form-group"><span class="field-label">Password</span><div class="pin-wrap"><input type="password" id="repRegPin" class="field-input" placeholder="····" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('repRegPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+ <div class="form-group"><span class="field-label">Staff Activation Token</span><input type="text" id="repRegToken" class="field-input" placeholder="WAGE-XXXXXXXX"></div>
+ <div class="form-group"><span class="field-label">Payment PIN (4–6 digits)</span><div class="pin-wrap"><input type="password" id="repRegPayPin" class="field-input" placeholder="····" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('repRegPayPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+ <div id="repRegMsg"></div>
+ <button class="land-submit-btn" id="repRegBtn" onclick="doRepRegister()">Create Representative Account</button>
+ </div>
+ </div>
+ <div class="footer" id="footer">© 2026 Wonderful & Able God Enterprises. All rights reserved.</div>
+</div>
+
+<div id="agentIdModal" class="modal"><div class="msheet" style="max-width:480px;text-align:center;"><div class="m-handle"></div><div style="font-size:36px;margin-bottom:7px;"></div><div class="m-title" style="text-align:center;">Account Created!</div><p style="color:var(--sub);font-size:13px;margin-bottom:4px;">Save or screenshot your Agent ID — you'll use it to log in.</p><div class="agentid-card"><div class="agentid-lbl">Your Agent ID</div><div class="agentid-val" id="newRepId">------</div></div><div class="msg-info">! This is your login credential. Keep it safe!</div><button class="btn btn-blue" onclick="closeModal('agentIdModal');window.location.href='login.html'">I've Saved My Agent ID</button></div></div>
+
+<script>
+let currentRole = localStorage.getItem('wagLandRole') || 'customer';
+
+initTheme();
+
+function setLandRole(r){
+  currentRole = r;
+  localStorage.setItem('wagLandRole', r);
+  document.getElementById('landRoleCust').classList.toggle('active', r==='customer');
+  document.getElementById('landRoleRep').classList.toggle('active', r==='representative');
+  document.getElementById('custCreate').style.display = r==='customer' ? 'block' : 'none';
+  document.getElementById('repCreate').style.display = r==='customer' ? 'none' : 'block';
+}
+
+// setAuthTab is referenced by auth.js (doVerifyCode success -> setAuthTab('signin')).
+// On the register page that means: go back to the sign-in page.
+function setAuthTab(t){
+  if(t === 'signin') window.location.href = 'login.html';
+}
+
+// If a logged-in user lands here, send them straight to their dashboard.
+(function redirectIfLoggedIn(){
+  const u = getUser();
+  if(u && u.role && ROLE_HOME[u.role]) window.location.replace(rootPath() + ROLE_HOME[u.role]);
+})();
+
+setLandRole(currentRole);
+initEmailJS();
+</script>
+</body>
+</html>

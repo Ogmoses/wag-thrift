@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Sign In – WAG Enterprises</title>
+<link rel="stylesheet" href="css/shared.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/auth.js"></script>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loadingOverlay">
+ <div class="loading-spinner"></div>
+ <div class="loading-text" id="loadingText">Please wait…</div>
+</div>
+
+<div id="landingView" class="view active">
+ <div class="land-hero">
+ <button class="land-theme-btn" onclick="toggleTheme()" id="landThemeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
+ <a href="index.html" style="text-decoration:none;"><div class="land-logo"><svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:42px;height:42px;"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9v.01M18 15v.01"/></svg></div></a>
+ <h1 class="land-title">Wonderful & Able God</h1>
+ <p class="land-title" style="margin-bottom:6px;font-size:28px;">Enterprises</p>
+ <p class="land-sub" style="font-size:10px;letter-spacing:3px;margin-bottom:26px;">Thrift Savings</p>
+ <div class="land-role-row">
+ <button class="land-role-btn active" id="landRoleCust" onclick="setLandRole('customer')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Customer</button>
+ <button class="land-role-btn" id="landRoleRep" onclick="setLandRole('representative')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>Representative</button>
+ </div>
+ </div>
+ <div class="land-card-wrap">
+ <div class="auth-tab-row">
+ <button class="auth-tab-btn active" id="authSignIn" onclick="">Sign In</button>
+ <button class="auth-tab-btn" id="authCreate" onclick="window.location.href='register.html'">Create Account</button>
+ </div>
+ <!-- Customer Sign In -->
+ <div id="custSignIn">
+ <div class="form-group"><span class="field-label">Phone Number</span><input type="tel" id="loginPhone" class="field-input" placeholder="e.g. 08012345678" maxlength="11"></div>
+ <div class="form-group"><span class="field-label">Password</span><div class="pin-wrap"><input type="password" id="loginPin" class="field-input" placeholder="Enter your password" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('loginPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+ <div id="loginMsg"></div>
+ <button class="land-submit-btn" id="loginBtn" onclick="doLogin()">Sign In as Customer</button>
+ <p style="text-align:center;font-size:12px;color:var(--sub);margin-top:7px;"><a href="#" onclick="showForgotModal();return false;" style="color:var(--blue);font-weight:700;">Forgot Password?</a></p>
+ </div>
+ <!-- Rep Sign In -->
+ <div id="repSignIn" style="display:none;">
+ <div class="form-group"><span class="field-label">Agent ID</span><input type="text" id="loginRepId" class="field-input" placeholder="e.g. 234567" maxlength="6" inputmode="numeric"></div>
+ <div class="form-group"><span class="field-label">Password</span><div class="pin-wrap"><input type="password" id="loginRepPin" class="field-input" placeholder="····" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('loginRepPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+ <div id="loginRepMsg"></div>
+ <button class="land-submit-btn" id="loginRepBtn" onclick="doLogin()">Sign In as Representative</button>
+ <p style="text-align:center;font-size:12px;color:var(--sub);margin-top:7px;"><a href="#" onclick="showForgotModal();return false;" style="color:var(--blue);font-weight:700;">Forgot Password?</a></p>
+ </div>
+ </div>
+ <div class="footer" id="footer">© 2026 Wonderful & Able God Enterprises. All rights reserved.</div>
+</div>
+
+<!-- Reset Password Page (shown via URL ?reset=TOKEN) -->
+<div id="resetPasswordModal" class="modal" style="align-items:center;">
+ <div class="msheet" style="max-width:480px;position:relative;border-radius:20px;">
+ <div class="m-handle"></div>
+ <div class="m-title"> Create New Password</div>
+ <div class="msg-info" id="resetTokenInfo">Enter your new password below.</div>
+ <div class="mform-group"><label class="form-lbl">New Password</label>
+ <div class="pin-wrap"><input type="password" id="newPasswordInp" class="form-inp field-input" placeholder="Enter new password" maxlength="100">
+ <button type="button" class="pw-eye" onclick="togglePw('newPasswordInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+ </div>
+ <div class="mform-group"><label class="form-lbl">Confirm Password</label>
+ <div class="pin-wrap"><input type="password" id="confirmPasswordInp" class="form-inp field-input" placeholder="Confirm new password" maxlength="100">
+ <button type="button" class="pw-eye" onclick="togglePw('confirmPasswordInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+ </div>
+ <div id="resetPasswordMsg"></div>
+ <button class="btn btn-blue" onclick="doResetPassword()" style="margin-top:8px;">Save New Password</button>
+ </div>
+</div>
+
+<div id="forgotModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('forgotModal')">×</button><div class="m-handle"></div><div class="m-title">Reset Password</div><div class="msg-info">Enter your email and we'll send you a password reset link.</div><div class="mform-group"><label class="form-lbl">Email Address</label><input type="email" id="resetEmail" class="form-inp"></div><div id="resetMsg"></div><button class="btn btn-blue" onclick="doForgotPin()">Send Password Reset Link</button></div></div>
+
+<script>
+let currentRole = localStorage.getItem('wagLandRole') || 'customer';
+
+initTheme();
+
+function setLandRole(r){
+  currentRole = r;
+  localStorage.setItem('wagLandRole', r);
+  document.getElementById('landRoleCust').classList.toggle('active', r==='customer');
+  document.getElementById('landRoleRep').classList.toggle('active', r==='representative');
+  document.getElementById('custSignIn').style.display = r==='customer' ? 'block' : 'none';
+  document.getElementById('repSignIn').style.display = r==='customer' ? 'none' : 'block';
+}
+
+// If a logged-in user lands here, send them straight to their dashboard.
+(function redirectIfLoggedIn(){
+  const u = getUser();
+  if(u && u.role && ROLE_HOME[u.role]) window.location.replace(rootPath() + ROLE_HOME[u.role]);
+})();
+
+setLandRole(currentRole);
+initEmailJS();
+checkResetTokenInURL();
+
+document.getElementById('loginPin')?.addEventListener('keypress', e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('loginRepPin')?.addEventListener('keypress', e=>{ if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>
