@@ -3,106 +3,75 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Overview – WAG Admin</title>
+<title>Dashboard – WAG Enterprises</title>
 <link rel="stylesheet" href="../css/shared.css">
-<link rel="stylesheet" href="../css/admin.css">
+<link rel="stylesheet" href="../css/representative.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="../js/supabase.js"></script>
 <script src="../js/utils.js"></script>
-<script src="../js/admin.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/representative.js"></script>
 </head>
 <body>
 
-<div id="adminShellRoot"></div>
+<div class="loading-overlay" id="loadingOverlay">
+ <div class="loading-spinner"></div>
+ <div class="loading-text" id="loadingText">Please wait…</div>
+</div>
 
-<div id="appShell">
-  <main class="main-content" id="mainContent">
-
-    <!-- OVERVIEW -->
-    <div class="page active" id="page-overview">
-      <div class="page-inner">
-        <div class="overview-grid">
-          <div class="ov-card"><div class="ov-lbl">Customers</div><div class="ov-val" id="ovCust">—</div><div class="ov-sub">registered</div></div>
-          <div class="ov-card"><div class="ov-lbl">Field Agents</div><div class="ov-val" id="ovReps">—</div><div class="ov-sub">active</div></div>
-          <div class="ov-card green"><div class="ov-lbl">Total Deposits</div><div class="ov-val" id="ovDeposits">—</div><div class="ov-sub">all time</div></div>
-          <div class="ov-card red"><div class="ov-lbl">Total Payouts</div><div class="ov-val" id="ovPayouts">—</div><div class="ov-sub">disbursed</div></div>
-          <div class="ov-card orange"><div class="ov-lbl">Pending Withdrawals</div><div class="ov-val" id="ovPendingDisb">—</div><div class="ov-sub">awaiting review</div></div>
-          <div class="ov-card"><div class="ov-lbl">Active Plans</div><div class="ov-val" id="ovPlans">—</div><div class="ov-sub">in progress</div></div>
-        </div>
-
-        <div class="section-card">
-          <div class="section-card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-            Pending Disbursements
-            <a href="#disbursements" id="ovViewAllDisb" style="float:right;font-size:11px;color:var(--yellow);text-decoration:none;">View all →</a>
-          </div>
-          <div id="ovDisbList"><div class="empty-state">Loading…</div></div>
-        </div>
-
-        <div class="section-card">
-          <div class="section-card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
-            Recent Activity
-          </div>
-          <div id="ovAuditList"><div class="empty-state">Loading…</div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- DISBURSEMENTS -->
-    <div class="page" id="page-disbursements">
-      <div class="page-inner">
-        <div class="section-card" style="margin-bottom:10px;">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <select id="disbFilterStatus" class="search-inp" style="flex:none;width:auto;padding:8px 12px;font-size:13px;" onchange="renderDisbPage()">
-              <option value="pending">Pending</option>
-              <option value="reviewed">Reviewed</option>
-              <option value="approved">Approved</option>
-              <option value="paid">Paid</option>
-              <option value="rejected">Rejected</option>
-              <option value="">All</option>
-            </select>
-            <button class="btn btn-ghost" onclick="renderDisbPage()" style="padding:8px 14px;font-size:12px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh</button>
-          </div>
-        </div>
-        <div id="disbPageList"><div class="empty-state">Loading…</div></div>
-      </div>
-    </div>
-
-  </main>
+<div id="repView" class="view active">
+ <div class="dash-header">
+ <div class="avatar-c" id="repAv">?</div>
+ <div class="hdr-info"><div class="hdr-name" id="repName">—</div><div class="hdr-sub" id="repCode">Code: —</div></div>
+ <div class="hdr-right"><button class="signout-btn" onclick="doLogout()" title="Sign Out" style="width:32px;height:32px;border-radius:8px;padding:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.25);color:#fff;cursor:pointer;flex-shrink:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button></div>
+ </div>
+ <div style="padding-bottom:80px;">
+ <div class="rep-stats">
+ <div class="stat-dark"><div class="sl">Today's Deposits</div><div class="sa" id="repTodayAmt">₦0.00</div><div class="ss" id="repTodayCnt">0 transactions</div></div>
+ <div class="stat-light"><div class="sl">Reliability Score</div><div class="sa" id="repScoreVal">—%</div><div class="ss" id="repScoreLbl">calculating…</div></div>
+ </div>
+ <div class="rep-stats" style="margin-top:10px;">
+ <div class="stat-light"><div class="sl">Total Saved</div><div class="sa" id="repAllAmt">₦0.00</div><div class="ss">total</div></div>
+ <div class="stat-light"><div class="sl">Confirmations</div><div class="sa" id="repConfirmed">0</div><div class="ss">approved</div></div>
+ </div>
+ <div style="padding:11px 13px 32px;">
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;">
+ <div class="search-card-title">My Recent Deposits</div>
+ <a href="collections.html" class="tx-viewall" style="background:none;border:none;color:var(--blue);font-size:13px;font-weight:700;text-decoration:none;">View all →</a>
+ </div>
+ <div id="repTxPreview" class="wcard" style="padding:8px;">
+ <div class="tx-empty">No deposits yet</div>
+ </div>
+ </div>
+ </div>
+ <!-- Rep bottom nav -->
+ <nav class="bnav visible" id="repBnav">
+  <button class="bnav-tab active">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+   Home
+  </button>
+  <button class="bnav-tab" onclick="window.location.href='customer-search.html'">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+   Search
+  </button>
+  <button class="bnav-tab" onclick="window.location.href='requests.html'">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M12 2v13M5 9l7-7 7 7"/><path d="M4 22h16"/></svg>
+   Requests
+  </button>
+  <button class="bnav-tab" onclick="window.location.href='settings.html'">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   Profile
+  </button>
+ </nav>
 </div>
 
 <script>
-const _a = requireAdmin();
-if (_a) {
-  initAdminTheme();
-  const initial = (location.hash === '#disbursements') ? 'disbursements' : 'overview';
-  renderAdminShell(initial, initial === 'disbursements' ? 'Disbursements' : 'Overview');
-
-  function showAdminTab(page) {
-    currentPage = page;
-    document.getElementById('page-overview').classList.toggle('active', page === 'overview');
-    document.getElementById('page-disbursements').classList.toggle('active', page === 'disbursements');
-    document.querySelector('.topbar-title').textContent = page === 'disbursements' ? 'Disbursements' : 'Overview';
-    document.querySelectorAll('.nav-item').forEach(n => {
-      n.classList.toggle('active', n.getAttribute('href') === (page === 'disbursements' ? 'dashboard.html#disbursements' : 'dashboard.html'));
-    });
-    history.replaceState(null, '', page === 'disbursements' ? '#disbursements' : location.pathname);
-    if (page === 'disbursements') renderDisbPage(); else renderOverview();
-  }
-
-  // Intercept the Overview / Disbursements nav links so they switch tabs in-page
-  document.querySelectorAll('.nav-item').forEach(n => {
-    const href = n.getAttribute('href');
-    if (href === 'dashboard.html' || href === 'dashboard.html#disbursements') {
-      n.addEventListener('click', e => { e.preventDefault(); showAdminTab(href.includes('#') ? 'disbursements' : 'overview'); });
-    }
-  });
-  document.getElementById('ovViewAllDisb').addEventListener('click', e => { e.preventDefault(); showAdminTab('disbursements'); });
-
-  showAdminTab(initial);
-  closeSidebar();
-}
+requireRole(['representative']);
+initTheme();
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+renderRepDash();
+startSuspendCheck();
 </script>
 </body>
 </html>
