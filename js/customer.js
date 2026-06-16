@@ -348,9 +348,10 @@ function drawCal() {
   const grid = document.getElementById('calGrid');
   if (!lbl || !hdr || !grid) return;
   lbl.textContent = MN[mo] + ' ' + yr;
-  hdr.innerHTML = DN.map(d => `<div class="cal-day-hdr">${d}</div>`).join('');
-  let cells = '';
-  for (let i = 0; i < firstDay; i++) cells += '<div></div>';
+
+  // Build day cells as <td> strings, chunked into rows of 7
+  const tds = [];
+  for (let i = 0; i < firstDay; i++) tds.push('<td></td>');
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = `${yr}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const isPayout = payouts.has(ds);
@@ -364,9 +365,18 @@ function drawCal() {
     else if (isMissed) { cls += ' c-red'; title = 'Missed'; }
     else { cls += ' c-grey'; }
     if (isToday) cls += ' c-today';
-    cells += `<div class="${cls}" title="${title}">${d}</div>`;
+    tds.push(`<td class="${cls}" title="${title}">${d}</td>`);
   }
-  grid.innerHTML = `<div class="mini-cal-grid">${cells}</div>`;
+  while (tds.length % 7 !== 0) tds.push('<td></td>');
+
+  let rows = '';
+  for (let i = 0; i < tds.length; i += 7) rows += '<tr>' + tds.slice(i, i + 7).join('') + '</tr>';
+
+  // Days-of-week header row, built as a <table> too so columns align
+  // exactly with the day-grid table below (both use table-layout:fixed
+  // with equal-width columns).
+  hdr.innerHTML = `<table class="mini-cal-table"><tr>${DN.map(d => `<td class="cal-day-hdr">${d}</td>`).join('')}</tr></table>`;
+  grid.innerHTML = `<table class="mini-cal-table">${rows}</table>`;
 }
 
 function prevCalMonth() { calState.mo--; if (calState.mo < 0) { calState.mo = 11; calState.yr--; } drawCal(); }
