@@ -34,8 +34,8 @@ body.dark{background:#0f0f0f;color:#f0f0f0;}
 .dash-header{background:var(--blue);padding:13px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:200;box-shadow:0 2px 16px rgba(0,0,0,.25);}
 .avatar-c{width:40px;height:40px;min-width:40px;background:var(--yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#111;flex-shrink:0;}
 .hdr-info{flex:1;min-width:0;}
-.hdr-name{color:var(--yellow);font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.hdr-sub{color:rgba(255,255,255,.6);font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hdr-name{color:var(--yellow);font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hdr-sub{color:rgba(255,255,255,.7);font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .hdr-right{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:auto;}
 .role-badge{background:var(--yellow);color:#111;font-size:10px;font-weight:800;padding:4px 9px;border-radius:6px;letter-spacing:.5px;white-space:nowrap;}
 .theme-btn{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;}
@@ -467,12 +467,15 @@ body:not(.dark) .adr-elevate-section{background:rgba(255,186,9,.08);border-color
 
 
 .mini-cal-wrap{touch-action:pan-y;}
-.mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px;}
+.mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
 .mini-cal-wrap{touch-action:pan-y;}
-.mini-cal-month-lbl{font-size:15px;font-weight:800;color:var(--text);flex:1;text-align:center;line-height:1;}
+.mini-cal-month-lbl{font-size:15px;font-weight:800;color:var(--text);flex:1;text-align:center;padding:0 12px;}
 body.dark .mini-cal-month-lbl{color:#f0f0f0;}
-.cal-nav-btn{background:var(--border);border:none;font-size:20px;color:var(--text);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;padding:0;}
+.cal-nav-btn{background:var(--border);border:none;color:var(--text);cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;transition:background .18s;}
+.cal-nav-btn:hover{background:#d1d5db;}
+.cal-nav-btn svg{width:14px;height:14px;stroke:currentColor;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round;}
 body.dark .cal-nav-btn{color:#f0f0f0;background:#2a2a2a;}
+body.dark .cal-nav-btn:hover{background:#3a3a3a;}
 /* Calendar table — border-spacing controls gap between day cells */
 .mini-cal-table{width:100%;border-collapse:separate;border-spacing:4px 5px;table-layout:fixed;}
 .mini-cal-days-hdr{border:1.5px solid #111;border-radius:10px;padding:6px 0;margin-bottom:8px;overflow:hidden;}

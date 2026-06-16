@@ -4,3 +4,7 @@
    All current rep styles already live in shared.css (selectors like
    #repView, .rep-*, etc.) so this file is intentionally empty for now.
    Add representative-only overrides/additions here as the app evolves. */
+
+/* Withdrawal request card — customer name visible in both themes */
+.dis-cust-name{font-weight:700;font-size:13px;color:#111;margin-bottom:4px;}
+body.dark .dis-cust-name{color:#f0f0f0;}
