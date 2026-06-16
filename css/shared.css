@@ -7,10 +7,10 @@
  /* RGB channels for alpha variants (rgba can't use hex vars directly) */
  --blue-rgb:1,31,123;
  --yellow-rgb:255,186,9;
- /* Brand deep backgrounds */
- --brand-deep:#010e3d;
+ /* Brand gradient stops — all true shades of brand blue #011f7b */
+ --brand-deep:#011060;
  --brand-mid:#011f7b;
- --brand-light:#01318c;
+ --brand-light:#01277a;
 }
 html,body{height:100%;overflow-x:hidden;}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);transition:background .3s,color .3s;}
@@ -467,22 +467,20 @@ body:not(.dark) .adr-elevate-section{background:rgba(255,186,9,.08);border-color
 
 
 .mini-cal-wrap{touch-action:pan-y;}
-.mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
-.cal-month-name{font-size:22px;font-weight:800;color:var(--text);}
-body.dark .cal-month-name{color:#f0f0f0;}
-.cal-year-lbl{font-size:14px;font-weight:700;color:var(--sub);}
-.mini-cal-month-lbl{font-size:15px;font-weight:800;color:var(--text);flex:1;text-align:center;}
+.mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px;}
+.mini-cal-wrap{touch-action:pan-y;}
+.mini-cal-month-lbl{font-size:15px;font-weight:800;color:var(--text);flex:1;text-align:center;line-height:1;}
 body.dark .mini-cal-month-lbl{color:#f0f0f0;}
-.cal-nav-btn{background:var(--border);border:none;font-size:18px;color:var(--text);cursor:pointer;padding:4px 12px;border-radius:20px;line-height:1;display:flex;align-items:center;justify-content:center;}
+.cal-nav-btn{background:var(--border);border:none;font-size:20px;color:var(--text);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;padding:0;}
 body.dark .cal-nav-btn{color:#f0f0f0;background:#2a2a2a;}
-/* Calendar grid — built as <table> elements in JS (drawCal). */
-.mini-cal-table{width:100%;border-collapse:separate;border-spacing:5px;table-layout:fixed;}
-.mini-cal-days-hdr{border:1.5px solid #111;border-radius:10px;padding:6px 0;margin-bottom:6px;overflow:hidden;}
+/* Calendar table — border-spacing controls gap between day cells */
+.mini-cal-table{width:100%;border-collapse:separate;border-spacing:4px 5px;table-layout:fixed;}
+.mini-cal-days-hdr{border:1.5px solid #111;border-radius:10px;padding:6px 0;margin-bottom:8px;overflow:hidden;}
 body.dark .mini-cal-days-hdr{border-color:#fff;}
 .mini-cal-days-hdr .mini-cal-table{border-spacing:0;}
 .cal-day-hdr{font-size:10px;font-weight:700;color:#111;text-align:center;padding:0;}
 body.dark .cal-day-hdr{color:#fff;}
-.cal-cell{height:34px;border-radius:10px;font-size:12px;font-weight:700;border:1px solid #111;color:#111;text-align:center;vertical-align:middle;}
+.cal-cell{height:38px;border-radius:10px;font-size:12px;font-weight:700;border:1px solid #111;color:#111;text-align:center;vertical-align:middle;}
 body.dark .cal-cell{border-color:#fff;color:#fff;}
 .cal-cell.c-green{background:#d1fae5;color:#111;border-color:#111;}
 body.dark .cal-cell.c-green{background:#064e3b;color:#fff;border-color:#fff;}

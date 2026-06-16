@@ -4,3 +4,6 @@
    All current customer styles already live in shared.css (selectors like
    #customerView, .cust-*, etc.) so this file is intentionally empty for now.
    Add customer-only overrides/additions here as the app evolves. */
+
+/* Dark mode fixes */
+body.dark .plan-name-display{color:#f0f0f0!important;}
