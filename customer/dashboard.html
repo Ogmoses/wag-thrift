@@ -25,7 +25,7 @@
  <div class="dash-header">
  <div class="avatar-c" id="custAv">?</div>
  <div class="hdr-info"><div class="hdr-name" id="custName">—</div><div class="hdr-sub" id="custPhone">—</div></div>
- <div class="hdr-right"><button class="signout-btn" onclick="doLogout()" title="Sign Out" style="width:32px;height:32px;border-radius:8px;padding:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.25);color:#fff;cursor:pointer;flex-shrink:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button></div>
+ <div class="hdr-right"><button class="signout-btn" onclick="doLogout()" style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.25);color:#fff;cursor:pointer;flex-shrink:0;font-size:12px;font-weight:700;letter-spacing:.3px;display:flex;align-items:center;gap:5px;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign Out</button></div>
  </div>
  <div class="plan-tabs-bar" id="planTabsBar"><div class="plan-tab add-tab" onclick="openNewPlanModal()">+ New Plan</div></div>
  <div id="noPlanMsg" class="no-plan"><div class="no-plan-ico"></div><div style="font-size:16px;font-weight:700;margin-bottom:7px;">No savings plans yet</div><div style="font-size:12px;color:var(--sub);">Tap "+ New Plan" to get started</div></div>
@@ -46,9 +46,9 @@
  </div>
  <div class="wcard" style="margin:0 13px 11px;">
  <div class="mini-cal-hdr">
- <button class="cal-nav-btn" onclick="prevCalMonth()">‹</button>
+ <button class="cal-nav-btn" onclick="prevCalMonth()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
  <span class="mini-cal-month-lbl" id="calMonthLbl">—</span>
- <button class="cal-nav-btn" onclick="nextCalMonth()">›</button>
+ <button class="cal-nav-btn" onclick="nextCalMonth()"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
  </div>
  <div class="mini-cal-days-hdr" id="calDaysHdr"></div>
  <div id="calGrid"></div>
@@ -142,12 +142,14 @@
 requireRole(['customer']);
 initTheme();
 document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
-// Render dashboard first, then start background tasks after paint
-renderCustDash().then(() => {
-  // Defer non-critical tasks until after first render
-  requestAnimationFrame(() => {
-    startSuspendCheck();
-    initCalSwipe();
+// Fix 10: verify role server-side before rendering sensitive data
+verifyRoleFromDB('customer').then(valid => {
+  if (!valid) return window.location.replace(rootPath() + 'login.html');
+  renderCustDash().then(() => {
+    requestAnimationFrame(() => {
+      startSuspendCheck();
+      initCalSwipe();
+    });
   });
 });
 </script>
