@@ -4,6 +4,13 @@
  --text:#111;--sub:#6b7280;--border:#e5e7eb;
  --green:#059669;--red:#dc2626;--orange:#d97706;--purple:#7c3aed;
  --dark-bg:#0d1117;--dark-card:#161b22;--dark-border:#30363d;
+ /* RGB channels for alpha variants (rgba can't use hex vars directly) */
+ --blue-rgb:1,31,123;
+ --yellow-rgb:255,186,9;
+ /* Brand deep backgrounds */
+ --brand-deep:#010e3d;
+ --brand-mid:#011f7b;
+ --brand-light:#01318c;
 }
 html,body{height:100%;overflow-x:hidden;}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);transition:background .3s,color .3s;}
@@ -460,19 +467,17 @@ body:not(.dark) .adr-elevate-section{background:rgba(255,186,9,.08);border-color
 
 
 .mini-cal-wrap{touch-action:pan-y;}
-.mini-cal-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;}
+.mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
 .cal-month-name{font-size:22px;font-weight:800;color:var(--text);}
 body.dark .cal-month-name{color:#f0f0f0;}
 .cal-year-lbl{font-size:14px;font-weight:700;color:var(--sub);}
-.mini-cal-month-lbl{font-size:14px;font-weight:800;color:var(--text);}
+.mini-cal-month-lbl{font-size:15px;font-weight:800;color:var(--text);flex:1;text-align:center;}
 body.dark .mini-cal-month-lbl{color:#f0f0f0;}
-.cal-nav-btn{background:none;border:none;font-size:18px;color:var(--text);cursor:pointer;padding:2px 8px;}
-body.dark .cal-nav-btn{color:#f0f0f0;}
-/* Calendar grid — built as <table> elements in JS (drawCal). Tables
-   provide a guaranteed 7-column row/column structure without relying on
-   CSS grid/flex/aspect-ratio, which may not render on all devices. */
-.mini-cal-table{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed;}
-.mini-cal-days-hdr{border:1.5px solid #111;border-radius:10px;padding:6px 0;margin-bottom:8px;overflow:hidden;}
+.cal-nav-btn{background:var(--border);border:none;font-size:18px;color:var(--text);cursor:pointer;padding:4px 12px;border-radius:20px;line-height:1;display:flex;align-items:center;justify-content:center;}
+body.dark .cal-nav-btn{color:#f0f0f0;background:#2a2a2a;}
+/* Calendar grid — built as <table> elements in JS (drawCal). */
+.mini-cal-table{width:100%;border-collapse:separate;border-spacing:5px;table-layout:fixed;}
+.mini-cal-days-hdr{border:1.5px solid #111;border-radius:10px;padding:6px 0;margin-bottom:6px;overflow:hidden;}
 body.dark .mini-cal-days-hdr{border-color:#fff;}
 .mini-cal-days-hdr .mini-cal-table{border-spacing:0;}
 .cal-day-hdr{font-size:10px;font-weight:700;color:#111;text-align:center;padding:0;}
