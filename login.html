@@ -28,7 +28,7 @@ body{background:linear-gradient(160deg,var(--brand-deep) 0%,var(--brand-mid) 60%
 .role-btn-outer.active{background:var(--yellow);color:#111;border-color:var(--yellow);box-shadow:0 4px 16px rgba(var(--yellow-rgb),.4);}
 
 /* FLOATING CARD */
-.login-card{background:#fff;border-radius:28px 28px 0 0;margin:0 16px;padding:26px 22px 32px;box-shadow:0 -8px 40px rgba(0,0,0,.2);animation:cardSlideUp .4s cubic-bezier(.34,1.1,.64,1) both;flex:1;}
+.login-card{background:#fff;border-radius:28px;margin:0 18px 32px;padding:26px 22px 32px;box-shadow:0 8px 40px rgba(0,0,0,.25),0 2px 12px rgba(0,0,0,.12);animation:cardSlideUp .4s cubic-bezier(.34,1.1,.64,1) both;}
 body.dark .login-card{background:#1a1a1a;}
 @keyframes cardSlideUp{from{opacity:0;transform:translateY(32px);}to{opacity:1;transform:translateY(0);}}
 
@@ -137,7 +137,7 @@ body.dark .forgot-link{color:var(--yellow);}
   <div class="fgroup">
    <label class="flabel">Password</label>
    <div class="pin-wrap">
-    <input type="password" id="loginRepPin" class="finput" placeholder="····" maxlength="100">
+    <input type="password" id="loginRepPin" class="finput" placeholder="Enter your password" maxlength="100">
     <button type="button" class="pw-eye" onclick="togglePw('loginRepPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
    </div>
   </div>
