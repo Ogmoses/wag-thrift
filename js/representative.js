@@ -141,7 +141,7 @@ function renderDisbCards(disbs) {
     if (isPending) {
       actionHtml = `<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:9px 12px;font-size:11px;color:#92400e;display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span><strong>Awaiting Admin Review</strong> — This request must be reviewed by a Super Admin before you can process it.</span></div>`;
     } else if (isReviewed) {
-      actionHtml = `<div class="dis-acts"><button class="btn-sm btn-sm-blue" onclick="doApproveDisb('${d.id}','${d.plan_id}',${d.amount},'${d.customer_id}')">✓ Approve & Pay</button><button class="btn-sm btn-sm-ghost" onclick="doRejectDisb('${d.id}','${d.customer_id}')">✕ Reject</button></div>`;
+      actionHtml = `<div class="dis-acts"><button class="btn-sm btn-sm-blue" onclick="doApproveDisb('${d.id}','${d.plan_id}',${d.amount},'${d.customer_id}')">✓ Approve</button><button class="btn-sm btn-sm-ghost" onclick="doRejectDisb('${d.id}','${d.customer_id}')">✕ Reject</button></div>`;
     } else if (isApproved) {
       actionHtml = `<div style="background:#d1fae5;border:1px solid #059669;border-radius:8px;padding:9px 12px;font-size:11px;color:#065f46;display:flex;align-items:center;gap:6px;">✓ Approved — awaiting payment confirmation</div>`;
     }
@@ -167,7 +167,7 @@ function openCollectModal() {
   requirePayPin('Payment PIN', 'Enter your payment PIN to save this deposit.', () => showModal('collectModal'));
 }
 
-async function doCollection() { await guardedAction('collection', _doCollection); }
+async function doCollection() { guardedSubmit('collection', () => _doCollection()); }
 async function _doCollection() {
   const amtVal = document.getElementById('colAmt').value.trim(), method = document.getElementById('colMethod').value, notes = document.getElementById('colNotes').value.trim();
   if (!amtVal || +amtVal <= 0) { setMsg('colMsg', '<div class="msg-err">Enter a valid amount</div>'); return; }
@@ -218,22 +218,33 @@ function showReceipt(amount, plan, rep, cust, ref, method, newBal) {
 // WITHDRAWAL REQUEST ACTIONS — approve/reject (used by both
 // customer-search.html (per-customer) and requests.html (global list))
 // ═══════════════════════════════════════════════
-async function doApproveDisb(disbId, planId, amount, custId) { await guardedAction('approveDisb_' + disbId, () => _doApproveDisb(disbId, planId, amount, custId)); }
+async function doApproveDisb(disbId, planId, amount, custId) { guardedSubmit('approveDisb_' + disbId, () => _doApproveDisb(disbId, planId, amount, custId)); }
 async function _doApproveDisb(disbId, planId, amount, custId) {
   const rep = getUser();
   const { data: disbCheck } = await db.from('disbursements').select('status').eq('id', disbId).single();
-  if (!disbCheck || disbCheck.status !== 'reviewed') { alert('This withdrawal must be reviewed by a Super Admin before you can approve it.'); return; }
+  if (!disbCheck || disbCheck.status !== 'reviewed') {
+    alert('This withdrawal must be reviewed by a Super Admin before you can approve it.');
+    return;
+  }
   const { data: bal } = await db.from('plan_balances').select('balance').eq('plan_id', planId).single();
   if ((bal?.balance || 0) < amount) { alert(`Insufficient plan balance.\nAvailable: ${fmt(bal?.balance)}`); return; }
   const { data: cust } = await db.from('customers').select('first_name,last_name').eq('id', custId).single();
-  showLoading('Processing withdrawal…');
-  const ref = genRef();
-  await db.from('transactions').insert({ ref, type: 'payout', amount, plan_id: planId, customer_id: custId, agent_id: rep.id, method: 'Cash', notes: 'Approved withdrawal' });
-  await db.from('disbursements').update({ status: 'paid', confirmed_by: rep.id, confirmed_at: new Date().toISOString() }).eq('id', disbId);
-  await db.from('representatives').update({ confirmed_count: (rep.confirmed_count || 0) + 1 }).eq('id', rep.id);
-  await audit('approve', rep.id, 'representative', `Approved & paid ${fmt(amount)} to ${cust?.first_name || ''} ${cust?.last_name || ''} — Ref: ${ref}`, amount, planId);
+  if (!confirm(`Approve withdrawal of ${fmt(amount)} for ${cust?.first_name || 'customer'}?\n\nThis marks it as approved. The Super Admin will complete the final payment step.`)) return;
+  showLoading('Approving withdrawal…');
+  // Fix 9: rep sets status → 'approved' only. 'paid' + payout transaction
+  // is done server-side by admin via approve_withdrawal RPC.
+  const { error } = await db.from('disbursements').update({
+    status: 'approved',
+    confirmed_by: rep.id,
+    confirmed_at: new Date().toISOString()
+  }).eq('id', disbId);
+  if (error) { hideLoading(); alert('Approval failed: ' + error.message); return; }
+  await audit('approve', rep.id, 'representative',
+    `Rep approved withdrawal of ${fmt(amount)} for ${cust?.first_name || ''} ${cust?.last_name || ''} — pending admin payment`,
+    amount, planId);
   setUser({ ...rep, confirmed_count: (rep.confirmed_count || 0) + 1 });
-  hideLoading(); alert(` Approved & Paid\nAmount: ${fmt(amount)}\nRef: ${ref}`);
+  hideLoading();
+  alert(`✓ Withdrawal Approved\nAmount: ${fmt(amount)}\nStatus: Awaiting final payment by Super Admin`);
   if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
   if (document.getElementById('repAllRequestsList')) await loadAllRepRequests();
 }
@@ -268,7 +279,7 @@ async function loadAllRepRequests() {
     const cu = custMap[d.customer_id] || {};
     const cards = renderDisbCards([d]);
     return `<div class="wcard" style="margin-bottom:10px;padding:10px;">
-      <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:4px;">${cu.first_name || 'Customer'} ${cu.last_name || ''}</div>
+      <div class="dis-cust-name">${cu.first_name || 'Customer'} ${cu.last_name || ''}</div>
       <div style="font-size:11px;color:var(--sub);margin-bottom:8px;">${cu.phone || ''}</div>
       ${cards}
     </div>`;

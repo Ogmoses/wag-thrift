@@ -28,6 +28,15 @@ async function guardedAction(key, fn) {
   if (!acquireActionLock(key)) { console.warn('Action "' + key + '" already in progress — duplicate tap ignored'); return; }
   try { await fn(); } finally { releaseActionLock(key); }
 }
+// guardedSubmit: same as guardedAction but holds the lock for 3s after
+// completion to prevent rapid re-submission of financial actions.
+function guardedSubmit(key, fn) {
+  if (_actionLocks[key]) return;
+  _actionLocks[key] = true;
+  Promise.resolve(fn()).finally(() => {
+    setTimeout(() => { _actionLocks[key] = false; }, 3000);
+  });
+}
 
 // ── FORMATTERS
 const fmt = n => '₦' + (+n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

@@ -16,16 +16,28 @@ function getUser() { try { return JSON.parse(sessionStorage.getItem('wagUser'));
 function setUser(u) { sessionStorage.setItem('wagUser', JSON.stringify(u)); }
 
 // ── ROUTE GUARDS
-// Map of role -> dashboard URL (relative to site root), used for redirects
-// after login / wrong-role access. Always combine with rootPath().
+// ── ROLE GUARD HELPERS
 const ROLE_HOME = {
   customer: 'customer/dashboard.html',
   representative: 'representative/dashboard.html',
   admin: 'admin/dashboard.html'
 };
 
-// Call at the top of every protected customer/representative page.
-// allowedRoles: array of role strings allowed to view this page (e.g. ['customer'])
+// Fix 10: verifyRoleFromDB — verifies the session user actually exists and
+// is active in the DB. Cannot be spoofed by editing sessionStorage.
+// Call at the top of every protected dashboard page after requireRole().
+async function verifyRoleFromDB(expectedRole) {
+  if (!db) return false;
+  const stored = getUser();
+  if (!stored?.id) return false;
+  const table = expectedRole === 'representative' ? 'representatives' : 'customers';
+  const { data, error } = await db.from(table).select('id,status').eq('id', stored.id).single();
+  if (error || !data) { doLogout(); return false; }
+  // Block suspended/deleted accounts even if they have a valid session token
+  if (data.status === 'suspended' || data.status === 'deleted') { doLogout(); return false; }
+  return true;
+}
+
 function requireRole(allowedRoles) {
   const u = getUser();
   if (!u || !u.role) {

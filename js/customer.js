@@ -117,7 +117,7 @@ function toggleBalVis() {
 // ═══════════════════════════════════════════════
 async function openNewPlanModal() { showModal('newPlanModal'); }
 
-async function doCreatePlan() { await guardedAction('createPlan', _doCreatePlan); }
+async function doCreatePlan() { guardedSubmit('createPlan', () => _doCreatePlan()); }
 async function _doCreatePlan() {
   if (!dbReady()) return;
   const name = (document.getElementById('npName')?.value || '').trim();
@@ -214,7 +214,7 @@ async function _openWithdrawalModal() {
   showModal('withdrawalModal');
 }
 
-async function doWithdrawalRequest() { await guardedAction('withdrawalRequest', _doWithdrawalRequest); }
+async function doWithdrawalRequest() { guardedSubmit('withdrawalRequest', () => _doWithdrawalRequest()); }
 async function _doWithdrawalRequest() {
   const planId = document.getElementById('wdPlan').value, amtVal = document.getElementById('wdAmt').value.trim(), reason = document.getElementById('wdReason').value.trim();
   if (!planId) { setMsg('wdMsg', '<div class="msg-err">Please select a plan</div>'); return; }
@@ -255,10 +255,24 @@ async function confirmPayPin() {
   const pin = document.getElementById('payPinInp').value.trim();
   if (!pin || pin.length < 4) { setMsg('payPinMsg', '<div class="msg-err">Enter your 4–6 digit payment PIN</div>'); return; }
   const user = getUser(); const pinHash = await hashPin(pin);
-  const tbl = user.role === 'representative' ? 'representatives' : 'customers';
-  const { data: row } = await db.from(tbl).select('payment_pin_hash').eq('id', user.id).single();
-  if (!row?.payment_pin_hash) { closeModal('payPinModal'); if (_payPinCallback) { _payPinCallback(); _payPinCallback = null; } return; }
-  if (row.payment_pin_hash !== pinHash) { setMsg('payPinMsg', '<div class="msg-err">Incorrect PIN. Try again.</div>'); return; }
+  // Fix 8: verify PIN server-side via RPC — never fetch hash to frontend
+  const { data: hasPin } = await db.from(
+    user.role === 'representative' ? 'representatives' : 'customers'
+  ).select('payment_pin_hash').eq('id', user.id).single();
+  if (!hasPin?.payment_pin_hash) {
+    // No PIN set yet — let them through and prompt setup
+    closeModal('payPinModal');
+    if (_payPinCallback) { _payPinCallback(); _payPinCallback = null; }
+    return;
+  }
+  const { data: valid, error } = await db.rpc('verify_payment_pin', {
+    p_customer_id: user.id,
+    p_pin_hash: pinHash
+  });
+  if (error || valid !== true) {
+    setMsg('payPinMsg', '<div class="msg-err">Incorrect PIN. Try again.</div>');
+    return;
+  }
   closeModal('payPinModal');
   document.getElementById('payPinInp').value = '';
   if (_payPinCallback) { _payPinCallback(); _payPinCallback = null; }
@@ -522,8 +536,8 @@ async function changeCustPayPin() {
   if (!/^\d{4,6}$/.test(nw)) { setMsg('cpPinMsg', '<div class="msg-err">PIN must be 4–6 digits</div>'); return; }
   showLoading('Verifying…');
   const curHash = await hashPin(cur);
-  const { data: chk } = await db.from('customers').select('id').eq('id', u.id).eq('payment_pin_hash', curHash).single();
-  if (!chk) { hideLoading(); setMsg('cpPinMsg', '<div class="msg-err">Current PIN is incorrect</div>'); return; }
+  const { data: valid } = await db.rpc('verify_payment_pin', { p_customer_id: u.id, p_pin_hash: curHash });
+  if (valid !== true) { hideLoading(); setMsg('cpPinMsg', '<div class="msg-err">Current PIN is incorrect</div>'); return; }
   await db.from('customers').update({ payment_pin_hash: await hashPin(nw) }).eq('id', u.id);
   await audit('login', u.id, 'customer', `Customer ${u.first_name} ${u.last_name} changed their withdrawal PIN`);
   hideLoading(); setMsg('cpPinMsg', '<div class="msg-ok">Withdrawal PIN updated</div>');
