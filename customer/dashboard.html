@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Dashboard – WAG Enterprises</title>
-<link rel="stylesheet" href="../css/shared.css?v=4">
+<link rel="stylesheet" href="../css/shared.css">
 <link rel="stylesheet" href="../css/customer.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -32,7 +32,7 @@
  <div id="planArea" style="display:none;">
  <div id="overdueBanner" style="display:none;" class="overdue-banner"><div class="overdue-banner-icon">!</div><div><div class="overdue-banner-text">Missed contributions</div><div class="overdue-banner-count" id="overdueCount">0 overdue</div></div></div>
  <div style="display:flex;align-items:center;gap:8px;padding:14px 13px 0;">
-  <div id="planNameDisplay" style="font-size:17px;font-weight:800;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</div>
+  <div id="planNameDisplay" style="font-size:17px;font-weight:800;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" class="plan-name-display">—</div>
   <button onclick="openRenamePlanModal()" title="Rename plan" style="background:none;border:none;color:var(--sub);cursor:pointer;padding:4px;display:flex;align-items:center;flex-shrink:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
  </div>
  <div class="bal-hero">
@@ -142,9 +142,14 @@
 requireRole(['customer']);
 initTheme();
 document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
-renderCustDash();
-startSuspendCheck();
-initCalSwipe();
+// Render dashboard first, then start background tasks after paint
+renderCustDash().then(() => {
+  // Defer non-critical tasks until after first render
+  requestAnimationFrame(() => {
+    startSuspendCheck();
+    initCalSwipe();
+  });
+});
 </script>
 </body>
 </html>
