@@ -5,74 +5,159 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>WAG – Wonderful & Able God Enterprises</title>
 <link rel="stylesheet" href="css/shared.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script src="js/supabase.js"></script>
+<style>
+*{-webkit-font-smoothing:antialiased;}
+html,body{height:100%;overflow-x:hidden;scroll-behavior:smooth;}
+body{background:var(--brand-deep);color:#fff;font-family:'Segoe UI',system-ui,sans-serif;}
+
+/* HERO */
+.hero{min-height:100vh;background:linear-gradient(160deg,var(--brand-deep) 0%,var(--brand-mid) 55%,var(--brand-light) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px 80px;text-align:center;position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(var(--yellow-rgb),.13) 0%,transparent 70%);pointer-events:none;}
+.hero-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(var(--yellow-rgb),.12);border:1px solid rgba(var(--yellow-rgb),.3);border-radius:50px;padding:6px 16px;font-size:11px;font-weight:700;color:var(--yellow);letter-spacing:1px;text-transform:uppercase;margin-bottom:36px;animation:fadeUp .6s ease both;}
+.hero-logo{width:90px;height:90px;background:var(--yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 28px;box-shadow:0 0 0 14px rgba(var(--yellow-rgb),.12),0 0 0 30px rgba(var(--yellow-rgb),.06);animation:fadeUp .6s .1s ease both;}
+.hero-logo svg{width:46px;height:46px;}
+.hero-title{font-size:clamp(28px,7vw,42px);font-weight:900;line-height:1.15;color:#fff;margin-bottom:10px;animation:fadeUp .6s .2s ease both;}
+.hero-title span{color:var(--yellow);}
+.hero-sub{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:22px;animation:fadeUp .6s .25s ease both;}
+.hero-desc{font-size:15px;color:rgba(255,255,255,.7);line-height:1.65;max-width:320px;margin:0 auto 40px;animation:fadeUp .6s .3s ease both;}
+.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;animation:fadeUp .6s .4s ease both;}
+.btn-hero-primary{padding:15px 36px;background:var(--yellow);color:#111;border:none;border-radius:50px;font-size:15px;font-weight:800;cursor:pointer;transition:all .22s;box-shadow:0 6px 24px rgba(var(--yellow-rgb),.4);}
+.btn-hero-primary:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(var(--yellow-rgb),.5);}
+.btn-hero-secondary{padding:15px 36px;background:transparent;color:#fff;border:2px solid rgba(255,255,255,.3);border-radius:50px;font-size:15px;font-weight:700;cursor:pointer;transition:all .22s;}
+.btn-hero-secondary:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.6);}
+.hero-scroll{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;color:rgba(255,255,255,.35);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;animation:bounce 2s ease-in-out infinite;}
+@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0);}50%{transform:translateX(-50%) translateY(6px);}}
+
+/* ORBS */
+.orb{position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none;animation:orbFloat 8s ease-in-out infinite;}
+.orb1{width:220px;height:220px;background:rgba(var(--yellow-rgb),.07);top:-60px;right:-60px;}
+.orb2{width:180px;height:180px;background:rgba(var(--blue-rgb),.4);bottom:60px;left:-40px;animation-delay:-3s;}
+.orb3{width:120px;height:120px;background:rgba(var(--yellow-rgb),.05);bottom:200px;right:30px;animation-delay:-5s;}
+@keyframes orbFloat{0%,100%{transform:translateY(0) scale(1);}50%{transform:translateY(-20px) scale(1.05);}}
+
+/* STATS */
+.stats-strip{background:rgba(var(--yellow-rgb),.06);border-top:1px solid rgba(var(--yellow-rgb),.12);border-bottom:1px solid rgba(var(--yellow-rgb),.12);padding:20px 24px;display:flex;justify-content:space-around;gap:8px;}
+.stat-item{text-align:center;}
+.stat-num{font-size:22px;font-weight:900;color:var(--yellow);display:block;}
+.stat-lbl{font-size:10px;font-weight:600;color:rgba(255,255,255,.5);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+
+/* SECTIONS */
+.section{padding:60px 24px;max-width:480px;margin:0 auto;}
+.section-tag{font-size:10px;font-weight:800;color:var(--yellow);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:block;}
+.section-title{font-size:clamp(22px,5vw,30px);font-weight:900;line-height:1.25;margin-bottom:8px;}
+.section-desc{font-size:13px;color:rgba(255,255,255,.6);line-height:1.65;margin-bottom:32px;}
+
+/* STEPS */
+.steps{display:flex;flex-direction:column;gap:20px;}
+.step{display:flex;gap:16px;align-items:flex-start;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease;}
+.step.visible{opacity:1;transform:translateY(0);}
+.step-num{width:38px;height:38px;min-width:38px;background:var(--yellow);color:#111;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;}
+.step-body{padding-top:2px;}
+.step-title{font-size:14px;font-weight:800;margin-bottom:4px;}
+.step-text{font-size:12px;color:rgba(255,255,255,.6);line-height:1.6;}
+
+/* FEATURES */
+.features-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.feature-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:20px 16px;text-align:center;transition:all .3s;opacity:0;transform:translateY(20px);}
+.feature-card.visible{opacity:1;transform:translateY(0);}
+.feature-card:hover{background:rgba(var(--yellow-rgb),.07);border-color:rgba(var(--yellow-rgb),.25);transform:translateY(-4px);}
+.feature-icon{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;background:rgba(var(--yellow-rgb),.12);}
+.feature-icon svg{width:22px;height:22px;stroke:var(--yellow);}
+.feature-name{font-size:13px;font-weight:800;margin-bottom:4px;}
+.feature-desc{font-size:11px;color:rgba(255,255,255,.55);line-height:1.5;}
+
+/* TRUST */
+.trust-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:24px 20px;margin-top:12px;opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease;}
+.trust-card.visible{opacity:1;transform:translateY(0);}
+.trust-quote{font-size:14px;line-height:1.65;color:rgba(255,255,255,.8);font-style:italic;margin-bottom:14px;}
+.trust-author{display:flex;align-items:center;gap:10px;}
+.trust-avatar{width:36px;height:36px;border-radius:50%;background:var(--yellow);display:flex;align-items:center;justify-content:center;font-weight:900;color:#111;font-size:14px;}
+.trust-name{font-size:12px;font-weight:700;}
+.trust-role{font-size:11px;color:rgba(255,255,255,.45);}
+
+/* CTA */
+.cta-section{padding:56px 24px 80px;text-align:center;background:linear-gradient(180deg,transparent,rgba(var(--yellow-rgb),.05));}
+.cta-title{font-size:clamp(22px,5vw,30px);font-weight:900;margin-bottom:12px;}
+.cta-sub{font-size:13px;color:rgba(255,255,255,.6);margin-bottom:30px;line-height:1.6;}
+.cta-btns{display:flex;flex-direction:column;gap:12px;max-width:320px;margin:0 auto;}
+
+/* FOOTER */
+.mkt-footer{border-top:1px solid rgba(255,255,255,.08);padding:24px;text-align:center;color:rgba(255,255,255,.3);font-size:11px;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+</style>
 <script src="js/utils.js"></script>
-<script src="js/auth.js"></script>
 </head>
 <body>
 
-<!-- LOADING OVERLAY -->
-<div class="loading-overlay" id="loadingOverlay">
- <div class="loading-spinner"></div>
- <div class="loading-text" id="loadingText">Please wait…</div>
+<section class="hero">
+ <div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div>
+ <div class="hero-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><polyline points="20 6 9 17 4 12"/></svg>Trusted Thrift Savings Platform</div>
+ <div class="hero-logo"><svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9v.01M18 15v.01"/></svg></div>
+ <h1 class="hero-title">Wonderful &amp; Able God<br><span>Enterprises</span></h1>
+ <p class="hero-sub">Thrift Savings · Since 2024</p>
+ <p class="hero-desc">Save daily or weekly with a trusted agent at your side. Your money grows safely, and you access it when you need it most.</p>
+ <div class="hero-btns">
+  <button class="btn-hero-primary" onclick="window.location.href='login.html'">Sign In</button>
+  <button class="btn-hero-secondary" onclick="window.location.href='register.html'">Create Account</button>
+ </div>
+ <div class="hero-scroll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><polyline points="6 9 12 15 18 9"/></svg>Scroll</div>
+</section>
+
+<div class="stats-strip">
+ <div class="stat-item"><span class="stat-num">₦50M+</span><span class="stat-lbl">Saved</span></div>
+ <div class="stat-item"><span class="stat-num">1,200+</span><span class="stat-lbl">Members</span></div>
+ <div class="stat-item"><span class="stat-num">99%</span><span class="stat-lbl">Reliable</span></div>
+ <div class="stat-item"><span class="stat-num">24/7</span><span class="stat-lbl">Access</span></div>
 </div>
 
-<!-- LANDING -->
-<div id="landingView" class="view active">
- <div class="land-hero">
- <button class="land-theme-btn" onclick="toggleTheme()" id="landThemeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
- <div class="land-logo"><svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:42px;height:42px;"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9v.01M18 15v.01"/></svg></div>
- <h1 class="land-title">Wonderful & Able God</h1>
- <p class="land-title" style="margin-bottom:6px;font-size:28px;">Enterprises</p>
- <p class="land-sub" style="font-size:10px;letter-spacing:3px;margin-bottom:26px;">Thrift Savings</p>
- <div class="land-role-row">
- <button class="land-role-btn active" id="landRoleCust" onclick="setLandRole('customer')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Customer</button>
- <button class="land-role-btn" id="landRoleRep" onclick="setLandRole('representative')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>Representative</button>
+<div class="section">
+ <span class="section-tag">How it works</span>
+ <h2 class="section-title">Three steps to grow your savings</h2>
+ <p class="section-desc">Getting started takes less than two minutes. Your agent handles daily collections so you never miss a beat.</p>
+ <div class="steps">
+  <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Create your account</div><div class="step-text">Register with your phone number, choose a password, and activate with a token from your field agent.</div></div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Open a savings plan</div><div class="step-text">Set a contribution amount and frequency. Daily or weekly — your agent collects at your doorstep.</div></div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Withdraw when ready</div><div class="step-text">Request a withdrawal anytime. Your agent processes it within 24 hours, securely and transparently.</div></div></div>
  </div>
- </div>
- <div class="land-card-wrap">
- <div class="auth-tab-row">
- <button class="auth-tab-btn active" id="authSignIn" onclick="goAuth('signin')">Sign In</button>
- <button class="auth-tab-btn" id="authCreate" onclick="goAuth('create')">Create Account</button>
- </div>
- <div class="land-features" id="featureCards">
- <div class="feat-card"><div class="feat-ico"></div><div class="feat-title">Daily Savings</div><div class="feat-sub">Build wealth through daily & weekly thrift contributions</div></div>
- <div class="feat-card"><div class="feat-ico"></div><div class="feat-title">Cloud Synced</div><div class="feat-sub">Your data is secure and accessible from any device</div></div>
- <div class="feat-card"><div class="feat-ico"></div><div class="feat-title">Secure Login</div><div class="feat-sub">Encrypted passwords with verified field agents</div></div>
- <div class="feat-card"><div class="feat-ico"></div><div class="feat-title">Withdrawal Access</div><div class="feat-sub">Request withdrawals from your savings anytime</div></div>
- </div>
- </div>
- <div class="footer" id="footer">© 2026 Wonderful & Able God Enterprises. All rights reserved.</div>
 </div>
+
+<div class="section" style="padding-top:0;">
+ <span class="section-tag">Features</span>
+ <h2 class="section-title">Everything you need to save better</h2>
+ <div class="features-grid">
+  <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="feature-name">Bank-Grade Security</div><div class="feature-desc">Encrypted PINs & password-protected accounts</div></div>
+  <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div><div class="feature-name">Withdrawal Access</div><div class="feature-desc">Request funds anytime, reviewed and paid fast</div></div>
+  <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="feature-name">Live Tracking</div><div class="feature-desc">See every deposit, payout, and missed day live</div></div>
+  <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div><div class="feature-name">Dedicated Agent</div><div class="feature-desc">Your personal field agent collects daily for you</div></div>
+  <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="feature-name">Savings Calendar</div><div class="feature-desc">Visual calendar showing paid, missed & payout days</div></div>
+  <div class="feature-card"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></div><div class="feature-name">Fraud Protection</div><div class="feature-desc">Every transaction logged and audited in real time</div></div>
+ </div>
+</div>
+
+<div class="section" style="padding-top:0;">
+ <span class="section-tag">Testimonials</span>
+ <h2 class="section-title">What our members say</h2>
+ <div class="trust-card"><div class="trust-quote">"WAG helped me save ₦120,000 in six months without even thinking about it. My agent comes every morning and the app shows me everything."</div><div class="trust-author"><div class="trust-avatar">A</div><div><div class="trust-name">Adaeze Nwosu</div><div class="trust-role">Lagos · Member since 2024</div></div></div></div>
+ <div class="trust-card" style="transition-delay:.1s;"><div class="trust-quote">"I finally have a way to save for my children's school fees. The withdrawal process is quick and I trust the system completely."</div><div class="trust-author"><div class="trust-avatar">E</div><div><div class="trust-name">Emmanuel Okafor</div><div class="trust-role">Abuja · Member since 2025</div></div></div></div>
+</div>
+
+<div class="cta-section">
+ <h2 class="cta-title">Ready to start saving?</h2>
+ <p class="cta-sub">Join thousands of members building wealth one day at a time with Wonderful & Able God Enterprises.</p>
+ <div class="cta-btns">
+  <button class="btn-hero-primary" style="width:100%;border-radius:13px;" onclick="window.location.href='register.html'">Create Free Account</button>
+  <button class="btn-hero-secondary" style="width:100%;border-radius:13px;" onclick="window.location.href='login.html'">Sign In to My Account</button>
+ </div>
+</div>
+
+<div class="mkt-footer">© 2026 Wonderful &amp; Able God Enterprises. All rights reserved.</div>
 
 <script>
-// Landing page only needs the role toggle (persisted to localStorage so
-// login.html/register.html open on the same role) and theme init.
-initTheme();
-
-function setLandRole(r){
-  localStorage.setItem('wagLandRole', r);
-  document.getElementById('landRoleCust').classList.toggle('active', r==='customer');
-  document.getElementById('landRoleRep').classList.toggle('active', r==='representative');
-}
-function goAuth(tab){
-  // tab: 'signin' -> login.html, 'create' -> register.html
-  window.location.href = (tab==='signin' ? 'login.html' : 'register.html');
-}
-
-// If a logged-in user lands here, send them straight to their dashboard.
-(function redirectIfLoggedIn(){
-  const u = getUser();
-  if(u && u.role && ROLE_HOME[u.role]) window.location.replace(rootPath() + ROLE_HOME[u.role]);
-})();
-
-// Restore previously chosen role toggle state
 (function(){
-  const r = localStorage.getItem('wagLandRole') || 'customer';
-  setLandRole(r);
+  try{const u=JSON.parse(sessionStorage.getItem('wagUser'));const h={customer:'customer/dashboard.html',representative:'representative/dashboard.html'};if(u&&h[u.role])window.location.replace(h[u.role]);}catch(e){}
 })();
+const io=new IntersectionObserver((entries)=>{entries.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('visible'),i*80);io.unobserve(e.target);}});},{threshold:.15});
+document.querySelectorAll('.step,.feature-card,.trust-card').forEach(el=>io.observe(el));
 </script>
 </body>
 </html>

@@ -5,6 +5,73 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Sign In – WAG Enterprises</title>
 <link rel="stylesheet" href="css/shared.css">
+<style>
+*{-webkit-font-smoothing:antialiased;}
+html,body{height:100%;overflow-x:hidden;}
+body{background:linear-gradient(160deg,var(--brand-deep) 0%,var(--brand-mid) 60%,var(--brand-light) 100%);min-height:100vh;display:flex;flex-direction:column;}
+
+/* TOPBAR */
+.login-topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;flex-shrink:0;}
+.login-back{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;text-decoration:none;transition:background .2s;}
+.login-back:hover{background:rgba(255,255,255,.2);}
+.login-brand{color:rgba(255,255,255,.6);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;}
+.login-theme-btn{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:background .2s;}
+.login-theme-btn:hover{background:rgba(255,255,255,.2);}
+
+/* HERO TEXT */
+.login-hero{text-align:center;padding:8px 24px 28px;flex-shrink:0;}
+.login-logo{width:72px;height:72px;background:var(--yellow);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 0 0 12px rgba(var(--yellow-rgb),.1),0 0 0 26px rgba(var(--yellow-rgb),.05);}
+.login-hero-title{color:#fff;font-size:22px;font-weight:900;margin-bottom:4px;}
+.login-hero-sub{color:rgba(255,255,255,.5);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;}
+
+/* FLOATING CARD */
+.login-card{background:#fff;border-radius:28px;margin:0 16px;padding:26px 22px 32px;box-shadow:0 24px 60px rgba(0,0,0,.35),0 4px 16px rgba(0,0,0,.15);animation:cardSlideUp .4s cubic-bezier(.34,1.1,.64,1) both;flex-shrink:0;}
+body.dark .login-card{background:#1a1a1a;}
+@keyframes cardSlideUp{from{opacity:0;transform:translateY(32px);}to{opacity:1;transform:translateY(0);}}
+
+/* ROLE TOGGLE */
+.role-toggle{display:flex;background:#f1f3f7;border-radius:13px;padding:4px;margin-bottom:22px;gap:4px;}
+body.dark .role-toggle{background:#2a2a2a;}
+.role-btn{flex:1;padding:11px 8px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;color:#6b7280;background:transparent;transition:all .22s;display:flex;align-items:center;justify-content:center;gap:5px;}
+.role-btn.active{background:var(--blue);color:#fff;box-shadow:0 3px 10px rgba(var(--blue-rgb),.3);}
+body.dark .role-btn.active{background:var(--yellow);color:#111;}
+
+/* AUTH TABS */
+.auth-tab-row{display:flex;background:#f1f3f7;border-radius:11px;padding:4px;margin-bottom:22px;}
+body.dark .auth-tab-row{background:#2a2a2a;}
+.auth-tab-btn{flex:1;padding:10px;border:none;background:transparent;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;color:#6b7280;transition:all .22s;}
+.auth-tab-btn.active{background:var(--blue);color:#fff;}
+body.dark .auth-tab-btn.active{background:var(--yellow);color:#111;}
+
+/* FORM */
+.fgroup{margin-bottom:16px;}
+.flabel{font-size:10px;font-weight:800;color:var(--sub);letter-spacing:.9px;text-transform:uppercase;margin-bottom:7px;display:block;}
+body.dark .flabel{color:#888;}
+.finput{width:100%;padding:14px 15px;border:2px solid var(--border);border-radius:12px;font-size:16px;background:#fff;color:#111;transition:border .2s,box-shadow .2s;}
+body.dark .finput{background:#111;color:#f0f0f0;border-color:#2a2a2a;}
+.finput:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(var(--blue-rgb),.08);}
+body.dark .finput:focus{border-color:var(--yellow);}
+.pin-wrap{position:relative;}
+.pin-wrap .finput{padding-right:46px;}
+.pw-eye{position:absolute;right:13px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--sub);display:flex;align-items:center;padding:4px;}
+
+/* SUBMIT */
+.submit-btn{width:100%;padding:16px;background:var(--yellow);color:#111;border:none;border-radius:13px;font-size:16px;font-weight:800;cursor:pointer;margin-top:4px;transition:all .22s;box-shadow:0 4px 16px rgba(var(--yellow-rgb),.35);}
+.submit-btn:hover{background:#e6a800;transform:translateY(-1px);box-shadow:0 6px 20px rgba(var(--yellow-rgb),.45);}
+.submit-btn:active{transform:scale(.98);}
+.submit-btn:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+
+/* FORGOT */
+.forgot-link{display:block;text-align:center;font-size:12px;color:var(--blue);font-weight:700;margin-top:12px;text-decoration:none;cursor:pointer;}
+body.dark .forgot-link{color:var(--yellow);}
+
+/* REGISTER PROMPT */
+.register-prompt{text-align:center;margin-top:20px;font-size:12px;color:rgba(255,255,255,.5);}
+.register-prompt a{color:var(--yellow);font-weight:700;text-decoration:none;}
+
+/* SPACER */
+.login-spacer{flex:1;min-height:28px;}
+</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="js/supabase.js"></script>
@@ -13,65 +80,106 @@
 </head>
 <body>
 
-<!-- LOADING OVERLAY -->
 <div class="loading-overlay" id="loadingOverlay">
  <div class="loading-spinner"></div>
  <div class="loading-text" id="loadingText">Please wait…</div>
 </div>
 
-<div id="landingView" class="view active">
- <div class="land-hero">
- <button class="land-theme-btn" onclick="toggleTheme()" id="landThemeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
- <a href="index.html" style="text-decoration:none;"><div class="land-logo"><svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:42px;height:42px;"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9v.01M18 15v.01"/></svg></div></a>
- <h1 class="land-title">Wonderful & Able God</h1>
- <p class="land-title" style="margin-bottom:6px;font-size:28px;">Enterprises</p>
- <p class="land-sub" style="font-size:10px;letter-spacing:3px;margin-bottom:26px;">Thrift Savings</p>
- <div class="land-role-row">
- <button class="land-role-btn active" id="landRoleCust" onclick="setLandRole('customer')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Customer</button>
- <button class="land-role-btn" id="landRoleRep" onclick="setLandRole('representative')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>Representative</button>
- </div>
- </div>
- <div class="land-card-wrap">
- <div class="auth-tab-row">
- <button class="auth-tab-btn active" id="authSignIn" onclick="">Sign In</button>
- <button class="auth-tab-btn" id="authCreate" onclick="window.location.href='register.html'">Create Account</button>
- </div>
- <!-- Customer Sign In -->
- <div id="custSignIn">
- <div class="form-group"><span class="field-label">Phone Number</span><input type="tel" id="loginPhone" class="field-input" placeholder="e.g. 08012345678" maxlength="11"></div>
- <div class="form-group"><span class="field-label">Password</span><div class="pin-wrap"><input type="password" id="loginPin" class="field-input" placeholder="Enter your password" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('loginPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
- <div id="loginMsg"></div>
- <button class="land-submit-btn" id="loginBtn" onclick="doLogin()">Sign In as Customer</button>
- <p style="text-align:center;font-size:12px;color:var(--sub);margin-top:7px;"><a href="#" onclick="showForgotModal();return false;" style="color:var(--blue);font-weight:700;">Forgot Password?</a></p>
- </div>
- <!-- Rep Sign In -->
- <div id="repSignIn" style="display:none;">
- <div class="form-group"><span class="field-label">Agent ID</span><input type="text" id="loginRepId" class="field-input" placeholder="e.g. 234567" maxlength="6" inputmode="numeric"></div>
- <div class="form-group"><span class="field-label">Password</span><div class="pin-wrap"><input type="password" id="loginRepPin" class="field-input" placeholder="····" maxlength="100"><button type="button" class="pw-eye" onclick="togglePw('loginRepPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
- <div id="loginRepMsg"></div>
- <button class="land-submit-btn" id="loginRepBtn" onclick="doLogin()">Sign In as Representative</button>
- <p style="text-align:center;font-size:12px;color:var(--sub);margin-top:7px;"><a href="#" onclick="showForgotModal();return false;" style="color:var(--blue);font-weight:700;">Forgot Password?</a></p>
- </div>
- </div>
- <div class="footer" id="footer">© 2026 Wonderful & Able God Enterprises. All rights reserved.</div>
+<!-- TOPBAR -->
+<div class="login-topbar">
+ <a href="index.html" class="login-back">←</a>
+ <span class="login-brand">WAG</span>
+ <button class="login-theme-btn" onclick="toggleTheme()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+ </button>
 </div>
 
-<!-- Reset Password Page (shown via URL ?reset=TOKEN) -->
+<!-- HERO -->
+<div class="login-hero">
+ <div class="login-logo">
+  <svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:36px;height:36px;"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9v.01M18 15v.01"/></svg>
+ </div>
+ <div class="login-hero-title">Welcome back</div>
+ <div class="login-hero-sub">Wonderful & Able God Enterprises</div>
+</div>
+
+<!-- FLOATING CARD -->
+<div class="login-card">
+ <!-- Role toggle -->
+ <div class="role-toggle">
+  <button class="role-btn active" id="roleCustomer" onclick="setRole('customer')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   Customer
+  </button>
+  <button class="role-btn" id="roleRep" onclick="setRole('representative')">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+   Representative
+  </button>
+ </div>
+
+ <!-- Sign In / Create Account tabs -->
+ <div class="auth-tab-row">
+  <button class="auth-tab-btn active" id="tabSignIn" onclick="setTab('signin')">Sign In</button>
+  <button class="auth-tab-btn" id="tabCreate" onclick="window.location.href='register.html'">Create Account</button>
+ </div>
+
+ <!-- Customer form -->
+ <div id="custForm">
+  <div class="fgroup">
+   <label class="flabel">Phone Number</label>
+   <input type="tel" id="loginPhone" class="finput" placeholder="e.g. 08012345678" maxlength="11">
+  </div>
+  <div class="fgroup">
+   <label class="flabel">Password</label>
+   <div class="pin-wrap">
+    <input type="password" id="loginPin" class="finput" placeholder="Enter your password" maxlength="100">
+    <button type="button" class="pw-eye" onclick="togglePw('loginPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+   </div>
+  </div>
+  <div id="loginMsg"></div>
+  <button class="submit-btn" id="loginBtn" onclick="doLogin()">Sign In as Customer</button>
+  <a class="forgot-link" onclick="showForgotModal();return false;">Forgot Password?</a>
+ </div>
+
+ <!-- Rep form -->
+ <div id="repForm" style="display:none;">
+  <div class="fgroup">
+   <label class="flabel">Agent ID</label>
+   <input type="text" id="loginRepId" class="finput" placeholder="e.g. 234567" maxlength="6" inputmode="numeric">
+  </div>
+  <div class="fgroup">
+   <label class="flabel">Password</label>
+   <div class="pin-wrap">
+    <input type="password" id="loginRepPin" class="finput" placeholder="····" maxlength="100">
+    <button type="button" class="pw-eye" onclick="togglePw('loginRepPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+   </div>
+  </div>
+  <div id="loginRepMsg"></div>
+  <button class="submit-btn" id="loginRepBtn" onclick="doLogin()">Sign In as Representative</button>
+  <a class="forgot-link" onclick="showForgotModal();return false;">Forgot Password?</a>
+ </div>
+</div>
+
+<div class="login-spacer"></div>
+<p class="register-prompt">New here? <a href="register.html">Create a free account →</a></p>
+<div style="height:32px;"></div>
+
+<!-- Reset Password Modal -->
 <div id="resetPasswordModal" class="modal" style="align-items:center;">
  <div class="msheet" style="max-width:480px;position:relative;border-radius:20px;">
- <div class="m-handle"></div>
- <div class="m-title"> Create New Password</div>
- <div class="msg-info" id="resetTokenInfo">Enter your new password below.</div>
- <div class="mform-group"><label class="form-lbl">New Password</label>
- <div class="pin-wrap"><input type="password" id="newPasswordInp" class="form-inp field-input" placeholder="Enter new password" maxlength="100">
- <button type="button" class="pw-eye" onclick="togglePw('newPasswordInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
- </div>
- <div class="mform-group"><label class="form-lbl">Confirm Password</label>
- <div class="pin-wrap"><input type="password" id="confirmPasswordInp" class="form-inp field-input" placeholder="Confirm new password" maxlength="100">
- <button type="button" class="pw-eye" onclick="togglePw('confirmPasswordInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
- </div>
- <div id="resetPasswordMsg"></div>
- <button class="btn btn-blue" onclick="doResetPassword()" style="margin-top:8px;">Save New Password</button>
+  <div class="m-handle"></div>
+  <div class="m-title">Create New Password</div>
+  <div class="msg-info" id="resetTokenInfo">Enter your new password below.</div>
+  <div class="mform-group"><label class="form-lbl">New Password</label>
+   <div class="pin-wrap"><input type="password" id="newPasswordInp" class="form-inp finput" placeholder="Enter new password" maxlength="100">
+   <button type="button" class="pw-eye" onclick="togglePw('newPasswordInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+  </div>
+  <div class="mform-group"><label class="form-lbl">Confirm Password</label>
+   <div class="pin-wrap"><input type="password" id="confirmPasswordInp" class="form-inp finput" placeholder="Confirm new password" maxlength="100">
+   <button type="button" class="pw-eye" onclick="togglePw('confirmPasswordInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+  </div>
+  <div id="resetPasswordMsg"></div>
+  <button class="btn btn-blue" onclick="doResetPassword()" style="margin-top:8px;">Save New Password</button>
  </div>
 </div>
 
@@ -79,25 +187,23 @@
 
 <script>
 let currentRole = localStorage.getItem('wagLandRole') || 'customer';
-
 initTheme();
 
-function setLandRole(r){
+function setRole(r) {
   currentRole = r;
   localStorage.setItem('wagLandRole', r);
-  document.getElementById('landRoleCust').classList.toggle('active', r==='customer');
-  document.getElementById('landRoleRep').classList.toggle('active', r==='representative');
-  document.getElementById('custSignIn').style.display = r==='customer' ? 'block' : 'none';
-  document.getElementById('repSignIn').style.display = r==='customer' ? 'none' : 'block';
+  document.getElementById('roleCustomer').classList.toggle('active', r === 'customer');
+  document.getElementById('roleRep').classList.toggle('active', r === 'representative');
+  document.getElementById('custForm').style.display = r === 'customer' ? 'block' : 'none';
+  document.getElementById('repForm').style.display = r === 'customer' ? 'none' : 'block';
 }
 
-// If a logged-in user lands here, send them straight to their dashboard.
 (function redirectIfLoggedIn(){
   const u = getUser();
   if(u && u.role && ROLE_HOME[u.role]) window.location.replace(rootPath() + ROLE_HOME[u.role]);
 })();
 
-setLandRole(currentRole);
+setRole(currentRole);
 initEmailJS();
 checkResetTokenInURL();
 
