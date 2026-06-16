@@ -30,9 +30,11 @@ function getScheduleInfo(plan, balance, totalDaysCoveredOverride) {
 async function renderCustDash() {
   if (!db) return;
   const user = getUser();
+  // Render header immediately from session (no DB wait)
   document.getElementById('custAv').textContent = user.first_name[0].toUpperCase();
   document.getElementById('custName').textContent = user.first_name + ' ' + user.last_name;
   document.getElementById('custPhone').textContent = user.phone;
+  // Fire plans query
   const { data: plans } = await db.from('plan_balances').select('*').eq('customer_id', user.id).neq('status', 'deleted');
   if (!activePlanId || !plans?.find(p => p.plan_id === activePlanId)) activePlanId = plans?.[0]?.plan_id || null;
   const bar = document.getElementById('planTabsBar');
@@ -47,6 +49,7 @@ async function renderCustDash() {
 async function switchPlan(id) { activePlanId = id; await renderCustDash(); }
 
 async function renderPlanDetail(planId) {
+  // Fire all 3 queries in parallel instead of sequentially
   const [{ data: plan }, { data: planExtra }, { data: allDeposits }] = await Promise.all([
     db.from('plan_balances').select('*').eq('plan_id', planId).single(),
     db.from('plans').select('regular_contribution,maturity_date').eq('id', planId).single(),

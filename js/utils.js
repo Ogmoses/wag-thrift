@@ -3,6 +3,23 @@
 // GENERIC UI / FORMAT / ICON HELPERS — used by every page
 // ═══════════════════════════════════════════════
 
+// ── PRECONNECT — inject early hints in <head> so the Supabase TCP/TLS
+// handshake starts before any fetch() call is made. This shaves ~200-400ms
+// off the first DB query on cold loads.
+(function preconnect() {
+  const supabaseHost = typeof SUPABASE_URL !== 'undefined' ? new URL(SUPABASE_URL).host : 'rrrwzximztwrctbasgto.supabase.co';
+  [
+    { rel: 'preconnect', href: 'https://' + supabaseHost },
+    { rel: 'dns-prefetch', href: 'https://' + supabaseHost },
+    { rel: 'preconnect', href: 'https://cdn.jsdelivr.net' },
+  ].forEach(({ rel, href }) => {
+    if (document.querySelector(`link[rel="${rel}"][href="${href}"]`)) return;
+    const l = document.createElement('link'); l.rel = rel; l.href = href;
+    if (rel === 'preconnect') l.crossOrigin = 'anonymous';
+    document.head.appendChild(l);
+  });
+})();
+
 // ── DOUBLE-TAP GUARD — prevents duplicate submissions
 const _actionLocks = {};
 function acquireActionLock(key) { if (_actionLocks[key]) return false; _actionLocks[key] = true; return true; }

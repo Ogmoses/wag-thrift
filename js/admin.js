@@ -621,7 +621,11 @@ async function renderFraudFlags() {
   const el = document.getElementById('fraudFlagsList');
   if (!el) return;
   if (!flags?.length) { el.innerHTML = '<div class="empty-state">No active fraud flags</div>'; return; }
-  el.innerHTML = flags.map(f => `<div class="fraud-flag-card"><div class="ff-header"><span class="ff-type">${f.type.replace(/_/g, ' ')} · ${f.severity.toUpperCase()}</span><span class="ff-time">${fmtDate(f.created_at)}</span></div><div class="ff-desc">${f.description}</div><button class="btn btn-green" style="margin-top:9px;font-size:12px;padding:7px 12px;" onclick="resolveFlag('${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark Resolved</button></div>`).join('');
+  el.innerHTML = flags.map(f => {
+    const desc = (f.description || '').replace(/emergency/gi, 'withdrawal').replace(/EXCESS_EMERGENCY/g, 'EXCESS_WITHDRAWAL');
+    const type = (f.type || '').replace(/emergency/gi, 'withdrawal').replace(/EXCESS_EMERGENCY/g, 'EXCESS_WITHDRAWAL');
+    return `<div class="fraud-flag-card"><div class="ff-header"><span class="ff-type">${type.replace(/_/g, ' ')} · ${(f.severity||'').toUpperCase()}</span><span class="ff-time">${fmtDate(f.created_at)}</span></div><div class="ff-desc">${desc}</div><button class="btn btn-green" style="margin-top:9px;font-size:12px;padding:7px 12px;" onclick="resolveFlag('${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark Resolved</button></div>`;
+  }).join('');
 }
 
 async function resolveFlag(id) {
