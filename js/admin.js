@@ -4,7 +4,7 @@
 // Kept completely separate from customer/representative auth (js/auth.js
 // session helpers getUser/setUser are NOT used here — admin uses its own
 // sessionStorage key 'wagAdmin', see getAdminSession/setAdminSession in auth.js).
-// Depends on: js/supabase.js, js/utils.js, js/auth.js (load all three first)
+// Depends on: js/supabase.js, js/utils.js, js/auth.js (load all three first) 
 // ═══════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════
