@@ -8,12 +8,12 @@
 <style>
 *{-webkit-font-smoothing:antialiased;}
 html,body{height:100%;overflow-x:hidden;}
-body{background:linear-gradient(160deg,var(--brand-deep) 0%,var(--brand-mid) 60%,var(--brand-light) 100%);min-height:100vh;display:flex;flex-direction:column;}
+/* Background always stays brand blue regardless of theme */
+body{background:linear-gradient(160deg,var(--brand-deep) 0%,var(--brand-mid) 60%,var(--brand-light) 100%) !important;min-height:100vh;display:flex;flex-direction:column;}
 
 /* TOPBAR */
 .login-topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;flex-shrink:0;}
 .login-back{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;text-decoration:none;transition:background .2s;}
-.login-brand{color:rgba(255,255,255,.6);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;}
 .login-theme-btn{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:background .2s;}
 
 /* HERO */
@@ -22,12 +22,12 @@ body{background:linear-gradient(160deg,var(--brand-deep) 0%,var(--brand-mid) 60%
 .login-hero-title{color:#fff;font-size:22px;font-weight:900;margin-bottom:4px;}
 .login-hero-sub{color:rgba(255,255,255,.5);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;}
 
-/* ROLE TOGGLE — lives outside the card, on the blue background */
+/* ROLE TOGGLE — always on the blue background */
 .role-toggle-outer{display:flex;gap:10px;justify-content:center;padding:0 20px 22px;flex-shrink:0;}
 .role-btn-outer{flex:1;max-width:160px;padding:12px 10px;border:2px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .22s;}
 .role-btn-outer.active{background:var(--yellow);color:#111;border-color:var(--yellow);box-shadow:0 4px 16px rgba(var(--yellow-rgb),.4);}
 
-/* FLOATING CARD */
+/* FLOATING CARD — goes dark in dark mode, stays white in light mode */
 .login-card{background:#fff;border-radius:28px;margin:0 18px 32px;padding:26px 22px 32px;box-shadow:0 8px 40px rgba(0,0,0,.25),0 2px 12px rgba(0,0,0,.12);animation:cardSlideUp .4s cubic-bezier(.34,1.1,.64,1) both;}
 body.dark .login-card{background:#1a1a1a;}
 @keyframes cardSlideUp{from{opacity:0;transform:translateY(32px);}to{opacity:1;transform:translateY(0);}}
@@ -36,6 +36,7 @@ body.dark .login-card{background:#1a1a1a;}
 .auth-tab-row{display:flex;background:#f1f3f7;border-radius:11px;padding:4px;margin-bottom:22px;}
 body.dark .auth-tab-row{background:#2a2a2a;}
 .auth-tab-btn{flex:1;padding:10px;border:none;background:transparent;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;color:#6b7280;transition:all .22s;}
+body.dark .auth-tab-btn{color:#888;}
 .auth-tab-btn.active{background:var(--blue);color:#fff;}
 body.dark .auth-tab-btn.active{background:var(--yellow);color:#111;}
 
@@ -76,7 +77,7 @@ body.dark .forgot-link{color:var(--yellow);}
 <!-- TOPBAR -->
 <div class="login-topbar">
  <a href="index.html" class="login-back">←</a>
- <span class="login-brand">WAG</span>
+ <span></span>
  <button class="login-theme-btn" onclick="toggleTheme()">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
  </button>
