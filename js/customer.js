@@ -221,14 +221,20 @@ async function _doWithdrawalRequest() {
   if (!amtVal || +amtVal <= 0) { setMsg('wdMsg', '<div class="msg-err">Enter a valid amount</div>'); return; }
   const { data: planBal } = await db.from('plan_balances').select('balance').eq('plan_id', planId).single();
   if (+amtVal > (planBal?.balance || 0)) { setMsg('wdMsg', `<div class="msg-err">Amount exceeds plan balance of ${fmt(planBal?.balance)}</div>`); return; }
-  const user = getUser(); const ref = genRef();
+  const user = getUser();
+  const ref = 'WAG-WD-' + Date.now();
   showLoading('Submitting request…');
   try {
-    const { error: insErr } = await db.from('disbursements').insert({ customer_id: user.id, plan_id: planId, type: 'withdrawal', amount: +amtVal, reason, ref, status: 'pending', stage_history: [{ stage: 'pending', timestamp: new Date().toISOString(), by: user.id }] });
-    if (insErr) throw insErr;
+    const { data, error } = await db.rpc('request_withdrawal', {
+      p_customer_id: user.id,
+      p_plan_id: planId,
+      p_amount: +amtVal,
+      p_reason: reason,
+      p_ref: ref
+    });
+    if (error) throw new Error(error.message);
     await checkExcessWithdrawal(user.id);
-    await audit('payout', user.id, 'customer', `Withdrawal request of ${fmt(+amtVal)} — PENDING — Ref: ${ref}`, +amtVal, planId);
-    setMsg('wdMsg', '<div class="msg-ok"> Request submitted! A representative will approve it shortly.</div>');
+    setMsg('wdMsg', '<div class="msg-ok">✓ Request submitted! A representative will approve it shortly.</div>');
     setTimeout(() => { closeModal('withdrawalModal'); setMsg('wdMsg', ''); document.getElementById('wdAmt').value = ''; document.getElementById('wdReason').value = ''; }, 2500);
   } catch (e) {
     console.error('Withdrawal request failed:', e);
