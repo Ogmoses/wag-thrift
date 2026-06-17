@@ -343,7 +343,16 @@ function renderDisbCard(d, compact) {
 async function reviewDisb(disbId) {
   if (!confirm('Mark this withdrawal as REVIEWED?\nThis allows the representative to proceed with approval.')) return;
   showLoading('Updating…');
-  await db.from('disbursements').update({ status: 'reviewed', reviewed_at: new Date().toISOString(), reviewed_by: 'admin' }).eq('id', disbId);
+  // Try with reviewed_at/reviewed_by first; fall back without if columns missing
+  let { error } = await db.from('disbursements')
+    .update({ status: 'reviewed', reviewed_at: new Date().toISOString(), reviewed_by: 'admin' })
+    .eq('id', disbId).eq('status', 'pending');
+  if (error && error.message?.includes('reviewed_at')) {
+    // Column not yet added — update status only
+    const res = await db.from('disbursements').update({ status: 'reviewed' }).eq('id', disbId).eq('status', 'pending');
+    error = res.error;
+  }
+  if (error) { hideLoading(); alert('Review failed: ' + error.message); return; }
   await audit('review', `Admin marked withdrawal ${disbId} as reviewed`);
   hideLoading();
   await renderOverview();
