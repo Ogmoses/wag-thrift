@@ -467,13 +467,12 @@ body:not(.dark) .adr-elevate-section{background:rgba(255,186,9,.08);border-color
 
 
 .mini-cal-wrap{touch-action:pan-y;}
-.mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.mini-cal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:6px;}
 .mini-cal-wrap{touch-action:pan-y;}
-.mini-cal-month-lbl{font-size:15px;font-weight:800;color:var(--text);flex:1;text-align:center;padding:0 12px;}
+.mini-cal-month-lbl{font-size:15px;font-weight:800;color:var(--text);flex:1;text-align:center;}
 body.dark .mini-cal-month-lbl{color:#f0f0f0;}
-.cal-nav-btn{background:var(--border);border:none;color:var(--text);cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;transition:background .18s;}
+.cal-nav-btn{background:var(--border);border:none;color:var(--text);cursor:pointer;width:30px;height:30px;min-width:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;transition:background .18s;}
 .cal-nav-btn:hover{background:#d1d5db;}
-.cal-nav-btn svg{width:14px;height:14px;stroke:currentColor;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round;}
 body.dark .cal-nav-btn{color:#f0f0f0;background:#2a2a2a;}
 body.dark .cal-nav-btn:hover{background:#3a3a3a;}
 /* Calendar table — border-spacing controls gap between day cells */
