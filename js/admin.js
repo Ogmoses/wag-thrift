@@ -301,23 +301,28 @@ function renderDisbCard(d, compact) {
   const curIdx = stages.indexOf(d.status);
   const cust = d.customers || {};
   const canReview = d.status === 'pending';
-  const canPay = d.status === 'approved';
-  const canReject = d.status === 'pending' || d.status === 'reviewed';
+  const canApprove = d.status === 'reviewed';
+  const isApproved = d.status === 'approved';
+  const canReject = ['pending', 'reviewed', 'approved'].includes(d.status);
 
   const stageBar = stages.map((s, i) => `<div class="stage-step"><div class="stage-dot ${i < curIdx ? 'done' : i === curIdx ? 'active' : ''}"></div><div class="stage-label">${s}</div></div>`).join('');
+
+  const rejectBtn = `<button class="btn-reject" onclick="rejectDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button>`;
 
   const actions = canReview
     ? `<div class="disb-actions">
         <button class="btn-review" onclick="reviewDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark as Reviewed</button>
-        <button class="btn-reject" onclick="rejectDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button>
+        ${rejectBtn}
        </div>`
-    : canPay
+    : canApprove
     ? `<div class="disb-actions">
-        <button class="btn-review" onclick="finalPayDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Complete Payment</button>
-        <button class="btn-reject" onclick="rejectDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button>
+        <button class="btn-review" onclick="approveDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Approve Withdrawal</button>
+        ${rejectBtn}
        </div>`
+    : isApproved
+    ? `<div class="disb-actions"><div style="font-size:11px;color:var(--sub);padding:6px 2px;">✓ Approved — representative will confirm cash delivery</div>${rejectBtn}</div>`
     : canReject
-    ? `<div class="disb-actions"><button class="btn-reject" onclick="rejectDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button></div>`
+    ? `<div class="disb-actions">${rejectBtn}</div>`
     : '';
 
   const phone = (cust.phone || '').replace('+234', '0');
@@ -340,15 +345,38 @@ function renderDisbCard(d, compact) {
   </div>`;
 }
 
+async function approveDisb(disbId) {
+  if (!confirm('APPROVE this withdrawal?\n\nThe representative will then be able to mark it as paid once cash is delivered to the customer.')) return;
+  showLoading('Approving…');
+  const { error } = await db.from('disbursements')
+    .update({ status: 'approved' })
+    .eq('id', disbId).eq('status', 'reviewed');
+  if (error) { hideLoading(); alert('Approval failed: ' + error.message); return; }
+  await audit('approve', `Admin approved withdrawal ${disbId} — awaiting rep payment confirmation`);
+  hideLoading();
+  await renderOverview();
+  if (currentPage === 'disbursements') await renderDisbPage();
+}
+
 async function reviewDisb(disbId) {
-  if (!confirm('Mark this withdrawal as REVIEWED?\nThis allows the representative to proceed with approval.')) return;
+  if (!confirm('Mark this withdrawal as REVIEWED?\nThis allows you to then approve it.')) return;
   showLoading('Updating…');
-  const { data, error } = await db.rpc('mark_disbursement_reviewed', {
-    p_disbursement_id: disbId
-  });
+  const { data, error } = await db.rpc('mark_disbursement_reviewed', { p_disbursement_id: disbId });
   if (error) { hideLoading(); alert('Review failed: ' + error.message); return; }
-  if (data === false) { hideLoading(); alert('Could not review — it may already be reviewed or not found.'); return; }
+  if (data === false) { hideLoading(); alert('Could not review — already reviewed or not found.'); return; }
   await audit('review', `Admin marked withdrawal ${disbId} as reviewed`);
+  hideLoading();
+  await renderOverview();
+  if (currentPage === 'disbursements') await renderDisbPage();
+}
+
+async function approveDisb(disbId) {
+  if (!confirm('APPROVE this withdrawal?\nThe balance will be deducted immediately and the representative will deliver cash to the customer.')) return;
+  showLoading('Approving…');
+  const { data, error } = await db.rpc('approve_disbursement', { p_disbursement_id: disbId });
+  if (error) { hideLoading(); alert('Approval failed: ' + error.message); return; }
+  if (data?.ok === false) { hideLoading(); alert('Approval failed: ' + (data.error || 'Unknown error')); return; }
+  await audit('approve', `Admin approved withdrawal ${disbId} — balance deducted, rep delivering cash`);
   hideLoading();
   await renderOverview();
   if (currentPage === 'disbursements') await renderDisbPage();

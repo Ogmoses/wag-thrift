@@ -138,12 +138,13 @@ function renderDisbCards(disbs) {
     const isReviewed = d.status === 'reviewed';
     const isApproved = d.status === 'approved';
     let actionHtml = '';
-    if (isPending) {
-      actionHtml = `<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:9px 12px;font-size:11px;color:#92400e;display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span><strong>Awaiting Admin Review</strong> — This request must be reviewed by a Super Admin before you can process it.</span></div>`;
-    } else if (isReviewed) {
-      actionHtml = `<div class="dis-acts"><button class="btn-sm btn-sm-blue" onclick="doApproveDisb('${d.id}','${d.plan_id}',${d.amount},'${d.customer_id}')">✓ Approve</button><button class="btn-sm btn-sm-ghost" onclick="doRejectDisb('${d.id}','${d.customer_id}')">✕ Reject</button></div>`;
+    if (isPending || isReviewed) {
+      const msg = isPending
+        ? '<strong>Awaiting Admin Review</strong> — A Super Admin must review this request first.'
+        : '<strong>Awaiting Admin Approval</strong> — Admin has reviewed, now needs to approve.';
+      actionHtml = `<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:9px 12px;font-size:11px;color:#92400e;display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span>${msg}</span></div>`;
     } else if (isApproved) {
-      actionHtml = `<div style="background:#d1fae5;border:1px solid #059669;border-radius:8px;padding:9px 12px;font-size:11px;color:#065f46;display:flex;align-items:center;gap:6px;">✓ Approved — awaiting payment confirmation</div>`;
+      actionHtml = `<div class="dis-acts"><button class="btn-sm btn-sm-blue" onclick="doMarkPaid('${d.id}','${d.plan_id}',${d.amount},'${d.customer_id}')">💵 Mark as Paid</button><button class="btn-sm btn-sm-ghost" onclick="doRejectDisb('${d.id}','${d.customer_id}')">✕ Reject</button></div>`;
     }
     return `<div class="dis-card"><div class="dis-type">${d.type === 'withdrawal' ? 'Withdrawal' : 'Milestone'}</div><div class="dis-amt">${fmt(d.amount)}</div><div class="dis-stage-bar">${stages.map((s, i) => `<div class="stage-step"><div class="stage-dot ${i < curIdx ? 'done' : i === curIdx ? 'active' : ''}"></div><div class="stage-label">${s}</div></div>`).join('')}</div><div class="dis-reason">${d.reason || 'No reason provided'}</div>${actionHtml}</div>`;
   }).join('');
@@ -229,10 +230,8 @@ async function _doApproveDisb(disbId, planId, amount, custId) {
   const { data: bal } = await db.from('plan_balances').select('balance').eq('plan_id', planId).single();
   if ((bal?.balance || 0) < amount) { alert(`Insufficient plan balance.\nAvailable: ${fmt(bal?.balance)}`); return; }
   const { data: cust } = await db.from('customers').select('first_name,last_name').eq('id', custId).single();
-  if (!confirm(`Approve withdrawal of ${fmt(amount)} for ${cust?.first_name || 'customer'}?\n\nThis marks it as approved. The Super Admin will complete the final payment step.`)) return;
-  showLoading('Approving withdrawal…');
-  // Fix 9: rep sets status → 'approved' only. 'paid' + payout transaction
-  // is done server-side by admin via approve_withdrawal RPC.
+  if (!confirm(`Approve withdrawal of ${fmt(amount)} for ${cust?.first_name || 'customer'}?\n\nOnce approved, you will deliver the cash and then tap "Mark as Paid".`)) return;
+  showLoading('Approving…');
   const { error } = await db.from('disbursements').update({
     status: 'approved',
     confirmed_by: rep.id,
@@ -240,11 +239,44 @@ async function _doApproveDisb(disbId, planId, amount, custId) {
   }).eq('id', disbId);
   if (error) { hideLoading(); alert('Approval failed: ' + error.message); return; }
   await audit('approve', rep.id, 'representative',
-    `Rep approved withdrawal of ${fmt(amount)} for ${cust?.first_name || ''} ${cust?.last_name || ''} — pending admin payment`,
+    `Rep approved withdrawal of ${fmt(amount)} for ${cust?.first_name || ''} ${cust?.last_name || ''}`,
     amount, planId);
-  setUser({ ...rep, confirmed_count: (rep.confirmed_count || 0) + 1 });
   hideLoading();
-  alert(`✓ Withdrawal Approved\nAmount: ${fmt(amount)}\nStatus: Awaiting final payment by Super Admin`);
+  alert(`✓ Approved\nNow deliver ${fmt(amount)} cash to ${cust?.first_name || 'customer'} and tap "Mark as Paid".`);
+  if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
+  if (document.getElementById('repAllRequestsList')) await loadAllRepRequests();
+}
+
+// Rep marks paid after physically delivering cash to customer
+async function doMarkPaid(disbId, planId, amount, custId) { guardedSubmit('markPaid_' + disbId, () => _doMarkPaid(disbId, planId, amount, custId)); }
+async function _doMarkPaid(disbId, planId, amount, custId) {
+  const { data: disbCheck } = await db.from('disbursements').select('status').eq('id', disbId).single();
+  if (!disbCheck || disbCheck.status !== 'approved') {
+    alert('This withdrawal must be in approved status before marking as paid.');
+    return;
+  }
+  const { data: cust } = await db.from('customers').select('first_name,last_name').eq('id', custId).single();
+  if (!confirm(`Confirm cash of ${fmt(amount)} has been physically delivered to ${cust?.first_name || 'customer'}?`)) return;
+  showLoading('Confirming delivery…');
+  const rep = getUser();
+  const ref = 'CASH-' + Date.now();
+  // Balance was already deducted when admin approved.
+  // Rep just records the payout transaction + marks disbursement paid.
+  const { error: txErr } = await db.from('transactions').insert({
+    ref, type: 'payout', amount, plan_id: planId,
+    customer_id: custId, agent_id: rep.id,
+    method: 'Cash', notes: 'Cash delivered by rep'
+  });
+  if (txErr) { hideLoading(); alert('Failed to record transaction: ' + txErr.message); return; }
+  const { error: disbErr } = await db.from('disbursements')
+    .update({ status: 'paid', confirmed_by: rep.id, confirmed_at: new Date().toISOString() })
+    .eq('id', disbId);
+  if (disbErr) { hideLoading(); alert('Failed to mark paid: ' + disbErr.message); return; }
+  await audit('paid', rep.id, 'representative',
+    `Rep confirmed cash delivery of ${fmt(amount)} to ${cust?.first_name || ''} ${cust?.last_name || ''} — Ref: ${ref}`,
+    amount, planId);
+  hideLoading();
+  alert(`✅ Payment Complete!\nCash delivered to ${cust?.first_name || 'customer'}`);
   if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
   if (document.getElementById('repAllRequestsList')) await loadAllRepRequests();
 }
