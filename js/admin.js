@@ -4,7 +4,7 @@
 // Kept completely separate from customer/representative auth (js/auth.js
 // session helpers getUser/setUser are NOT used here — admin uses its own
 // sessionStorage key 'wagAdmin', see getAdminSession/setAdminSession in auth.js).
-// Depends on: js/supabase.js, js/utils.js, js/auth.js (load all three first) 
+// Depends on: js/supabase.js, js/utils.js, js/auth.js (load all three first)
 // ═══════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════
@@ -343,19 +343,11 @@ function renderDisbCard(d, compact) {
 async function reviewDisb(disbId) {
   if (!confirm('Mark this withdrawal as REVIEWED?\nThis allows the representative to proceed with approval.')) return;
   showLoading('Updating…');
-  // reviewed_by is a UUID column — don't pass a string 'admin'.
-  // reviewed_at is enough to track when; audit log records who.
-  let { error } = await db.from('disbursements')
-    .update({ status: 'reviewed', reviewed_at: new Date().toISOString() })
-    .eq('id', disbId).eq('status', 'pending');
-  if (error && error.message?.includes('reviewed_at')) {
-    // Column not added yet — update status only
-    const res = await db.from('disbursements')
-      .update({ status: 'reviewed' })
-      .eq('id', disbId).eq('status', 'pending');
-    error = res.error;
-  }
+  const { data, error } = await db.rpc('mark_disbursement_reviewed', {
+    p_disbursement_id: disbId
+  });
   if (error) { hideLoading(); alert('Review failed: ' + error.message); return; }
+  if (data === false) { hideLoading(); alert('Could not review — it may already be reviewed or not found.'); return; }
   await audit('review', `Admin marked withdrawal ${disbId} as reviewed`);
   hideLoading();
   await renderOverview();
