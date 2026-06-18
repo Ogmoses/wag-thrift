@@ -259,21 +259,18 @@ async function _doMarkPaid(disbId, planId, amount, custId) {
   if (!confirm(`Confirm cash of ${fmt(amount)} has been physically delivered to ${cust?.first_name || 'customer'}?`)) return;
   showLoading('Confirming delivery…');
   const rep = getUser();
-  const ref = 'CASH-' + Date.now();
-  // Balance was already deducted when admin approved.
-  // Rep just records the payout transaction + marks disbursement paid.
-  const { error: txErr } = await db.from('transactions').insert({
-    ref, type: 'payout', amount, plan_id: planId,
-    customer_id: custId, agent_id: rep.id,
-    method: 'Cash', notes: 'Cash delivered by rep'
-  });
-  if (txErr) { hideLoading(); alert('Failed to record transaction: ' + txErr.message); return; }
+  // NOTE: Balance was already deducted when admin approved (payout transaction inserted).
+  // Rep only needs to mark disbursement as paid + update the reservation transaction note.
   const { error: disbErr } = await db.from('disbursements')
     .update({ status: 'paid', confirmed_by: rep.id, confirmed_at: new Date().toISOString() })
     .eq('id', disbId);
   if (disbErr) { hideLoading(); alert('Failed to mark paid: ' + disbErr.message); return; }
+  // Update the reserved payout transaction to mark it as confirmed cash delivery
+  await db.from('transactions')
+    .update({ method: 'Cash', notes: `Cash delivered by rep ${rep.first_name} ${rep.last_name}`, agent_id: rep.id })
+    .eq('plan_id', planId).eq('type', 'payout').eq('method', 'Pending');
   await audit('paid', rep.id, 'representative',
-    `Rep confirmed cash delivery of ${fmt(amount)} to ${cust?.first_name || ''} ${cust?.last_name || ''} — Ref: ${ref}`,
+    `Rep confirmed cash delivery of ${fmt(amount)} to ${cust?.first_name || ''} ${cust?.last_name || ''}`,
     amount, planId);
   hideLoading();
   alert(`✅ Payment Complete!\nCash delivered to ${cust?.first_name || 'customer'}`);
