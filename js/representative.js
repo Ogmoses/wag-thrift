@@ -82,14 +82,16 @@ async function loadRepTxPreview() {
   el.innerHTML = _repTxCache.slice(0, 3).map(tx => {
     const isPayout = tx.type === 'payout';
     const isRejected = tx.type === 'rejected_disb';
+    const isReserved = tx.ref?.startsWith('RESERVE-');
     const isIn = !isPayout && !isRejected;
-    const label = tx.type === 'opening' ? 'Opening' : isPayout ? 'Payout' : isRejected ? 'Rejected Withdrawal' : 'Deposit';
+    const label = tx.type === 'opening' ? 'Opening' : isPayout ? (isReserved ? 'Withdrawal' : 'Payout') : isRejected ? 'Rejected Withdrawal' : 'Deposit';
+    const refDisplay = isReserved ? 'Withdrawal request' : (tx.ref || '—');
     return `<div class="tx-row">
  <div class="tx-ico ${isIn ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
  <div class="tx-body">
  <div class="tx-name">${_repCustMap[tx.customer_id] || 'Customer'}</div>
  <div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${label}</div>
- <div class="tx-ref">${tx.ref || '—'}</div>
+ <div class="tx-ref">${refDisplay}</div>
  </div>
  <div class="${isIn ? 'tx-amt-g' : 'tx-amt-r'}">${isIn ? '+' : '-'}${fmt(tx.amount)}</div>
  </div>`;
@@ -144,7 +146,7 @@ function renderDisbCards(disbs) {
         : '<strong>Awaiting Admin Approval</strong> — Admin has reviewed, now needs to approve.';
       actionHtml = `<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:9px 12px;font-size:11px;color:#92400e;display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span>${msg}</span></div>`;
     } else if (isApproved) {
-      actionHtml = `<div class="dis-acts"><button class="btn-sm btn-sm-blue" onclick="doMarkPaid('${d.id}','${d.plan_id}',${d.amount},'${d.customer_id}')">Mark as Paid</button></div>`;
+      actionHtml = `<div class="dis-acts" style="grid-template-columns:1fr;"><button class="btn-sm btn-sm-blue" style="padding:11px;font-size:13px;" onclick="doMarkPaid('${d.id}','${d.plan_id}',${d.amount},'${d.customer_id}')">Mark as Paid</button></div>`;
     }
     return `<div class="dis-card"><div class="dis-type">${d.type === 'withdrawal' ? 'Withdrawal' : 'Milestone'}</div><div class="dis-amt">${fmt(d.amount)}</div><div class="dis-stage-bar">${stages.map((s, i) => `<div class="stage-step"><div class="stage-dot ${i < curIdx ? 'done' : i === curIdx ? 'active' : ''}"></div><div class="stage-label">${s}</div></div>`).join('')}</div><div class="dis-reason">${d.reason || 'No reason provided'}</div>${actionHtml}</div>`;
   }).join('');
@@ -156,9 +158,31 @@ async function repOnPlanChange() {
   const det = document.getElementById('repPlanDetails');
   if (!repSelectedPlan) { det.style.display = 'none'; return; }
   document.getElementById('rpBal').textContent = fmt(repSelectedPlan.balance);
-  let regContrib = 0;
-  if (db) { const { data: pl } = await db.from('plans').select('regular_contribution').eq('id', repSelectedPlan.id).single(); regContrib = pl?.regular_contribution || 0; }
+  let regContrib = 0, createdAt = null;
+  if (db) {
+    const { data: pl } = await db.from('plans').select('regular_contribution,created_at').eq('id', repSelectedPlan.id).single();
+    regContrib = pl?.regular_contribution || 0;
+    createdAt = pl?.created_at || null;
+  }
   document.getElementById('rpTgt').textContent = regContrib > 0 ? fmt(regContrib) : 'Not set';
+
+  // Missed contributions — same calculation as customer dashboard:
+  // calendar days since plan start vs. days actually covered by balance.
+  const missedEl = document.getElementById('rpMissed');
+  if (missedEl) {
+    if (regContrib > 0 && createdAt) {
+      const start = new Date(createdAt); start.setHours(0, 0, 0, 0);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const calendarDaysElapsed = Math.max(0, Math.floor((today - start) / (1000 * 60 * 60 * 24)));
+      const daysCovered = Math.floor(repSelectedPlan.balance / regContrib);
+      const missed = Math.max(0, calendarDaysElapsed - daysCovered);
+      missedEl.textContent = missed === 0 ? 'None' : `${missed} day${missed !== 1 ? 's' : ''}`;
+      missedEl.style.color = missed === 0 ? 'var(--green)' : missed < 3 ? 'var(--orange)' : 'var(--red)';
+    } else {
+      missedEl.textContent = '—';
+      missedEl.style.color = '';
+    }
+  }
   det.style.display = 'block';
 }
 
@@ -344,12 +368,14 @@ function renderRepTxList() {
   el.innerHTML = filtered.map(tx => {
     const isPayout = tx.type === 'payout';
     const isRejected = tx.type === 'rejected_disb';
+    const isReserved = tx.ref?.startsWith('RESERVE-');
     const isIn = !isPayout && !isRejected;
-    const lbl = tx.type === 'opening' ? 'Opening' : isPayout ? 'Payout' : isRejected ? 'Rejected Withdrawal' : 'Deposit';
-    const badge = `<span style="background:${isIn ? '#d1fae5' : '#fee2e2'};color:${isIn ? '#065f46' : '#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${tx.type}</span>`;
+    const lbl = tx.type === 'opening' ? 'Opening' : isPayout ? (isReserved ? 'Withdrawal' : 'Payout') : isRejected ? 'Rejected Withdrawal' : 'Deposit';
+    const refDisplay = isReserved ? 'Withdrawal request' : (tx.ref || '—');
+    const badge = `<span style="background:${isIn ? '#d1fae5' : '#fee2e2'};color:${isIn ? '#065f46' : '#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${isReserved ? 'withdrawal' : tx.type}</span>`;
     return `<div class="tx-row">
      <div class="tx-ico ${isIn ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
-     <div class="tx-body"><div class="tx-name">${_repCustMapHist[tx.customer_id] || 'Customer'}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${lbl}</div><div class="tx-ref">${tx.ref || '—'}</div><div style="margin-top:3px;">${badge}</div></div>
+     <div class="tx-body"><div class="tx-name">${_repCustMapHist[tx.customer_id] || 'Customer'}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${lbl}</div><div class="tx-ref">${refDisplay}</div><div style="margin-top:3px;">${badge}</div></div>
      <div class="${isIn ? 'tx-amt-g' : 'tx-amt-r'}">${isIn ? '+' : '-'}${fmt(tx.amount)}</div>
     </div>`;
   }).join('');

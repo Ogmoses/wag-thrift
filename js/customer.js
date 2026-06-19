@@ -454,11 +454,16 @@ function renderCustTxList() {
   if (!filtered.length) { el.innerHTML = '<div class="tx-empty">No transactions yet</div>'; return; }
   el.innerHTML = filtered.map(tx => {
     const isIn = tx.type === 'deposit' || tx.type === 'opening';
-    const lbl = tx.type === 'opening' ? 'Opening' : tx.type === 'deposit' ? 'Deposit' : tx.type === 'payout' ? 'Payout' : 'Rejected';
-    const badge = `<span style="background:${isIn ? '#d1fae5' : '#fee2e2'};color:${isIn ? '#065f46' : '#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${tx.type}</span>`;
+    const isReserved = tx.ref?.startsWith('RESERVE-');
+    const lbl = tx.type === 'opening' ? 'Opening'
+      : tx.type === 'deposit' ? 'Deposit'
+      : tx.type === 'payout' ? (isReserved ? 'Withdrawal' : 'Payout')
+      : 'Rejected';
+    const refDisplay = isReserved ? 'Withdrawal request' : (tx.ref || '—');
+    const badge = `<span style="background:${isIn ? '#d1fae5' : '#fee2e2'};color:${isIn ? '#065f46' : '#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${isReserved ? 'withdrawal' : tx.type}</span>`;
     return `<div class="tx-row">
      <div class="tx-ico ${isIn ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
-     <div class="tx-body"><div class="tx-name">${lbl}${tx._planName ? ' · ' + tx._planName : ''}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${tx.ref || '—'}</div><div style="margin-top:3px;">${badge}</div></div>
+     <div class="tx-body"><div class="tx-name">${lbl}${tx._planName ? ' · ' + tx._planName : ''}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${refDisplay}</div><div style="margin-top:3px;">${badge}</div></div>
      <div class="${isIn ? 'tx-amt-g' : 'tx-amt-r'}">${isIn ? '+' : '-'}${fmt(tx.amount)}</div>
     </div>`;
   }).join('');
