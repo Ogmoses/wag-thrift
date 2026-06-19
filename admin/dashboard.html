@@ -55,12 +55,12 @@
         <div class="section-card" style="margin-bottom:10px;">
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <select id="disbFilterStatus" class="search-inp" style="flex:none;width:auto;padding:8px 12px;font-size:13px;" onchange="renderDisbPage()">
+              <option value="" selected>All</option>
               <option value="pending">Pending</option>
               <option value="reviewed">Reviewed</option>
               <option value="approved">Approved</option>
               <option value="paid">Paid</option>
               <option value="rejected">Rejected</option>
-              <option value="">All</option>
             </select>
             <button class="btn btn-ghost" onclick="renderDisbPage()" style="padding:8px 14px;font-size:12px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh</button>
           </div>
