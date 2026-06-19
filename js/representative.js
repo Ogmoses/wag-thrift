@@ -144,7 +144,7 @@ function renderDisbCards(disbs) {
         : '<strong>Awaiting Admin Approval</strong> — Admin has reviewed, now needs to approve.';
       actionHtml = `<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:9px 12px;font-size:11px;color:#92400e;display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span>${msg}</span></div>`;
     } else if (isApproved) {
-      actionHtml = `<div class="dis-acts"><button class="btn-sm btn-sm-blue" onclick="doMarkPaid('${d.id}','${d.plan_id}',${d.amount},'${d.customer_id}')">💵 Mark as Paid</button><button class="btn-sm btn-sm-ghost" onclick="doRejectDisb('${d.id}','${d.customer_id}')">✕ Reject</button></div>`;
+      actionHtml = `<div class="dis-acts"><button class="btn-sm btn-sm-blue" onclick="doMarkPaid('${d.id}','${d.plan_id}',${d.amount},'${d.customer_id}')">Mark as Paid</button></div>`;
     }
     return `<div class="dis-card"><div class="dis-type">${d.type === 'withdrawal' ? 'Withdrawal' : 'Milestone'}</div><div class="dis-amt">${fmt(d.amount)}</div><div class="dis-stage-bar">${stages.map((s, i) => `<div class="stage-step"><div class="stage-dot ${i < curIdx ? 'done' : i === curIdx ? 'active' : ''}"></div><div class="stage-label">${s}</div></div>`).join('')}</div><div class="dis-reason">${d.reason || 'No reason provided'}</div>${actionHtml}</div>`;
   }).join('');
@@ -242,7 +242,7 @@ async function _doApproveDisb(disbId, planId, amount, custId) {
     `Rep approved withdrawal of ${fmt(amount)} for ${cust?.first_name || ''} ${cust?.last_name || ''}`,
     amount, planId);
   hideLoading();
-  alert(`✓ Approved\nNow deliver ${fmt(amount)} cash to ${cust?.first_name || 'customer'} and tap "Mark as Paid".`);
+  alert(`Approved\nNow deliver ${fmt(amount)} cash to ${cust?.first_name || 'customer'} and tap "Mark as Paid".`);
   if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
   if (document.getElementById('repAllRequestsList')) await loadAllRepRequests();
 }
@@ -273,7 +273,7 @@ async function _doMarkPaid(disbId, planId, amount, custId) {
     `Rep confirmed cash delivery of ${fmt(amount)} to ${cust?.first_name || ''} ${cust?.last_name || ''}`,
     amount, planId);
   hideLoading();
-  alert(`✅ Payment Complete!\nCash delivered to ${cust?.first_name || 'customer'}`);
+  alert(`Payment Complete\nCash delivered to ${cust?.first_name || 'customer'}`);
   if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
   if (document.getElementById('repAllRequestsList')) await loadAllRepRequests();
 }

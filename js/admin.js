@@ -250,7 +250,9 @@ async function renderOverview() {
     db.from('representatives').select('*', { count: 'exact', head: true }),
     db.from('transactions').select('amount,type'),
     db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    db.from('disbursements').select('*,customers(first_name,last_name,phone)').eq('status', 'pending').order('requested_at', { ascending: false }).limit(5)
+    // Show both pending AND reviewed here — admin can review or approve
+    // directly from the Overview without navigating to the full Disbursements tab.
+    db.from('disbursements').select('*,customers(first_name,last_name,phone)').in('status', ['pending', 'reviewed']).order('requested_at', { ascending: false }).limit(5)
   ]);
 
   const deps = (allTx || []).filter(t => t.type === 'deposit' || t.type === 'opening');
@@ -264,7 +266,7 @@ async function renderOverview() {
   document.getElementById('ovPayouts').textContent = fmt(totalPay);
   document.getElementById('ovPlans').textContent = planCnt || 0;
 
-  const { count: pdc } = await db.from('disbursements').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+  const { count: pdc } = await db.from('disbursements').select('*', { count: 'exact', head: true }).in('status', ['pending', 'reviewed']);
   document.getElementById('ovPendingDisb').textContent = pdc || 0;
   const badge = document.getElementById('disbBadge');
   if (badge) { if (pdc > 0) { badge.style.display = ''; badge.textContent = pdc; } else badge.style.display = 'none'; }
@@ -303,7 +305,7 @@ function renderDisbCard(d, compact) {
   const canReview = d.status === 'pending';
   const canApprove = d.status === 'reviewed';
   const isApproved = d.status === 'approved';
-  const canReject = ['pending', 'reviewed', 'approved'].includes(d.status);
+  const canReject = d.status === 'pending' || d.status === 'reviewed';
 
   const stageBar = stages.map((s, i) => `<div class="stage-step"><div class="stage-dot ${i < curIdx ? 'done' : i === curIdx ? 'active' : ''}"></div><div class="stage-label">${s}</div></div>`).join('');
 
@@ -320,7 +322,7 @@ function renderDisbCard(d, compact) {
         ${rejectBtn}
        </div>`
     : isApproved
-    ? `<div class="disb-actions"><div style="font-size:11px;color:var(--sub);padding:6px 2px;">✓ Approved — representative will confirm cash delivery</div>${rejectBtn}</div>`
+    ? `<div class="disb-actions"><div style="font-size:11px;color:var(--sub);padding:6px 2px;">Approved — representative will confirm cash delivery</div></div>`
     : canReject
     ? `<div class="disb-actions">${rejectBtn}</div>`
     : '';
@@ -406,7 +408,7 @@ async function finalPayDisb(disbId) {
   } else {
     await audit('approve', `Admin completed final payment for withdrawal ${disbId}`);
     hideLoading();
-    alert('✓ Payment completed successfully');
+    alert('Payment completed successfully');
   }
   await renderOverview();
   if (currentPage === 'disbursements') await renderDisbPage();
@@ -415,7 +417,13 @@ async function finalPayDisb(disbId) {
 async function rejectDisb(disbId) {
   if (!confirm('Reject this withdrawal? This action cannot be undone.')) return;
   showLoading('Rejecting…');
-  await db.from('disbursements').update({ status: 'rejected' }).eq('id', disbId);
+  // Guard: never allow rejecting an already-approved/paid withdrawal —
+  // the balance has already been deducted and there is no reversal logic.
+  const { error } = await db.from('disbursements')
+    .update({ status: 'rejected' })
+    .eq('id', disbId)
+    .in('status', ['pending', 'reviewed']);
+  if (error) { hideLoading(); alert('Reject failed: ' + error.message); return; }
   await audit('reject', `Admin rejected withdrawal ${disbId}`);
   hideLoading();
   await renderOverview();
@@ -458,7 +466,7 @@ function filterCustomersPage() {
 }
 
 function showMigrationAlert(table) {
-  alert('⚠️ Database Setup Required\n\nThe \'status\' column is missing from your \'' + table + '\' table.\n\nTo fix this, go to:\nSupabase Dashboard → SQL Editor → New Query\n\nThen paste and run this SQL:\n\n' + `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';` + '\n\nAfter running it, refresh this page and try again.');
+  alert('Database Setup Required\n\nThe \'status\' column is missing from your \'' + table + '\' table.\n\nTo fix this, go to:\nSupabase Dashboard → SQL Editor → New Query\n\nThen paste and run this SQL:\n\n' + `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';` + '\n\nAfter running it, refresh this page and try again.');
 }
 
 async function suspendCustomer(id, name) {
