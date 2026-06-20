@@ -455,14 +455,12 @@ function renderCustTxList() {
   el.innerHTML = filtered.map(tx => {
     const isIn = tx.type === 'deposit' || tx.type === 'opening';
     const isReserved = tx.ref?.startsWith('RESERVE-');
-    const isConfirmedPaid = isReserved && tx.method === 'Cash';
     const lbl = tx.type === 'opening' ? 'Opening'
       : tx.type === 'deposit' ? 'Deposit'
-      : tx.type === 'payout' ? (isConfirmedPaid ? 'Withdrawal (Paid)' : isReserved ? 'Withdrawal (Pending)' : 'Payout')
+      : tx.type === 'payout' ? (isReserved ? 'Withdrawal' : 'Payout')
       : 'Rejected';
-    const refDisplay = isReserved ? (isConfirmedPaid ? 'Cash delivered' : 'Withdrawal request') : (tx.ref || '—');
-    const badgeText = isConfirmedPaid ? 'paid' : isReserved ? 'pending' : tx.type;
-    const badge = `<span style="background:${isIn || isConfirmedPaid ? '#d1fae5' : '#fee2e2'};color:${isIn || isConfirmedPaid ? '#065f46' : '#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${badgeText}</span>`;
+    const refDisplay = isReserved ? 'Withdrawal request' : (tx.ref || '—');
+    const badge = `<span style="background:${isIn ? '#d1fae5' : '#fee2e2'};color:${isIn ? '#065f46' : '#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${isReserved ? 'withdrawal' : tx.type}</span>`;
     return `<div class="tx-row">
      <div class="tx-ico ${isIn ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
      <div class="tx-body"><div class="tx-name">${lbl}${tx._planName ? ' · ' + tx._planName : ''}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${refDisplay}</div><div style="margin-top:3px;">${badge}</div></div>

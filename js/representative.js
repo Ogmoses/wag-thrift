@@ -283,7 +283,7 @@ async function _doApproveDisb(disbId, planId, amount, custId) {
 // Rep marks paid after physically delivering cash to customer
 async function doMarkPaid(disbId, planId, amount, custId) { guardedSubmit('markPaid_' + disbId, () => _doMarkPaid(disbId, planId, amount, custId)); }
 async function _doMarkPaid(disbId, planId, amount, custId) {
-  const { data: disbCheck } = await db.from('disbursements').select('status').eq('id', disbId).single();
+  const { data: disbCheck } = await db.from('disbursements').select('status,reserve_ref').eq('id', disbId).single();
   if (!disbCheck || disbCheck.status !== 'approved') {
     alert('This withdrawal must be in approved status before marking as paid.');
     return;
@@ -292,16 +292,29 @@ async function _doMarkPaid(disbId, planId, amount, custId) {
   if (!confirm(`Confirm cash of ${fmt(amount)} has been physically delivered to ${cust?.first_name || 'customer'}?`)) return;
   showLoading('Confirming delivery…');
   const rep = getUser();
-  // NOTE: Balance was already deducted when admin approved (payout transaction inserted).
-  // Rep only needs to mark disbursement as paid + update the reservation transaction note.
+  // Balance was already deducted when admin approved (reserved payout transaction inserted).
+  // Find the EXACT reserved transaction by its ref (stored on the disbursement at approval time)
+  // rather than guessing by plan_id+type+method, which can match the wrong row if a customer
+  // has multiple withdrawals on the same plan.
+  if (!disbCheck.reserve_ref) {
+    hideLoading();
+    alert('Could not find the reserved transaction for this withdrawal (missing reference). Please contact support — the disbursement was not marked paid.');
+    return;
+  }
+  const { data: updatedTx, error: txErr } = await db.from('transactions')
+    .update({ method: 'Cash', notes: `Cash delivered by rep ${rep.first_name} ${rep.last_name}`, agent_id: rep.id })
+    .eq('ref', disbCheck.reserve_ref)
+    .select();
+  if (txErr) { hideLoading(); alert('Failed to update transaction: ' + txErr.message); return; }
+  if (!updatedTx || !updatedTx.length) {
+    hideLoading();
+    alert('Could not find the reserved transaction (ref: ' + disbCheck.reserve_ref + '). The disbursement was NOT marked paid — please contact support.');
+    return;
+  }
   const { error: disbErr } = await db.from('disbursements')
     .update({ status: 'paid', confirmed_by: rep.id, confirmed_at: new Date().toISOString() })
     .eq('id', disbId);
-  if (disbErr) { hideLoading(); alert('Failed to mark paid: ' + disbErr.message); return; }
-  // Update the reserved payout transaction to mark it as confirmed cash delivery
-  await db.from('transactions')
-    .update({ method: 'Cash', notes: `Cash delivered by rep ${rep.first_name} ${rep.last_name}`, agent_id: rep.id })
-    .eq('plan_id', planId).eq('type', 'payout').eq('method', 'Pending');
+  if (disbErr) { hideLoading(); alert('Transaction updated but failed to mark disbursement paid: ' + disbErr.message); return; }
   await audit('paid', rep.id, 'representative',
     `Rep confirmed cash delivery of ${fmt(amount)} to ${cust?.first_name || ''} ${cust?.last_name || ''}`,
     amount, planId);
