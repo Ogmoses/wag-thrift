@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>Super Admin Portal – WAG</title>
 <link rel="stylesheet" href="../css/shared.css">
 <link rel="stylesheet" href="../css/admin.css">
@@ -49,7 +50,17 @@
 </div>
 
 <script>
-// If already logged in this session, skip straight to the dashboard. 
+// If a customer/rep is logged in on this device, never let them reach
+// the admin login screen at all — kick them straight to their own dashboard.
+(function blockNonAdminSessions() {
+  let s = null;
+  try { s = JSON.parse(sessionStorage.getItem('wagUser')); } catch (e) {}
+  if (s && s.role) {
+    alert('This area is restricted. You do not have permission to access the admin portal.');
+    window.location.replace(rootPath() + (s.role === 'representative' ? 'representative/dashboard.html' : 'customer/dashboard.html'));
+  }
+})();
+// If already logged in this session, skip straight to the dashboard.
 (function () {
   if (isAdminLoggedIn()) window.location.replace('dashboard.html');
 })();
