@@ -158,23 +158,28 @@ async function repOnPlanChange() {
   const det = document.getElementById('repPlanDetails');
   if (!repSelectedPlan) { det.style.display = 'none'; return; }
   document.getElementById('rpBal').textContent = fmt(repSelectedPlan.balance);
-  let regContrib = 0, createdAt = null;
+  let regContrib = 0, createdAt = null, totalDeposited = 0;
   if (db) {
-    const { data: pl } = await db.from('plans').select('regular_contribution,created_at').eq('id', repSelectedPlan.id).single();
+    const [{ data: pl }, { data: deposits }] = await Promise.all([
+      db.from('plans').select('regular_contribution,created_at').eq('id', repSelectedPlan.id).single(),
+      db.from('transactions').select('amount').eq('plan_id', repSelectedPlan.id).in('type', ['opening', 'deposit'])
+    ]);
     regContrib = pl?.regular_contribution || 0;
     createdAt = pl?.created_at || null;
+    totalDeposited = (deposits || []).reduce((s, t) => s + Number(t.amount), 0);
   }
   document.getElementById('rpTgt').textContent = regContrib > 0 ? fmt(regContrib) : 'Not set';
 
-  // Missed contributions — same calculation as customer dashboard:
-  // calendar days since plan start vs. days actually covered by balance.
+  // Missed contributions — uses TOTAL DEPOSITED (not current balance), same as
+  // the customer dashboard/calendar. Withdrawals reduce balance but shouldn't
+  // make past paid days look "missed" — only deposits count as days covered.
   const missedEl = document.getElementById('rpMissed');
   if (missedEl) {
     if (regContrib > 0 && createdAt) {
       const start = new Date(createdAt); start.setHours(0, 0, 0, 0);
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const calendarDaysElapsed = Math.max(0, Math.floor((today - start) / (1000 * 60 * 60 * 24)));
-      const daysCovered = Math.floor(repSelectedPlan.balance / regContrib);
+      const daysCovered = Math.floor(totalDeposited / regContrib);
       const missed = Math.max(0, calendarDaysElapsed - daysCovered);
       missedEl.textContent = missed === 0 ? 'None' : `${missed} day${missed !== 1 ? 's' : ''}`;
       missedEl.style.color = missed === 0 ? 'var(--green)' : missed < 3 ? 'var(--orange)' : 'var(--red)';
