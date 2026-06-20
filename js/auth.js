@@ -282,37 +282,40 @@ async function doRepRegister() {
   const repPayPinRaw = document.getElementById('repRegPayPin')?.value?.trim() || '';
   const repPayPinHash = repPayPinRaw ? await hashPin(repPayPinRaw) : null;
 
-  // We don't know the Agent ID yet (generated server-side), so we can't build
-  // the internal email until after complete_rep_registration runs. Instead,
-  // sign up with a temporary placeholder email derived from the token, then
-  // the RPC assigns the real Agent ID and we don't need to rename the Auth
-  // email — Supabase Auth email is just an internal key, never shown to the rep.
-  const tempEmail = 'pending-' + tok.slice(0, 8) + '-' + Date.now() + '@wag.internal';
-  const { data: signUpData, error: signUpErr } = await db.auth.signUp({ email: tempEmail, password: pin });
+  // Step 1: reserve a unique Agent ID and validate the token BEFORE signup,
+  // so we can build the correct final internal email upfront — no fragile
+  // post-signup email rename needed (which silently failed if Supabase
+  // requires confirmation on email changes).
+  const { data: reserveResult, error: reserveErr } = await db.rpc('reserve_rep_agent_id', { p_token: tok });
+  if (reserveErr || reserveResult?.ok === false) {
+    hideLoading();
+    setMsg('repRegMsg', `<div class="msg-err">${reserveResult?.error || reserveErr?.message || 'Could not validate token'}</div>`);
+    return;
+  }
+  const repId = reserveResult.rep_id;
+
+  // Step 2: sign up directly with the correct final email
+  const { data: finalEmail } = await db.rpc('rep_internal_email', { p_rep_id: repId });
+  const { data: signUpData, error: signUpErr } = await db.auth.signUp({ email: finalEmail, password: pin });
   if (signUpErr || !signUpData?.user) {
     hideLoading();
     setMsg('repRegMsg', `<div class="msg-err">${signUpErr?.message || 'Could not create account'}</div>`);
     return;
   }
 
+  // Step 3: create the profile row with the already-reserved Agent ID
   const { data: regResult, error: regErr } = await db.rpc('complete_rep_registration', {
     p_auth_user_id: signUpData.user.id,
     p_first_name: fn, p_last_name: ln, p_email: em, p_phone: normPh,
-    p_token: tok, p_payment_pin_hash: repPayPinHash
+    p_token: tok, p_rep_id: repId, p_payment_pin_hash: repPayPinHash
   });
+  hideLoading();
   if (regErr || regResult?.ok === false) {
-    hideLoading();
     setMsg('repRegMsg', `<div class="msg-err">${regResult?.error || regErr?.message || 'Registration failed'}</div>`);
     return;
   }
 
-  // Now that we have the real Agent ID, update the Auth user's email to the
-  // proper internal format so future logins via get_login_email_for_rep_id work.
-  const { data: finalEmail } = await db.rpc('rep_internal_email', { p_rep_id: regResult.rep_id });
-  await db.auth.updateUser({ email: finalEmail });
-
   await audit('login', regResult.rep_uuid, 'representative', `New representative registered: ${fn} ${ln} — ID: ${regResult.rep_id}`);
-  hideLoading();
   document.getElementById('newRepId').textContent = regResult.rep_id;
   showModal('agentIdModal');
 }
