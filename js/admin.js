@@ -347,19 +347,6 @@ function renderDisbCard(d, compact) {
   </div>`;
 }
 
-async function approveDisb(disbId) {
-  if (!confirm('APPROVE this withdrawal?\n\nThe representative will then be able to mark it as paid once cash is delivered to the customer.')) return;
-  showLoading('Approving…');
-  const { error } = await db.from('disbursements')
-    .update({ status: 'approved' })
-    .eq('id', disbId).eq('status', 'reviewed');
-  if (error) { hideLoading(); alert('Approval failed: ' + error.message); return; }
-  await audit('approve', `Admin approved withdrawal ${disbId} — awaiting rep payment confirmation`);
-  hideLoading();
-  await renderOverview();
-  if (currentPage === 'disbursements') await renderDisbPage();
-}
-
 async function reviewDisb(disbId) {
   if (!confirm('Mark this withdrawal as REVIEWED?\nThis allows you to then approve it.')) return;
   showLoading('Updating…');
@@ -378,42 +365,14 @@ async function approveDisb(disbId) {
   const { data, error } = await db.rpc('approve_disbursement', { p_disbursement_id: disbId });
   if (error) { hideLoading(); alert('Approval failed: ' + error.message); return; }
   if (data?.ok === false) { hideLoading(); alert('Approval failed: ' + (data.error || 'Unknown error')); return; }
-  await audit('approve', `Admin approved withdrawal ${disbId} — balance deducted, rep delivering cash`);
+  // NOTE: no audit() call here — approve_disbursement RPC already writes
+  // its own audit_log entry server-side. A second call here would duplicate it.
   hideLoading();
   await renderOverview();
   if (currentPage === 'disbursements') await renderDisbPage();
 }
 
 // Fix 9: final payment step — admin only, calls server-side RPC
-async function finalPayDisb(disbId) {
-  if (!confirm('Complete final PAYMENT for this withdrawal?\nThis will create the payout transaction and mark it as paid.')) return;
-  showLoading('Processing payment…');
-  const { data, error } = await db.rpc('approve_withdrawal', {
-    p_disbursement_id: disbId,
-    p_admin_id: 'admin'
-  });
-  if (error) {
-    hideLoading();
-    // Fallback: if RPC doesn't exist yet, do it directly
-    console.warn('approve_withdrawal RPC not found, using direct update:', error.message);
-    const { data: d } = await db.from('disbursements').select('*').eq('id', disbId).single();
-    if (d) {
-      const ref = 'ADMIN-' + Math.random().toString(36).slice(2,8).toUpperCase();
-      await db.from('transactions').insert({ ref, type: 'payout', amount: d.amount, plan_id: d.plan_id, customer_id: d.customer_id, method: 'Admin', notes: 'Admin finalised payment' });
-      await db.from('disbursements').update({ status: 'paid' }).eq('id', disbId);
-      await db.from('plan_balances').update({ balance: db.raw(`balance - ${d.amount}`) }).eq('plan_id', d.plan_id).gte('balance', d.amount);
-    }
-    hideLoading();
-    alert('Payment completed (fallback mode — set up approve_withdrawal RPC for full security)');
-  } else {
-    await audit('approve', `Admin completed final payment for withdrawal ${disbId}`);
-    hideLoading();
-    alert('Payment completed successfully');
-  }
-  await renderOverview();
-  if (currentPage === 'disbursements') await renderDisbPage();
-}
-
 async function rejectDisb(disbId) {
   if (!confirm('Reject this withdrawal? This action cannot be undone.')) return;
   showLoading('Rejecting…');
