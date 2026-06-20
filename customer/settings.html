@@ -45,8 +45,11 @@
 <script>
 requireRole(['customer']);
 initTheme();
-buildCustProfilePage();
-startSuspendCheck();
+verifyRoleFromDB('customer').then(valid => {
+  if (!valid) return window.location.replace(rootPath() + 'login.html');
+  buildCustProfilePage();
+  startSuspendCheck();
+});
 </script>
 </body>
 </html>

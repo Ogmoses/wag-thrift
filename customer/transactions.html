@@ -59,8 +59,11 @@
 <script>
 requireRole(['customer']);
 initTheme();
-loadCustTxPage();
-startSuspendCheck();
+verifyRoleFromDB('customer').then(valid => {
+  if (!valid) return window.location.replace(rootPath() + 'login.html');
+  loadCustTxPage();
+  startSuspendCheck();
+});
 </script>
 </body>
 </html>
