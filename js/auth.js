@@ -2,20 +2,44 @@
 // js/auth.js
 // SESSION MANAGEMENT · LOGIN/LOGOUT/REGISTER · ROUTE GUARDS
 // AUDIT LOGGING · FRAUD DETECTION
+// Now backed by REAL Supabase Auth (supabase.auth.*) instead of manual
+// password-hash comparisons. Customers/reps still log in with phone /
+// Agent ID — those are translated to hidden internal emails
+// (c08012345678@wag.internal / r234567@wag.internal) under the hood via
+// the customer_internal_email()/rep_internal_email() SQL functions.
 // Depends on: js/supabase.js, js/utils.js (load both first)
 // ═══════════════════════════════════════════════
 
-// ── SHA-256 PIN hashing
+// ── SHA-256 hashing — still used for the separate PAYMENT PIN
+// (withdrawal confirmation), NOT for login passwords anymore.
 async function hashPin(pin) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// ── SESSION HELPERS (Supabase-powered)
+// ── SESSION HELPERS
+// getUser() now reads from the cached profile we store alongside the
+// Supabase session, populated by refreshUserProfile() after sign-in.
 function getUser() { try { return JSON.parse(sessionStorage.getItem('wagUser')); } catch (e) { return null; } }
 function setUser(u) { sessionStorage.setItem('wagUser', JSON.stringify(u)); }
 
-// ── ROUTE GUARDS
+// Re-fetches the customer/representative profile row for the CURRENTLY
+// signed-in Supabase Auth user, and caches it in sessionStorage as before
+// so the rest of the app (which reads getUser()) doesn't need to change.
+async function refreshUserProfile(expectedRole) {
+  if (!db) return null;
+  const { data: { session } } = await db.auth.getSession();
+  if (!session?.user) return null;
+  const authId = session.user.id;
+  const table = expectedRole === 'representative' ? 'representatives' : 'customers';
+  const { data, error } = await db.from(table).select('*').eq('auth_user_id', authId).single();
+  if (error || !data) return null;
+  if (data.status === 'suspended' || data.status === 'deleted') return null;
+  const profile = { ...data, role: expectedRole };
+  setUser(profile);
+  return profile;
+}
+
 // ── ROLE GUARD HELPERS
 const ROLE_HOME = {
   customer: 'customer/dashboard.html',
@@ -23,21 +47,22 @@ const ROLE_HOME = {
   admin: 'admin/dashboard.html'
 };
 
-// Fix 10: verifyRoleFromDB — verifies the session user actually exists and
-// is active in the DB. Cannot be spoofed by editing sessionStorage.
-// Call at the top of every protected dashboard page after requireRole().
+// verifyRoleFromDB — now backed by a REAL Supabase Auth session check.
+// There is no longer a sessionStorage value that can be hand-edited to
+// fake a role: this checks the live JWT session and re-derives the
+// profile from the database every time.
 async function verifyRoleFromDB(expectedRole) {
   if (!db) return false;
-  const stored = getUser();
-  if (!stored?.id) return false;
-  const table = expectedRole === 'representative' ? 'representatives' : 'customers';
-  const { data, error } = await db.from(table).select('id,status').eq('id', stored.id).single();
-  if (error || !data) { doLogout(); return false; }
-  // Block suspended/deleted accounts even if they have a valid session token
-  if (data.status === 'suspended' || data.status === 'deleted') { doLogout(); return false; }
+  const { data: { session } } = await db.auth.getSession();
+  if (!session?.user) { doLogout(); return false; }
+  const profile = await refreshUserProfile(expectedRole);
+  if (!profile) { doLogout(); return false; }
   return true;
 }
 
+// requireRole — quick synchronous check using the cached profile, for
+// immediate UI decisions (e.g. don't flash protected content). Always
+// followed by verifyRoleFromDB() for the real, authoritative check.
 function requireRole(allowedRoles) {
   const u = getUser();
   if (!u || !u.role) {
@@ -45,7 +70,6 @@ function requireRole(allowedRoles) {
     return null;
   }
   if (!allowedRoles.includes(u.role)) {
-    // Logged in, but wrong role for this page — never silently allow via URL change
     window.location.replace(rootPath() + (ROLE_HOME[u.role] || 'login.html'));
     return null;
   }
@@ -55,6 +79,7 @@ function requireRole(allowedRoles) {
 // Note: admin session helpers (getAdminSession/setAdminSession/clearAdminSession/
 // requireAdmin) and the admin audit() live in js/admin.js — admin pages do NOT
 // load this file, keeping admin fully isolated from customer/rep auth.
+// Admin continues to use the existing PIN-gate system (unchanged by this migration).
 
 // ═══════════════════════════════════════════════
 // AUDIT LOGGING
@@ -64,7 +89,7 @@ async function audit(action, userId, userRole, description, amount = null, planI
 }
 
 // ═══════════════════════════════════════════════
-// FRAUD DETECTION — writes to Supabase
+// FRAUD DETECTION
 // ═══════════════════════════════════════════════
 async function flagFraud(type, severity, userId, description, planId = null) {
   const { data: existing } = await db.from('fraud_flags').select('id').eq('type', type).eq('user_id', userId).eq('resolved', false);
@@ -80,6 +105,9 @@ async function checkExcessWithdrawal(customerId) {
   const { data } = await db.from('disbursements').select('id').eq('customer_id', customerId).eq('type', 'withdrawal').gte('requested_at', since);
   if (data && data.length >= 3) await flagFraud('EXCESS_WITHDRAWAL', 'high', customerId, `${data.length} withdrawal requests in 30 days`);
 }
+// checkFailedPin is now superseded by Supabase Auth's own rate limiting on
+// signInWithPassword, but we keep a lightweight local counter for the
+// "Account locked" UX message (Supabase doesn't expose attempt counts to us).
 async function checkFailedPin(phone) {
   const { data } = await db.from('pin_attempts').select('attempts').eq('phone', phone).single();
   const attempts = (data?.attempts || 0) + 1;
@@ -89,9 +117,8 @@ async function checkFailedPin(phone) {
 }
 
 // ═══════════════════════════════════════════════
-// LOGIN
+// LOGIN — now via supabase.auth.signInWithPassword()
 // currentRole is set by the login page UI ('customer' | 'representative')
-// On success, redirects to the role's dashboard page (real navigation).
 // ═══════════════════════════════════════════════
 async function doLogin() {
   if (!dbReady()) return;
@@ -99,44 +126,72 @@ async function doLogin() {
     const rawPh = document.getElementById('loginPhone').value.trim(), pin = document.getElementById('loginPin').value.trim();
     const normPh = normPhone(rawPh);
     showLoading('Signing in…');
+
     const { data: attempts } = await db.from('pin_attempts').select('attempts').eq('phone', normPh).single();
     if ((attempts?.attempts || 0) >= 5) { hideLoading(); setMsg('loginMsg', '<div class="msg-err">Account locked due to too many failed attempts.</div>'); return; }
-    const pinHash = await hashPin(pin);
-    const { data: cust } = await db.from('customers').select('*').eq('phone', normPh).eq('pin_hash', pinHash).single();
-    if (!cust) { hideLoading(); const locked = await checkFailedPin(normPh); setMsg('loginMsg', `<div class="msg-err">Invalid phone or password.${locked ? ' Account locked.' : ''}</div>`); return; }
-    if (cust.status === 'suspended') { hideLoading(); setMsg('loginMsg', '<div class="msg-err">This account has been suspended. Please contact support.</div>'); return; }
+
+    // Translate phone -> internal email via the SQL helper, then sign in
+    // through real Supabase Auth (password verified server-side by Supabase,
+    // never compared in our own code).
+    const { data: emailResult } = await db.rpc('get_login_email_for_phone', { p_phone: normPh });
+    if (!emailResult) { hideLoading(); const locked = await checkFailedPin(normPh); setMsg('loginMsg', `<div class="msg-err">Invalid phone or password.${locked ? ' Account locked.' : ''}</div>`); return; }
+
+    const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email: emailResult, password: pin });
+    if (authErr || !authData?.session) { hideLoading(); const locked = await checkFailedPin(normPh); setMsg('loginMsg', `<div class="msg-err">Invalid phone or password.${locked ? ' Account locked.' : ''}</div>`); return; }
+
+    const profile = await refreshUserProfile('customer');
+    if (!profile) {
+      hideLoading();
+      await db.auth.signOut();
+      setMsg('loginMsg', '<div class="msg-err">This account has been suspended or could not be found. Please contact support.</div>');
+      return;
+    }
+
     await db.from('pin_attempts').upsert({ phone: normPh, attempts: 0 });
-    await audit('login', cust.id, 'customer', `Customer signed in: ${cust.first_name} ${cust.last_name}`);
-    setUser({ ...cust, role: 'customer' }); hideLoading();
+    await audit('login', profile.id, 'customer', `Customer signed in: ${profile.first_name} ${profile.last_name}`);
+    hideLoading();
     window.location.href = rootPath() + ROLE_HOME.customer;
   } else {
     const rid = document.getElementById('loginRepId').value.trim(), pin = document.getElementById('loginRepPin').value.trim();
     showLoading('Signing in…');
-    const pinHash = await hashPin(pin);
-    const { data: rep } = await db.from('representatives').select('*').eq('rep_id', rid).eq('pin_hash', pinHash).single();
-    if (!rep) { hideLoading(); setMsg('loginRepMsg', '<div class="msg-err">Invalid Agent ID or password</div>'); return; }
-    if (rep.status === 'suspended') { hideLoading(); setMsg('loginRepMsg', '<div class="msg-err">This agent account has been suspended. Please contact your supervisor.</div>'); return; }
-    await audit('login', rep.id, 'representative', `Representative signed in: ${rep.first_name} ${rep.last_name} (${rep.rep_id})`);
-    setUser({ ...rep, role: 'representative' }); hideLoading();
+
+    const { data: emailResult } = await db.rpc('get_login_email_for_rep_id', { p_rep_id: rid });
+    if (!emailResult) { hideLoading(); setMsg('loginRepMsg', '<div class="msg-err">Invalid Agent ID or password</div>'); return; }
+
+    const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email: emailResult, password: pin });
+    if (authErr || !authData?.session) { hideLoading(); setMsg('loginRepMsg', '<div class="msg-err">Invalid Agent ID or password</div>'); return; }
+
+    const profile = await refreshUserProfile('representative');
+    if (!profile) {
+      hideLoading();
+      await db.auth.signOut();
+      setMsg('loginRepMsg', '<div class="msg-err">This agent account has been suspended or could not be found. Please contact your supervisor.</div>');
+      return;
+    }
+
+    await audit('login', profile.id, 'representative', `Representative signed in: ${profile.first_name} ${profile.last_name} (${profile.rep_id})`);
+    hideLoading();
     window.location.href = rootPath() + ROLE_HOME.representative;
   }
 }
 
 // ═══════════════════════════════════════════════
-// LOGOUT — clears session and performs a real navigation to the login page.
-// Works for customer/representative sessions. Admin uses adminLogout() in admin.js.
+// LOGOUT — signs out of the real Supabase Auth session.
 // ═══════════════════════════════════════════════
 async function doLogout() {
   stopSuspendCheck();
   const u = getUser();
   if (u) await audit('login', u.id, u.role || 'unknown', `${u.first_name} ${u.last_name} signed out`);
+  if (db) await db.auth.signOut();
   sessionStorage.removeItem('wagUser');
   localStorage.removeItem('wagActiveUser');
   window.location.href = rootPath() + 'login.html';
 }
 
 // ═══════════════════════════════════════════════
-// REGISTRATION (customer) — email verification flow
+// REGISTRATION (customer) — email verification flow unchanged in UX;
+// the actual account creation now goes through supabase.auth.signUp()
+// followed by complete_customer_registration() to create the profile row.
 // ═══════════════════════════════════════════════
 async function doRegister() {
   if (!dbReady()) return;
@@ -158,11 +213,11 @@ async function doRegister() {
   document.getElementById('custCreateFormBtns').style.display = 'none';
   document.getElementById('verifySection').style.display = 'block';
   if (result.error) {
-    document.getElementById('verifyInfo').innerHTML = `! Could not send email automatically. <br><small style="color:var(--sub);">Your code is: <strong style="font-family:monospace;color:var(--blue);font-size:16px;">${code}</strong></small>`;
+    document.getElementById('verifyInfo').innerHTML = `Could not send email automatically. <br><small style="color:var(--sub);">Your code is: <strong style="font-family:monospace;color:var(--blue);font-size:16px;">${code}</strong></small>`;
   } else if (result.demo) {
-    document.getElementById('verifyInfo').innerHTML = ` EmailJS not configured yet.<br><small style="color:var(--sub);">For now your code is: <strong style="font-family:monospace;color:var(--blue);font-size:16px;">${code}</strong></small>`;
+    document.getElementById('verifyInfo').innerHTML = `EmailJS not configured yet.<br><small style="color:var(--sub);">For now your code is: <strong style="font-family:monospace;color:var(--blue);font-size:16px;">${code}</strong></small>`;
   } else {
-    document.getElementById('verifyInfo').innerHTML = ` A 6-digit verification code has been sent to <strong>${em}</strong>. Please check your inbox and enter the code below.`;
+    document.getElementById('verifyInfo').innerHTML = `A 6-digit verification code has been sent to <strong>${em}</strong>. Please check your inbox and enter the code below.`;
   }
   setMsg('regMsg', '');
 }
@@ -181,20 +236,38 @@ async function doVerifyCode() {
   if (Date.now() > stored.expires) { setMsg('verifyMsg', '<div class="msg-err">Code expired. Please start again.</div>'); cancelVerification(); return; }
   if (entered !== stored.code) { setMsg('verifyMsg', '<div class="msg-err">Incorrect code. Please try again.</div>'); return; }
   showLoading('Creating your account…');
-  const pinHash = await hashPin(stored.pin);
-  const { error } = await db.from('customers').insert({ first_name: stored.fn, last_name: stored.ln, email: stored.em, phone: stored.ph, address: stored.addr, pin_hash: pinHash });
+
+  // 1. Build the hidden internal email and create the real Supabase Auth account
+  const { data: internalEmail } = await db.rpc('customer_internal_email', { p_phone: stored.ph });
+  const { data: signUpData, error: signUpErr } = await db.auth.signUp({ email: internalEmail, password: stored.pin });
+  if (signUpErr || !signUpData?.user) {
+    hideLoading();
+    setMsg('verifyMsg', `<div class="msg-err">${signUpErr?.message || 'Could not create account. Please try again.'}</div>`);
+    return;
+  }
+
+  // 2. Create the customer profile row linked to that Auth user
+  const { data: regResult, error: regErr } = await db.rpc('complete_customer_registration', {
+    p_auth_user_id: signUpData.user.id,
+    p_first_name: stored.fn, p_last_name: stored.ln,
+    p_email: stored.em, p_phone: stored.ph, p_address: stored.addr
+  });
   hideLoading();
-  if (error) { setMsg('verifyMsg', `<div class="msg-err">${error.message.includes('unique') ? 'Phone or email already registered' : error.message}</div>`); return; }
-  await audit('login', stored.ph, 'customer', `New customer registered: ${stored.fn} ${stored.ln}`);
+  if (regErr || regResult?.ok === false) {
+    setMsg('verifyMsg', `<div class="msg-err">${regResult?.error || regErr?.message || 'Registration failed'}</div>`);
+    return;
+  }
+
   sessionStorage.removeItem('wagVerify');
   cancelVerification();
-  setMsg('regMsg', '<div class="msg-ok"> Account verified and created! You can now sign in.</div>');
+  setMsg('regMsg', '<div class="msg-ok">Account verified and created! You can now sign in.</div>');
   document.getElementById('verifyCodeInp').value = '';
   setTimeout(() => { setMsg('regMsg', ''); setAuthTab('signin'); }, 2500);
 }
 
 // ═══════════════════════════════════════════════
-// REPRESENTATIVE REGISTRATION (token-gated)
+// REPRESENTATIVE REGISTRATION (token-gated) — now via supabase.auth.signUp()
+// + complete_rep_registration(), which validates the token server-side.
 // ═══════════════════════════════════════════════
 async function doRepRegister() {
   if (!dbReady()) return;
@@ -204,22 +277,50 @@ async function doRepRegister() {
   if (!fn || !ln || !em || !ph || !pin || !tok) { setMsg('repRegMsg', '<div class="msg-err">Please fill in all fields</div>'); return; }
   if (pin.length < 6) { setMsg('repRegMsg', '<div class="msg-err">Password must be at least 6 characters</div>'); return; }
   showLoading('Verifying token…');
-  const { data: tokenRow } = await db.from('activation_tokens').select('*').eq('token', tok).eq('used', false).single();
-  if (!tokenRow) { hideLoading(); setMsg('repRegMsg', '<div class="msg-err">Invalid or already used activation token</div>'); return; }
-  const normPh = normPhone(ph), repId = genRepId(), pinHash = await hashPin(pin);
+
+  const normPh = normPhone(ph);
   const repPayPinRaw = document.getElementById('repRegPayPin')?.value?.trim() || '';
   const repPayPinHash = repPayPinRaw ? await hashPin(repPayPinRaw) : null;
-  const { data: repData, error } = await db.from('representatives').insert({ first_name: fn, last_name: ln, email: em, phone: normPh, pin_hash: pinHash, rep_id: repId, payment_pin_hash: repPayPinHash }).select().single();
-  if (error) { hideLoading(); setMsg('repRegMsg', `<div class="msg-err">${error.message}</div>`); return; }
-  await db.from('activation_tokens').update({ used: true, used_by: repData.id, used_at: new Date().toISOString() }).eq('id', tokenRow.id);
-  await audit('login', repId, 'representative', `New representative registered: ${fn} ${ln} — ID: ${repId}`);
+
+  // We don't know the Agent ID yet (generated server-side), so we can't build
+  // the internal email until after complete_rep_registration runs. Instead,
+  // sign up with a temporary placeholder email derived from the token, then
+  // the RPC assigns the real Agent ID and we don't need to rename the Auth
+  // email — Supabase Auth email is just an internal key, never shown to the rep.
+  const tempEmail = 'pending-' + tok.slice(0, 8) + '-' + Date.now() + '@wag.internal';
+  const { data: signUpData, error: signUpErr } = await db.auth.signUp({ email: tempEmail, password: pin });
+  if (signUpErr || !signUpData?.user) {
+    hideLoading();
+    setMsg('repRegMsg', `<div class="msg-err">${signUpErr?.message || 'Could not create account'}</div>`);
+    return;
+  }
+
+  const { data: regResult, error: regErr } = await db.rpc('complete_rep_registration', {
+    p_auth_user_id: signUpData.user.id,
+    p_first_name: fn, p_last_name: ln, p_email: em, p_phone: normPh,
+    p_token: tok, p_payment_pin_hash: repPayPinHash
+  });
+  if (regErr || regResult?.ok === false) {
+    hideLoading();
+    setMsg('repRegMsg', `<div class="msg-err">${regResult?.error || regErr?.message || 'Registration failed'}</div>`);
+    return;
+  }
+
+  // Now that we have the real Agent ID, update the Auth user's email to the
+  // proper internal format so future logins via get_login_email_for_rep_id work.
+  const { data: finalEmail } = await db.rpc('rep_internal_email', { p_rep_id: regResult.rep_id });
+  await db.auth.updateUser({ email: finalEmail });
+
+  await audit('login', regResult.rep_uuid, 'representative', `New representative registered: ${fn} ${ln} — ID: ${regResult.rep_id}`);
   hideLoading();
-  document.getElementById('newRepId').textContent = repId;
+  document.getElementById('newRepId').textContent = regResult.rep_id;
   showModal('agentIdModal');
 }
 
 // ═══════════════════════════════════════════════
 // FORGOT / RESET PASSWORD
+// Uses Supabase Auth's native password reset email flow instead of our
+// own token table, since Supabase now owns the password.
 // ═══════════════════════════════════════════════
 function showForgotModal() { showModal('forgotModal'); }
 
@@ -228,63 +329,56 @@ async function doForgotPin() {
   const em = document.getElementById('resetEmail').value.trim();
   if (!em) { setMsg('resetMsg', '<div class="msg-err">Please enter your email</div>'); return; }
   const [{ data: cu }, { data: re }] = await Promise.all([
-    db.from('customers').select('id,first_name').eq('email', em).single(),
-    db.from('representatives').select('id,first_name').eq('email', em).single()
+    db.from('customers').select('id,first_name,auth_user_id').eq('email', em).single(),
+    db.from('representatives').select('id,first_name,auth_user_id').eq('email', em).single()
   ]);
   if (!cu && !re) { setMsg('resetMsg', '<div class="msg-err">No account found with that email</div>'); return; }
   showLoading('Generating link…');
-  const token = [...Array(24)].map(() => Math.random().toString(36)[2]).join('');
-  try { await db.from('password_resets').insert({ email: em, token, expires_at: new Date(Date.now() + 3600000).toISOString() }); } catch (e) { }
+  // NOTE: Supabase's native resetPasswordForEmail() sends to the ACCOUNT's
+  // real email field (cu.email/re.email), which is the contact email the
+  // user registered with — NOT the hidden @wag.internal login email.
+  const { error } = await db.auth.resetPasswordForEmail(em, {
+    redirectTo: `${location.origin}${rootPath()}login.html`
+  });
   hideLoading();
-  const link = `${location.origin}/login.html?reset=${token}`;
-  setMsg('resetMsg', `<div class="msg-ok">Reset link ready.<br><br><a href="${link}" style="color:var(--blue);font-weight:700;font-size:13px;">Tap here to reset your password</a><br><small style="color:var(--sub);font-size:11px;">Link expires in 1 hour.</small></div>`);
+  if (error) { setMsg('resetMsg', `<div class="msg-err">${error.message}</div>`); return; }
+  setMsg('resetMsg', `<div class="msg-ok">A password reset link has been sent to <strong>${em}</strong>. Please check your inbox.<br><small style="color:var(--sub);font-size:11px;">Link expires in 1 hour.</small></div>`);
 }
 
-let activeResetToken = null;
-
+// Supabase redirects back with a recovery session already active in the URL
+// hash — we detect that and show the reset-password modal directly.
 async function checkResetTokenInURL() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('reset');
-  if (!token) return;
   if (!dbReady()) return;
+  const hash = window.location.hash;
+  if (!hash.includes('type=recovery')) return;
   showLoading('Verifying reset link…');
-  const { data: row } = await db.from('password_resets')
-    .select('*').eq('token', token).eq('used', false).single();
+  const { data: { session } } = await db.auth.getSession();
   hideLoading();
-  if (!row) { alert('This reset link is invalid or has already been used.'); return; }
-  if (new Date(row.expires_at) < new Date()) { alert('This reset link has expired. Please request a new one.'); return; }
-  activeResetToken = row;
-  document.getElementById('resetTokenInfo').textContent = `Reset password for: ${row.email}`;
+  if (!session) { alert('This reset link is invalid or has already been used.'); return; }
+  document.getElementById('resetTokenInfo').textContent = `Reset password for: ${session.user.email}`;
   showModal('resetPasswordModal');
 }
 
 async function doResetPassword() {
-  if (!activeResetToken) { alert('Invalid reset session'); return; }
   const newPw = document.getElementById('newPasswordInp').value.trim();
   const confirmPw = document.getElementById('confirmPasswordInp').value.trim();
   if (!newPw || newPw.length < 6) { setMsg('resetPasswordMsg', '<div class="msg-err">Password must be at least 6 characters</div>'); return; }
   if (newPw !== confirmPw) { setMsg('resetPasswordMsg', '<div class="msg-err">Passwords do not match</div>'); return; }
   showLoading('Updating password…');
-  const pinHash = await hashPin(newPw);
-  const email = activeResetToken.email;
-  const { data: cust } = await db.from('customers').select('id').eq('email', email).single();
-  if (cust) await db.from('customers').update({ pin_hash: pinHash }).eq('id', cust.id);
-  const { data: rep } = await db.from('representatives').select('id').eq('email', email).single();
-  if (rep) await db.from('representatives').update({ pin_hash: pinHash }).eq('id', rep.id);
-  await db.from('password_resets').update({ used: true }).eq('token', activeResetToken.token);
-  await audit('login', email, 'system', `Password reset completed for ${email}`);
+  const { error } = await db.auth.updateUser({ password: newPw });
   hideLoading();
+  if (error) { setMsg('resetPasswordMsg', `<div class="msg-err">${error.message}</div>`); return; }
   closeModal('resetPasswordModal');
-  activeResetToken = null;
   document.getElementById('newPasswordInp').value = '';
   document.getElementById('confirmPasswordInp').value = '';
   window.history.replaceState({}, document.title, window.location.pathname);
-  alert(' Password updated successfully! You can now sign in with your new password.');
+  await db.auth.signOut();
+  alert('Password updated successfully! You can now sign in with your new password.');
 }
 
 // ═══════════════════════════════════════════════
-// SUSPENSION POLLING — runs on every protected customer/rep page after login.
-// If an admin suspends/deletes the account mid-session, the user is signed out.
+// SUSPENSION POLLING — unchanged behavior, still checks the profile row
+// every 30s and signs the user out if suspended/deleted mid-session.
 // ═══════════════════════════════════════════════
 let _suspendInterval = null;
 function startSuspendCheck() {
