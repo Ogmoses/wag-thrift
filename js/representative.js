@@ -291,33 +291,15 @@ async function _doMarkPaid(disbId, planId, amount, custId) {
   const { data: cust } = await db.from('customers').select('first_name,last_name').eq('id', custId).single();
   if (!confirm(`Confirm cash of ${fmt(amount)} has been physically delivered to ${cust?.first_name || 'customer'}?`)) return;
   showLoading('Confirming delivery…');
-  const rep = getUser();
-  // Balance was already deducted when admin approved (reserved payout transaction inserted).
-  // Find the EXACT reserved transaction by its ref (stored on the disbursement at approval time)
-  // rather than guessing by plan_id+type+method, which can match the wrong row if a customer
-  // has multiple withdrawals on the same plan.
-  if (!disbCheck.reserve_ref) {
+  // Goes through a SECURITY DEFINER RPC rather than direct table updates —
+  // reps only have READ access to disbursements/transactions under RLS,
+  // so a direct .update() here would silently affect 0 rows.
+  const { data: result, error } = await db.rpc('mark_disbursement_paid', { p_disbursement_id: disbId });
+  if (error || result?.ok === false) {
     hideLoading();
-    alert('Could not find the reserved transaction for this withdrawal (missing reference). Please contact support — the disbursement was not marked paid.');
+    alert('Failed to mark as paid: ' + (result?.error || error?.message || 'Unknown error'));
     return;
   }
-  const { data: updatedTx, error: txErr } = await db.from('transactions')
-    .update({ method: 'Cash', notes: `Cash delivered by rep ${rep.first_name} ${rep.last_name}`, agent_id: rep.id })
-    .eq('ref', disbCheck.reserve_ref)
-    .select();
-  if (txErr) { hideLoading(); alert('Failed to update transaction: ' + txErr.message); return; }
-  if (!updatedTx || !updatedTx.length) {
-    hideLoading();
-    alert('Could not find the reserved transaction (ref: ' + disbCheck.reserve_ref + '). The disbursement was NOT marked paid — please contact support.');
-    return;
-  }
-  const { error: disbErr } = await db.from('disbursements')
-    .update({ status: 'paid', confirmed_by: rep.id, confirmed_at: new Date().toISOString() })
-    .eq('id', disbId);
-  if (disbErr) { hideLoading(); alert('Transaction updated but failed to mark disbursement paid: ' + disbErr.message); return; }
-  await audit('paid', rep.id, 'representative',
-    `Rep confirmed cash delivery of ${fmt(amount)} to ${cust?.first_name || ''} ${cust?.last_name || ''}`,
-    amount, planId);
   hideLoading();
   alert(`Payment Complete\nCash delivered to ${cust?.first_name || 'customer'}`);
   if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
@@ -326,9 +308,14 @@ async function _doMarkPaid(disbId, planId, amount, custId) {
 
 async function doRejectDisb(disbId, custId) { await guardedAction('rejectDisb_' + disbId, () => _doRejectDisb(disbId, custId)); }
 async function _doRejectDisb(disbId, custId) {
-  const rep = getUser();
-  await db.from('disbursements').update({ status: 'rejected' }).eq('id', disbId);
-  await audit('reject', rep.id, 'representative', `Rejected disbursement`, null, null);
+  if (!confirm('Reject this withdrawal request? This cannot be undone.')) return;
+  showLoading('Rejecting…');
+  const { data: result, error } = await db.rpc('rep_reject_disbursement', { p_disbursement_id: disbId });
+  hideLoading();
+  if (error || result?.ok === false) {
+    alert('Failed to reject: ' + (result?.error || error?.message || 'Unknown error'));
+    return;
+  }
   alert('Withdrawal rejected');
   if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
   if (document.getElementById('repAllRequestsList')) await loadAllRepRequests();
