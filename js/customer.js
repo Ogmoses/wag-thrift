@@ -260,21 +260,10 @@ function requirePayPin(title, desc, callback) {
 async function confirmPayPin() {
   const pin = document.getElementById('payPinInp').value.trim();
   if (!pin || pin.length < 4) { setMsg('payPinMsg', '<div class="msg-err">Enter your 4–6 digit payment PIN</div>'); return; }
-  const user = getUser(); const pinHash = await hashPin(pin);
-  // Fix 8: verify PIN server-side via RPC — never fetch hash to frontend
-  const { data: hasPin } = await db.from(
-    user.role === 'representative' ? 'representatives' : 'customers'
-  ).select('payment_pin_hash').eq('id', user.id).single();
-  if (!hasPin?.payment_pin_hash) {
-    // No PIN set yet — let them through and prompt setup
-    closeModal('payPinModal');
-    if (_payPinCallback) { _payPinCallback(); _payPinCallback = null; }
-    return;
-  }
-  const { data: valid, error } = await db.rpc('verify_payment_pin', {
-    p_customer_id: user.id,
-    p_pin_hash: pinHash
-  });
+  const pinHash = await hashPin(pin);
+  // verify_payment_pin now identifies the caller via auth.uid() (real
+  // Supabase Auth session) — no need to pass or pre-check the customer ID.
+  const { data: valid, error } = await db.rpc('verify_payment_pin', { p_pin_hash: pinHash });
   if (error || valid !== true) {
     setMsg('payPinMsg', '<div class="msg-err">Incorrect PIN. Try again.</div>');
     return;
@@ -551,7 +540,7 @@ async function changeCustPayPin() {
   if (!/^\d{4,6}$/.test(nw)) { setMsg('cpPinMsg', '<div class="msg-err">PIN must be 4–6 digits</div>'); return; }
   showLoading('Verifying…');
   const curHash = await hashPin(cur);
-  const { data: valid } = await db.rpc('verify_payment_pin', { p_customer_id: u.id, p_pin_hash: curHash });
+  const { data: valid } = await db.rpc('verify_payment_pin', { p_pin_hash: curHash });
   if (valid !== true) { hideLoading(); setMsg('cpPinMsg', '<div class="msg-err">Current PIN is incorrect</div>'); return; }
   await db.from('customers').update({ payment_pin_hash: await hashPin(nw) }).eq('id', u.id);
   await audit('login', u.id, 'customer', `Customer ${u.first_name} ${u.last_name} changed their withdrawal PIN`);
