@@ -99,8 +99,10 @@ async function renderPlanDetail(planId) {
   else {
     txList.innerHTML = allTxs.slice(0, 3).map(tx => {
       const isIn = tx.type === 'deposit' || tx.type === 'opening';
-      const label = tx.type === 'opening' ? 'Opening Contribution' : tx.type === 'deposit' ? 'Deposit' : tx.type === 'rejected' ? 'Rejected Withdrawal' : 'Payout';
-      return `<div class="tx-row"><div class="tx-ico ${isIn ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div><div class="tx-body"><div class="tx-name">${label}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${tx.ref || '—'}</div></div><div class="${isIn ? 'tx-amt-g' : 'tx-amt-r'}">${isIn ? '+' : '-'}${fmt(tx.amount)}</div></div>`;
+      const isReserved = tx.ref?.startsWith('RESERVE-');
+      const label = tx.type === 'opening' ? 'Opening Contribution' : tx.type === 'deposit' ? 'Deposit' : tx.type === 'rejected' ? 'Rejected Withdrawal' : (isReserved ? 'Withdrawal' : 'Payout');
+      const refDisplay = isReserved ? 'Withdrawal request' : (tx.ref || '—');
+      return `<div class="tx-row"><div class="tx-ico ${isIn ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div><div class="tx-body"><div class="tx-name">${label}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${refDisplay}</div></div><div class="${isIn ? 'tx-amt-g' : 'tx-amt-r'}">${isIn ? '+' : '-'}${fmt(tx.amount)}</div></div>`;
     }).join('');
   }
 }
