@@ -17,6 +17,17 @@ function clearAdminSession() { sessionStorage.removeItem('wagAdmin'); }
 
 // Call at the top of every admin page (except admin/login.html).
 function requireAdmin() {
+  // Detect a customer/representative session present in this browser and
+  // immediately reject — they are never allowed past this point, even on
+  // admin/login.html, so a customer can't sit on the PIN screen and guess.
+  let custOrRepSession = null;
+  try { custOrRepSession = JSON.parse(sessionStorage.getItem('wagUser')); } catch (e) {}
+  if (custOrRepSession && custOrRepSession.role) {
+    alert('This area is restricted. You do not have permission to access the admin portal.');
+    window.location.replace(rootPath() + (custOrRepSession.role === 'representative' ? 'representative/dashboard.html' : 'customer/dashboard.html'));
+    return null;
+  }
+
   const a = getAdminSession();
   if (!a || !a.loggedIn) {
     window.location.replace(rootPath() + 'admin/login.html');
