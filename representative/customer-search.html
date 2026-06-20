@@ -90,7 +90,10 @@
 requireRole(['representative']);
 initTheme();
 document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
-startSuspendCheck();
+verifyRoleFromDB('representative').then(valid => {
+  if (!valid) return window.location.replace(rootPath() + 'login.html');
+  startSuspendCheck();
+});
 </script>
 </body>
 </html>

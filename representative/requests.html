@@ -52,8 +52,11 @@
 <script>
 requireRole(['representative']);
 initTheme();
-loadAllRepRequests();
-startSuspendCheck();
+verifyRoleFromDB('representative').then(valid => {
+  if (!valid) return window.location.replace(rootPath() + 'login.html');
+  loadAllRepRequests();
+  startSuspendCheck();
+});
 </script>
 </body>
 </html>
