@@ -478,7 +478,7 @@ async function deleteCustomer(id, name) {
   }
   if (!confirm(`Permanently delete ${name}? This cannot be undone.`)) return;
   showLoading('Deleting…');
-  await db.from('customers').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id, pin_hash: 'x' }).eq('id', id);
+  await db.from('customers').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id }).eq('id', id);
   await audit('delete', `Admin permanently deleted customer ${name} (${id})`);
   hideLoading();
   await renderCustomersPage();
@@ -553,7 +553,7 @@ async function restoreAgent(id, name) {
 async function deleteAgent(id, name) {
   if (!confirm(`Permanently delete agent ${name}? This cannot be undone.`)) return;
   showLoading('Deleting…');
-  await db.from('representatives').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id, pin_hash: 'x' }).eq('id', id);
+  await db.from('representatives').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id }).eq('id', id);
   await audit('delete', `Admin permanently deleted agent ${name} (${id})`);
   hideLoading();
   await renderAgentsPage();

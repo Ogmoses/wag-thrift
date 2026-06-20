@@ -527,11 +527,15 @@ async function changeCustPassword() {
   if (!cur || !nw) { setMsg('cpPwMsg', '<div class="msg-err">Fill in both fields</div>'); return; }
   if (nw.length < 6) { setMsg('cpPwMsg', '<div class="msg-err">New password must be at least 6 characters</div>'); return; }
   showLoading('Verifying…');
-  const curHash = await hashPin(cur);
-  const { data: chk } = await db.from('customers').select('id').eq('id', u.id).eq('pin_hash', curHash).single();
-  if (!chk) { hideLoading(); setMsg('cpPwMsg', '<div class="msg-err">Current password is incorrect</div>'); return; }
-  const newHash = await hashPin(nw);
-  await db.from('customers').update({ pin_hash: newHash }).eq('id', u.id);
+  // Verify the current password by re-checking it against the live Supabase
+  // Auth session's email (re-authenticating confirms the password is correct
+  // without us ever storing/comparing it ourselves).
+  const { data: { session } } = await db.auth.getSession();
+  if (!session?.user?.email) { hideLoading(); setMsg('cpPwMsg', '<div class="msg-err">Session expired. Please sign in again.</div>'); return; }
+  const { error: verifyErr } = await db.auth.signInWithPassword({ email: session.user.email, password: cur });
+  if (verifyErr) { hideLoading(); setMsg('cpPwMsg', '<div class="msg-err">Current password is incorrect</div>'); return; }
+  const { error: updateErr } = await db.auth.updateUser({ password: nw });
+  if (updateErr) { hideLoading(); setMsg('cpPwMsg', `<div class="msg-err">${updateErr.message}</div>`); return; }
   await audit('login', u.id, 'customer', `Customer ${u.first_name} ${u.last_name} changed their password`);
   hideLoading();
   setMsg('cpPwMsg', '<div class="msg-ok">Password updated successfully</div>');

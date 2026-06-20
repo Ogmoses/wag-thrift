@@ -466,10 +466,12 @@ async function changeRepPassword() {
   if (!cur || !nw) { setMsg('rpPwMsg', '<div class="msg-err">Fill in both fields</div>'); return; }
   if (nw.length < 6) { setMsg('rpPwMsg', '<div class="msg-err">New password must be at least 6 characters</div>'); return; }
   showLoading('Verifying…');
-  const curHash = await hashPin(cur);
-  const { data: chk } = await db.from('representatives').select('id').eq('id', u.id).eq('pin_hash', curHash).single();
-  if (!chk) { hideLoading(); setMsg('rpPwMsg', '<div class="msg-err">Current password is incorrect</div>'); return; }
-  await db.from('representatives').update({ pin_hash: await hashPin(nw) }).eq('id', u.id);
+  const { data: { session } } = await db.auth.getSession();
+  if (!session?.user?.email) { hideLoading(); setMsg('rpPwMsg', '<div class="msg-err">Session expired. Please sign in again.</div>'); return; }
+  const { error: verifyErr } = await db.auth.signInWithPassword({ email: session.user.email, password: cur });
+  if (verifyErr) { hideLoading(); setMsg('rpPwMsg', '<div class="msg-err">Current password is incorrect</div>'); return; }
+  const { error: updateErr } = await db.auth.updateUser({ password: nw });
+  if (updateErr) { hideLoading(); setMsg('rpPwMsg', `<div class="msg-err">${updateErr.message}</div>`); return; }
   await audit('login', u.id, 'representative', `Agent ${u.first_name} ${u.last_name} changed their password`);
   hideLoading(); setMsg('rpPwMsg', '<div class="msg-ok">Password updated</div>');
   document.getElementById('rpCurPw').value = ''; document.getElementById('rpNewPw').value = '';
