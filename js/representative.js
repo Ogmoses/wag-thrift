@@ -83,11 +83,15 @@ async function loadRepTxPreview() {
     const isPayout = tx.type === 'payout';
     const isRejected = tx.type === 'rejected_disb';
     const isReserved = tx.ref?.startsWith('RESERVE-');
+    const isConfirmedPaid = isReserved && tx.method === 'Cash';
     const isIn = !isPayout && !isRejected;
-    const label = tx.type === 'opening' ? 'Opening' : isPayout ? (isReserved ? 'Withdrawal' : 'Payout') : isRejected ? 'Rejected Withdrawal' : 'Deposit';
-    const refDisplay = isReserved ? 'Withdrawal request' : (tx.ref || '—');
+    const label = tx.type === 'opening' ? 'Opening'
+      : isPayout ? (isConfirmedPaid ? 'Paid' : isReserved ? 'Withdrawal (pending)' : 'Payout')
+      : isRejected ? 'Rejected Withdrawal'
+      : 'Deposit';
+    const refDisplay = isReserved ? (isConfirmedPaid ? 'Cash delivered' : 'Withdrawal request') : (tx.ref || '—');
     return `<div class="tx-row">
- <div class="tx-ico ${isIn ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
+ <div class="tx-ico ${isIn || isConfirmedPaid ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
  <div class="tx-body">
  <div class="tx-name">${_repCustMap[tx.customer_id] || 'Customer'}</div>
  <div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${label}</div>
@@ -374,12 +378,17 @@ function renderRepTxList() {
     const isPayout = tx.type === 'payout';
     const isRejected = tx.type === 'rejected_disb';
     const isReserved = tx.ref?.startsWith('RESERVE-');
+    const isConfirmedPaid = isReserved && tx.method === 'Cash';
     const isIn = !isPayout && !isRejected;
-    const lbl = tx.type === 'opening' ? 'Opening' : isPayout ? (isReserved ? 'Withdrawal' : 'Payout') : isRejected ? 'Rejected Withdrawal' : 'Deposit';
-    const refDisplay = isReserved ? 'Withdrawal request' : (tx.ref || '—');
-    const badge = `<span style="background:${isIn ? '#d1fae5' : '#fee2e2'};color:${isIn ? '#065f46' : '#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${isReserved ? 'withdrawal' : tx.type}</span>`;
+    const lbl = tx.type === 'opening' ? 'Opening'
+      : isPayout ? (isConfirmedPaid ? 'Paid' : isReserved ? 'Withdrawal (pending)' : 'Payout')
+      : isRejected ? 'Rejected Withdrawal'
+      : 'Deposit';
+    const refDisplay = isReserved ? (isConfirmedPaid ? 'Cash delivered' : 'Withdrawal request') : (tx.ref || '—');
+    const badgeText = isConfirmedPaid ? 'paid' : isReserved ? 'pending' : tx.type;
+    const badge = `<span style="background:${isIn ? '#d1fae5' : isConfirmedPaid ? '#d1fae5' : '#fee2e2'};color:${isIn ? '#065f46' : isConfirmedPaid ? '#065f46' : '#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${badgeText}</span>`;
     return `<div class="tx-row">
-     <div class="tx-ico ${isIn ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
+     <div class="tx-ico ${isIn || isConfirmedPaid ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
      <div class="tx-body"><div class="tx-name">${_repCustMapHist[tx.customer_id] || 'Customer'}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${lbl}</div><div class="tx-ref">${refDisplay}</div><div style="margin-top:3px;">${badge}</div></div>
      <div class="${isIn ? 'tx-amt-g' : 'tx-amt-r'}">${isIn ? '+' : '-'}${fmt(tx.amount)}</div>
     </div>`;
