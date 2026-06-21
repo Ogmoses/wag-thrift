@@ -51,21 +51,48 @@
         </div>
 
         <div class="section-card">
-          <div class="section-card-title">Admin PIN Management</div>
+          <div class="section-card-title">Change Password</div>
           <div class="settings-group">
-            <label class="settings-label">Current PIN (required)</label>
-            <input type="password" id="settCurrentPin" class="settings-inp" placeholder="Current PIN">
+            <label class="settings-label">Current Password (required)</label>
+            <input type="password" id="settCurrentPin" class="settings-inp" placeholder="Current password">
           </div>
           <div class="settings-group">
-            <label class="settings-label">New PIN</label>
-            <input type="password" id="settNewPin" class="settings-inp" placeholder="New PIN (min 8 chars)">
+            <label class="settings-label">New Password</label>
+            <input type="password" id="settNewPin" class="settings-inp" placeholder="New password (min 8 chars)">
           </div>
           <div class="settings-group">
-            <label class="settings-label">Confirm New PIN</label>
-            <input type="password" id="settConfirmPin" class="settings-inp" placeholder="Confirm new PIN">
+            <label class="settings-label">Confirm New Password</label>
+            <input type="password" id="settConfirmPin" class="settings-inp" placeholder="Confirm new password">
           </div>
           <div id="settMsg"></div>
-          <button class="btn btn-yellow" onclick="changeAdminPin()" style="margin-top:4px;">Update PIN</button>
+          <button class="btn btn-yellow" onclick="changeAdminPin()" style="margin-top:4px;">Update Password</button>
+        </div>
+
+        <div class="section-card">
+          <div class="section-card-title">Admin Accounts</div>
+          <div id="adminsList"><div class="empty-state">Loading…</div></div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-card-title">Invite New Admin</div>
+          <div class="settings-group">
+            <label class="settings-label">First Name</label>
+            <input type="text" id="newAdminFn" class="settings-inp" placeholder="First name">
+          </div>
+          <div class="settings-group">
+            <label class="settings-label">Last Name</label>
+            <input type="text" id="newAdminLn" class="settings-inp" placeholder="Last name">
+          </div>
+          <div class="settings-group">
+            <label class="settings-label">Email Address</label>
+            <input type="email" id="newAdminEmail" class="settings-inp" placeholder="admin@example.com">
+          </div>
+          <div class="settings-group">
+            <label class="settings-label">Temporary Password</label>
+            <input type="password" id="newAdminPw" class="settings-inp" placeholder="Min 8 characters">
+          </div>
+          <div id="inviteAdminMsg"></div>
+          <button class="btn btn-blue" onclick="inviteNewAdmin()" style="margin-top:4px;">Create Admin Account</button>
         </div>
 
         <div class="section-card">
@@ -90,7 +117,8 @@
 
 <script>
 const _a = requireAdmin();
-if (_a) {
+if (_a) (async () => {
+if (!(await verifyAdminFromDB())) return;
   initAdminTheme();
   const initial = (location.hash === '#auditlog') ? 'auditlog' : 'settings';
   renderAdminShell(initial, initial === 'auditlog' ? 'Audit Log' : 'Settings');
@@ -104,7 +132,7 @@ if (_a) {
       n.classList.toggle('active', n.getAttribute('href') === (page === 'auditlog' ? 'settings.html#auditlog' : 'settings.html'));
     });
     history.replaceState(null, '', page === 'auditlog' ? '#auditlog' : location.pathname);
-    if (page === 'auditlog') renderAuditLog(); else { renderSecurityLog(); renderAdminSessionInfo(); }
+    if (page === 'auditlog') renderAuditLog(); else { renderSecurityLog(); renderAdminSessionInfo(); renderAdminsList(); }
   }
 
   document.querySelectorAll('.nav-item').forEach(n => {
@@ -116,7 +144,7 @@ if (_a) {
 
   showAdminTab(initial);
   closeSidebar();
-}
+})();
 </script>
 </body>
 </html>

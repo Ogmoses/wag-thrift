@@ -51,7 +51,8 @@
 
 <script>
 const _a = requireAdmin();
-if (_a) {
+if (_a) (async () => {
+if (!(await verifyAdminFromDB())) return;
   initAdminTheme();
   const initial = (location.hash === '#search') ? 'search' : 'customers';
   renderAdminShell(initial, initial === 'search' ? 'Search' : 'Customers');
@@ -78,7 +79,7 @@ if (_a) {
   setSearchSub('customer');
   showAdminTab(initial);
   closeSidebar();
-}
+})();
 </script>
 </body>
 </html>

@@ -75,7 +75,8 @@
 
 <script>
 const _a = requireAdmin();
-if (_a) {
+if (_a) (async () => {
+if (!(await verifyAdminFromDB())) return;
   initAdminTheme();
   const initial = (location.hash === '#disbursements') ? 'disbursements' : 'overview';
   renderAdminShell(initial, initial === 'disbursements' ? 'Disbursements' : 'Overview');
@@ -103,7 +104,7 @@ if (_a) {
 
   showAdminTab(initial);
   closeSidebar();
-}
+})();
 </script>
 </body>
 </html>

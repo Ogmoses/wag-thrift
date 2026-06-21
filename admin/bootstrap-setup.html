@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Initial Admin Setup – WAG</title>
+<link rel="stylesheet" href="../css/shared.css">
+<link rel="stylesheet" href="../css/admin.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/supabase.js"></script>
+<script src="../js/utils.js"></script>
+</head>
+<body class="light-mode">
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Please wait…</div>
+</div>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">WAG</div>
+    <div class="login-title">Initial Admin Setup</div>
+    <div class="login-sub">One-time bootstrap — only works if no admin exists yet</div>
+
+    <div class="login-warning">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      This page only works once. Bookmark it now and delete it from your repo after use.
+    </div>
+
+    <label class="login-label">First Name</label>
+    <input type="text" id="bsFn" class="login-inp" placeholder="First name">
+
+    <label class="login-label" style="margin-top:12px;">Last Name</label>
+    <input type="text" id="bsLn" class="login-inp" placeholder="Last name">
+
+    <label class="login-label" style="margin-top:12px;">Email Address</label>
+    <input type="email" id="bsEmail" class="login-inp" placeholder="you@example.com" autocapitalize="off">
+
+    <label class="login-label" style="margin-top:12px;">Password</label>
+    <div class="pin-wrap">
+      <input type="password" id="bsPw" class="login-inp" placeholder="Min 8 characters" maxlength="100">
+      <button class="pw-eye" onclick="togglePw('bsPw')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+
+    <div id="bsMsg"></div>
+
+    <button class="login-btn" id="bsBtn" onclick="doBootstrap()">Create First Admin Account</button>
+  </div>
+</div>
+
+<script>
+async function doBootstrap() {
+  const fn = document.getElementById('bsFn').value.trim();
+  const ln = document.getElementById('bsLn').value.trim();
+  const em = document.getElementById('bsEmail').value.trim();
+  const pw = document.getElementById('bsPw').value;
+  if (!fn || !ln || !em || !pw) { setMsg('bsMsg', '<div class="msg-err">Fill in all fields</div>'); return; }
+  if (pw.length < 8) { setMsg('bsMsg', '<div class="msg-err">Password must be at least 8 characters</div>'); return; }
+  showLoading('Creating account…');
+
+  const { data: signUpData, error: signUpErr } = await db.auth.signUp({ email: em, password: pw });
+  if (signUpErr || !signUpData?.user) {
+    hideLoading();
+    setMsg('bsMsg', `<div class="msg-err">${signUpErr?.message || 'Could not create account'}</div>`);
+    return;
+  }
+
+  const { data: result, error: rpcErr } = await db.rpc('create_admin_account', {
+    p_auth_user_id: signUpData.user.id, p_first_name: fn, p_last_name: ln, p_email: em, p_bootstrap: true
+  });
+  hideLoading();
+  if (rpcErr || result?.ok === false) {
+    setMsg('bsMsg', `<div class="msg-err">${result?.error || rpcErr?.message || 'Bootstrap failed — an admin may already exist'}</div>`);
+    return;
+  }
+
+  setMsg('bsMsg', '<div class="msg-ok">First admin account created! Redirecting to login…</div>');
+  setTimeout(() => { window.location.href = 'login.html'; }, 2000);
+}
+document.getElementById('bsPw').addEventListener('keypress', e => { if (e.key === 'Enter') doBootstrap(); });
+</script>
+</body>
+</html>

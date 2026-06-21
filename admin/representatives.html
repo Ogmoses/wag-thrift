@@ -43,7 +43,8 @@
 
 <script>
 const _a = requireAdmin();
-if (_a) {
+if (_a) (async () => {
+if (!(await verifyAdminFromDB())) return;
   initAdminTheme();
   const initial = (location.hash === '#tokens') ? 'tokens' : 'agents';
   renderAdminShell(initial, initial === 'tokens' ? 'Activation Tokens' : 'Field Agents');
@@ -69,7 +70,7 @@ if (_a) {
 
   showAdminTab(initial);
   closeSidebar();
-}
+})();
 </script>
 </body>
 </html>

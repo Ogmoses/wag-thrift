@@ -30,9 +30,12 @@
       Restricted access. Unauthorised entry is prohibited and logged.
     </div>
 
-    <label class="login-label">Admin PIN</label>
+    <label class="login-label">Email Address</label>
+    <input type="email" id="adminEmailInp" class="login-inp" placeholder="admin@example.com" autocomplete="off" autocapitalize="off">
+
+    <label class="login-label" style="margin-top:12px;">Password</label>
     <div class="pin-wrap">
-      <input type="password" id="adminPinInp" class="login-inp" placeholder="••••••••" maxlength="20" autocomplete="off">
+      <input type="password" id="adminPinInp" class="login-inp" placeholder="••••••••" maxlength="100" autocomplete="off">
       <button class="pw-eye" onclick="togglePw('adminPinInp')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
@@ -60,10 +63,12 @@
     window.location.replace(rootPath() + (s.role === 'representative' ? 'representative/dashboard.html' : 'customer/dashboard.html'));
   }
 })();
+
 // If already logged in this session, skip straight to the dashboard.
-(function () {
-  if (isAdminLoggedIn()) window.location.replace('dashboard.html');
+(async function () {
+  if (await isAdminLoggedIn()) window.location.replace('dashboard.html');
 })();
+
 document.getElementById('adminPinInp').addEventListener('keypress', e => { if (e.key === 'Enter') doAdminLogin(); });
 </script>
 </body>
