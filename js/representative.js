@@ -51,11 +51,11 @@ async function renderRepDash() {
   document.getElementById('repName').textContent = rep.first_name + ' ' + rep.last_name;
   document.getElementById('repCode').textContent = 'Code: ' + rep.rep_id;
   const today = new Date().toISOString().split('T')[0];
-  const { data: todayTx } = await db.from('transactions').select('amount').eq('agent_id', rep.id).eq('type', 'deposit').gte('created_at', today);
+  const { data: todayTx } = await db.from('transactions').select('amount').eq('agent_id', rep.id).in('type', ['deposit', 'opening']).gte('created_at', today);
   const todayAmt = (todayTx || []).reduce((s, t) => s + Number(t.amount), 0);
   document.getElementById('repTodayAmt').textContent = fmt(todayAmt);
   document.getElementById('repTodayCnt').textContent = (todayTx || []).length + ' transaction' + ((todayTx || []).length !== 1 ? 's' : '');
-  const { data: allTx } = await db.from('transactions').select('amount').eq('agent_id', rep.id).eq('type', 'deposit');
+  const { data: allTx } = await db.from('transactions').select('amount').eq('agent_id', rep.id).in('type', ['deposit', 'opening']);
   document.getElementById('repAllAmt').textContent = fmt((allTx || []).reduce((s, t) => s + Number(t.amount), 0));
   document.getElementById('repConfirmed').textContent = rep.confirmed_count || 0;
   const score = await getAgentScore(rep.id);
@@ -302,6 +302,9 @@ async function _doMarkPaid(disbId, planId, amount, custId) {
   }
   hideLoading();
   alert(`Payment Complete\nCash delivered to ${cust?.first_name || 'customer'}`);
+  // Refresh cached profile so confirmed_count (updated server-side by the
+  // RPC) reflects on the dashboard without needing a full re-login.
+  if (typeof verifyRoleFromDB === 'function') await verifyRoleFromDB('representative');
   if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
   if (document.getElementById('repAllRequestsList')) await loadAllRepRequests();
 }
