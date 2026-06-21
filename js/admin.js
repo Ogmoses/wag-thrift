@@ -681,7 +681,7 @@ async function renderAnalytics() {
   document.getElementById('barChart').innerHTML = dayTotals.map((amt, i) => `<div class="bar-item"><div class="bar" style="height:${Math.max(4, Math.round((amt / maxAmt) * 70))}px;" title="${fmt(amt)}"></div><div class="bar-label">${days[i].toLocaleDateString('en', { weekday: 'short' })}</div></div>`).join('');
 
   const { data: reps } = await db.from('representatives').select('*');
-  const agentPerf = await Promise.all((reps || []).map(async r => { const { data: t } = await db.from('transactions').select('amount').eq('agent_id', r.id).eq('type', 'deposit'); const total = (t || []).reduce((s, x) => s + Number(x.amount), 0); return { ...r, total }; }));
+  const agentPerf = await Promise.all((reps || []).map(async r => { const { data: t } = await db.from('transactions').select('amount').eq('agent_id', r.id).in('type', ['deposit', 'opening']); const total = (t || []).reduce((s, x) => s + Number(x.amount), 0); return { ...r, total }; }));
   agentPerf.sort((a, b) => b.total - a.total);
   document.getElementById('topAgentsList').innerHTML = agentPerf.slice(0, 5).length
     ? agentPerf.slice(0, 5).map((r, i) => `<div class="agent-row"><div><span style="color:var(--yellow);font-weight:800;margin-right:7px;">#${i + 1}</span><span style="font-size:13px;">${r.first_name} ${r.last_name}</span><div style="color:var(--sub);font-size:10px;margin-top:2px;">ID: ${r.rep_id}</div></div><div style="color:var(--green);font-weight:700;font-size:13px;">${fmt(r.total)}</div></div>`).join('')
