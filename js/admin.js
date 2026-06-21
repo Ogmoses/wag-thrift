@@ -1,25 +1,45 @@
 // ═══════════════════════════════════════════════
 // js/admin.js
 // SUPER ADMIN PORTAL — AUTH & SESSION
-// Kept completely separate from customer/representative auth (js/auth.js
-// session helpers getUser/setUser are NOT used here — admin uses its own
-// sessionStorage key 'wagAdmin', see getAdminSession/setAdminSession in auth.js).
-// Depends on: js/supabase.js, js/utils.js, js/auth.js (load all three first)
+// Now backed by REAL Supabase Auth (db.auth.*) + an `administrators` table
+// gated by the is_admin() SQL function, replacing the old shared-PIN system.
+// Still kept isolated from customer/rep auth (does not load js/auth.js) —
+// the Supabase client's session handling is native to js/supabase.js, so
+// that isolation is preserved.
+// Depends on: js/supabase.js, js/utils.js (load both first)
 // ═══════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════
-// ADMIN SESSION — fully isolated from customer/rep sessions (wagUser).
-// Admin pages do NOT load js/auth.js.
-// ═══════════════════════════════════════════════
+// ── ADMIN SESSION — cached profile, refreshed from the live Supabase
+// session + administrators table (mirrors refreshUserProfile() in auth.js
+// but kept local here to avoid loading auth.js on admin pages).
 function getAdminSession() { try { return JSON.parse(sessionStorage.getItem('wagAdmin')); } catch (e) { return null; } }
 function setAdminSession(a) { sessionStorage.setItem('wagAdmin', JSON.stringify(a)); }
 function clearAdminSession() { sessionStorage.removeItem('wagAdmin'); }
 
+// Re-checks the live Supabase Auth session and confirms the user is an
+// active admin via is_admin(). Returns the admin profile or null.
+async function refreshAdminProfile() {
+  if (!db) return null;
+  const { data: { session } } = await db.auth.getSession();
+  if (!session?.user) return null;
+  const { data: isAdminResult } = await db.rpc('is_admin');
+  if (isAdminResult !== true) return null;
+  const { data: profile } = await db.from('administrators').select('*').eq('auth_user_id', session.user.id).single();
+  if (!profile || profile.status !== 'active') return null;
+  const adminSession = { loggedIn: true, id: profile.id, first_name: profile.first_name, last_name: profile.last_name, email: profile.email, loginTime: new Date().toISOString() };
+  setAdminSession(adminSession);
+  return adminSession;
+}
+
+async function isAdminLoggedIn() {
+  return !!(await refreshAdminProfile());
+}
+
 // Call at the top of every admin page (except admin/login.html).
+// Synchronous quick-check using cache, paired with an async re-verify.
 function requireAdmin() {
   // Detect a customer/representative session present in this browser and
-  // immediately reject — they are never allowed past this point, even on
-  // admin/login.html, so a customer can't sit on the PIN screen and guess.
+  // immediately reject — they are never allowed past this point.
   let custOrRepSession = null;
   try { custOrRepSession = JSON.parse(sessionStorage.getItem('wagUser')); } catch (e) {}
   if (custOrRepSession && custOrRepSession.role) {
@@ -36,12 +56,27 @@ function requireAdmin() {
   return a;
 }
 
+// The REAL, authoritative check — call this after requireAdmin() on every
+// protected admin page. Re-verifies against the live Supabase session +
+// is_admin(), so a revoked/expired session or a hand-edited sessionStorage
+// value can't fake admin access.
+async function verifyAdminFromDB() {
+  const profile = await refreshAdminProfile();
+  if (!profile) {
+    clearAdminSession();
+    window.location.replace(rootPath() + 'admin/login.html');
+    return false;
+  }
+  return true;
+}
+
 // ═══════════════════════════════════════════════
 // ADMIN AUDIT LOG WRITER
 // ═══════════════════════════════════════════════
 async function audit(action, description, amount = null, planId = null) {
   if (!db) return;
-  await db.from('audit_log').insert({ action, user_id: 'admin', user_role: 'super_admin', description, amount, plan_id: planId });
+  const a = getAdminSession();
+  await db.from('audit_log').insert({ action, user_id: a?.id || 'admin', user_role: 'super_admin', description, amount, plan_id: planId });
 }
 
 // ═══════════════════════════════════════════════
@@ -109,17 +144,8 @@ function renderAdminShell(activePage, title) {
   });
 }
 
-// Change this to a secure PIN. In production this should be validated server-side.
-const ADMIN_PIN = 'WAGE2026';
-
 let loginAttempts = 0;
 let lockoutUntil = 0;
-let currentAdminPin = ADMIN_PIN; // In production, this would be server-side
-
-function isAdminLoggedIn() {
-  const a = getAdminSession();
-  return !!(a && a.loggedIn);
-}
 
 // Called from admin/login.html
 async function doAdminLogin() {
@@ -127,24 +153,26 @@ async function doAdminLogin() {
   const now = Date.now();
   if (now < lockoutUntil) { return; }
 
-  btn.disabled = false;
-  btn.textContent = 'Access Super Admin Portal';
-
-  const pin = document.getElementById('adminPinInp').value;
-  if (!pin) { setMsg('loginMsg', '<div class="msg-err">Please enter the Admin PIN</div>'); return; }
+  const email = document.getElementById('adminEmailInp').value.trim();
+  const pw = document.getElementById('adminPinInp').value;
+  if (!email || !pw) { setMsg('loginMsg', '<div class="msg-err">Please enter your email and password</div>'); return; }
 
   btn.disabled = true;
   btn.textContent = 'Verifying…';
 
-  await new Promise(r => setTimeout(r, 600));
+  const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email, password: pw });
+  let success = false;
+  if (!authErr && authData?.session) {
+    const profile = await refreshAdminProfile();
+    success = !!profile;
+    if (!success) await db.auth.signOut(); // signed in but not an admin — reject
+  }
 
-  await auditLoginAttempt(pin === currentAdminPin);
-  sessionLog.unshift({ type: pin === currentAdminPin ? 'ok' : 'fail', time: new Date().toLocaleString() });
+  await auditLoginAttempt(success);
+  sessionLog.unshift({ type: success ? 'ok' : 'fail', time: new Date().toLocaleString() });
 
-  if (pin === currentAdminPin) {
+  if (success) {
     loginAttempts = 0;
-    const adminSession = { loggedIn: true, loginTime: new Date().toISOString() };
-    setAdminSession(adminSession);
     document.getElementById('adminPinInp').value = '';
     window.location.href = rootPath() + 'admin/dashboard.html';
   } else {
@@ -154,7 +182,7 @@ async function doAdminLogin() {
       showLockout(30);
       setMsg('loginMsg', '');
     } else {
-      setMsg('loginMsg', `<div class="msg-err">Invalid PIN — ${5 - loginAttempts} attempt(s) remaining</div>`);
+      setMsg('loginMsg', `<div class="msg-err">Invalid email or password — ${5 - loginAttempts} attempt(s) remaining</div>`);
     }
     btn.disabled = false;
     btn.textContent = 'Access Super Admin Portal';
@@ -198,6 +226,7 @@ async function auditLoginAttempt(success) {
 // Called from admin pages (sidebar/topbar logout button).
 async function doAdminLogout() {
   if (typeof teardownRealtime === 'function') teardownRealtime();
+  if (db) await db.auth.signOut();
   clearAdminSession();
   window.location.href = rootPath() + 'admin/login.html';
 }
@@ -744,13 +773,67 @@ async function changeAdminPin() {
   const cur = document.getElementById('settCurrentPin').value;
   const np = document.getElementById('settNewPin').value;
   const cp = document.getElementById('settConfirmPin').value;
-  if (cur !== currentAdminPin) { setMsg('settMsg', '<div class="msg-err">Current PIN is incorrect</div>'); return; }
-  if (np.length < 8) { setMsg('settMsg', '<div class="msg-err">New PIN must be at least 8 characters</div>'); return; }
-  if (np !== cp) { setMsg('settMsg', '<div class="msg-err">New PINs do not match</div>'); return; }
-  currentAdminPin = np;
-  await audit('login', 'Admin PIN changed');
-  setMsg('settMsg', '<div class="msg-ok">PIN updated for this session. Note: to persist across sessions, update ADMIN_PIN in js/admin.js.</div>');
+  if (!cur || !np) { setMsg('settMsg', '<div class="msg-err">Fill in all fields</div>'); return; }
+  if (np.length < 8) { setMsg('settMsg', '<div class="msg-err">New password must be at least 8 characters</div>'); return; }
+  if (np !== cp) { setMsg('settMsg', '<div class="msg-err">New passwords do not match</div>'); return; }
+  showLoading('Verifying…');
+  const { data: { session } } = await db.auth.getSession();
+  if (!session?.user?.email) { hideLoading(); setMsg('settMsg', '<div class="msg-err">Session expired. Please sign in again.</div>'); return; }
+  const { error: verifyErr } = await db.auth.signInWithPassword({ email: session.user.email, password: cur });
+  if (verifyErr) { hideLoading(); setMsg('settMsg', '<div class="msg-err">Current password is incorrect</div>'); return; }
+  const { error: updateErr } = await db.auth.updateUser({ password: np });
+  hideLoading();
+  if (updateErr) { setMsg('settMsg', `<div class="msg-err">${updateErr.message}</div>`); return; }
+  await audit('login', 'Admin changed their password');
+  setMsg('settMsg', '<div class="msg-ok">Password updated successfully.</div>');
   ['settCurrentPin', 'settNewPin', 'settConfirmPin'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+}
+
+// ═══════════════════════════════════════════════
+// INVITE NEW ADMIN — only callable by an existing admin (is_admin() check
+// happens server-side in create_admin_account).
+// ═══════════════════════════════════════════════
+async function inviteNewAdmin() {
+  const fn = document.getElementById('newAdminFn')?.value?.trim();
+  const ln = document.getElementById('newAdminLn')?.value?.trim();
+  const em = document.getElementById('newAdminEmail')?.value?.trim();
+  const pw = document.getElementById('newAdminPw')?.value?.trim();
+  if (!fn || !ln || !em || !pw) { setMsg('inviteAdminMsg', '<div class="msg-err">Fill in all fields</div>'); return; }
+  if (pw.length < 8) { setMsg('inviteAdminMsg', '<div class="msg-err">Password must be at least 8 characters</div>'); return; }
+  showLoading('Creating admin account…');
+  // Sign up the new admin's Auth account. Note: this will sign the CURRENT
+  // browser session in as the new user temporarily (Supabase JS client
+  // behavior) — we immediately restore the original admin session after.
+  const { data: { session: originalSession } } = await db.auth.getSession();
+  const { data: signUpData, error: signUpErr } = await db.auth.signUp({ email: em, password: pw });
+  if (signUpErr || !signUpData?.user) {
+    hideLoading();
+    setMsg('inviteAdminMsg', `<div class="msg-err">${signUpErr?.message || 'Could not create account'}</div>`);
+    return;
+  }
+  const { data: result, error: rpcErr } = await db.rpc('create_admin_account', {
+    p_auth_user_id: signUpData.user.id, p_first_name: fn, p_last_name: ln, p_email: em, p_bootstrap: false
+  });
+  // Restore the original admin's session (signUp may have switched the
+  // active session to the new user)
+  if (originalSession) await db.auth.setSession({ access_token: originalSession.access_token, refresh_token: originalSession.refresh_token });
+  hideLoading();
+  if (rpcErr || result?.ok === false) {
+    setMsg('inviteAdminMsg', `<div class="msg-err">${result?.error || rpcErr?.message || 'Failed to create admin'}</div>`);
+    return;
+  }
+  setMsg('inviteAdminMsg', `<div class="msg-ok">Admin account created for ${fn} ${ln}. They can now sign in with ${em}.</div>`);
+  ['newAdminFn', 'newAdminLn', 'newAdminEmail', 'newAdminPw'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  await renderAdminsList();
+}
+
+async function renderAdminsList() {
+  const el = document.getElementById('adminsList');
+  if (!el) return;
+  const { data: admins } = await db.from('administrators').select('*').order('created_at', { ascending: true });
+  if (!admins?.length) { el.innerHTML = '<div class="empty-state">No admins found</div>'; return; }
+  const me = getAdminSession();
+  el.innerHTML = admins.map(a => `<div class="agent-row"><div><div class="agent-row-name">${a.first_name} ${a.last_name}${a.id === me?.id ? ' <span style="color:var(--yellow);font-size:10px;">(you)</span>' : ''}</div><div class="agent-row-sub">${a.email}</div></div><div style="font-size:11px;color:${a.status === 'active' ? 'var(--green)' : 'var(--red)'};font-weight:700;text-transform:uppercase;">${a.status}</div></div>`).join('');
 }
 
 // ═══════════════════════════════════════════════
