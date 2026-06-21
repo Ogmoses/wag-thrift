@@ -252,33 +252,10 @@ function showReceipt(amount, plan, rep, cust, ref, method, newBal) {
 // WITHDRAWAL REQUEST ACTIONS — approve/reject (used by both
 // customer-search.html (per-customer) and requests.html (global list))
 // ═══════════════════════════════════════════════
-async function doApproveDisb(disbId, planId, amount, custId) { guardedSubmit('approveDisb_' + disbId, () => _doApproveDisb(disbId, planId, amount, custId)); }
-async function _doApproveDisb(disbId, planId, amount, custId) {
-  const rep = getUser();
-  const { data: disbCheck } = await db.from('disbursements').select('status').eq('id', disbId).single();
-  if (!disbCheck || disbCheck.status !== 'reviewed') {
-    alert('This withdrawal must be reviewed by a Super Admin before you can approve it.');
-    return;
-  }
-  const { data: bal } = await db.from('plan_balances').select('balance').eq('plan_id', planId).single();
-  if ((bal?.balance || 0) < amount) { alert(`Insufficient plan balance.\nAvailable: ${fmt(bal?.balance)}`); return; }
-  const { data: cust } = await db.from('customers').select('first_name,last_name').eq('id', custId).single();
-  if (!confirm(`Approve withdrawal of ${fmt(amount)} for ${cust?.first_name || 'customer'}?\n\nOnce approved, you will deliver the cash and then tap "Mark as Paid".`)) return;
-  showLoading('Approving…');
-  const { error } = await db.from('disbursements').update({
-    status: 'approved',
-    confirmed_by: rep.id,
-    confirmed_at: new Date().toISOString()
-  }).eq('id', disbId);
-  if (error) { hideLoading(); alert('Approval failed: ' + error.message); return; }
-  await audit('approve', rep.id, 'representative',
-    `Rep approved withdrawal of ${fmt(amount)} for ${cust?.first_name || ''} ${cust?.last_name || ''}`,
-    amount, planId);
-  hideLoading();
-  alert(`Approved\nNow deliver ${fmt(amount)} cash to ${cust?.first_name || 'customer'} and tap "Mark as Paid".`);
-  if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
-  if (document.getElementById('repAllRequestsList')) await loadAllRepRequests();
-}
+// NOTE: doApproveDisb/_doApproveDisb removed — reps no longer approve
+// withdrawals directly (that bypassed the balance-deduction logic in
+// approve_disbursement RPC). Only admin approves now; reps mark paid
+// after cash delivery via doMarkPaid/_doMarkPaid below.
 
 // Rep marks paid after physically delivering cash to customer
 async function doMarkPaid(disbId, planId, amount, custId) { guardedSubmit('markPaid_' + disbId, () => _doMarkPaid(disbId, planId, amount, custId)); }
