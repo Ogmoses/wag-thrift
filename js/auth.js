@@ -331,34 +331,36 @@ async function doForgotPin() {
   if (!dbReady()) return;
   const em = document.getElementById('resetEmail').value.trim();
   if (!em) { setMsg('resetMsg', '<div class="msg-err">Please enter your email</div>'); return; }
-  const [{ data: cu }, { data: re }] = await Promise.all([
-    db.from('customers').select('id,first_name,auth_user_id').eq('email', em).single(),
-    db.from('representatives').select('id,first_name,auth_user_id').eq('email', em).single()
-  ]);
-  if (!cu && !re) { setMsg('resetMsg', '<div class="msg-err">No account found with that email</div>'); return; }
-  showLoading('Generating link…');
-  // NOTE: Supabase's native resetPasswordForEmail() sends to the ACCOUNT's
-  // real email field (cu.email/re.email), which is the contact email the
-  // user registered with — NOT the hidden @wag.internal login email.
-  const { error } = await db.auth.resetPasswordForEmail(em, {
-    redirectTo: `${location.origin}${rootPath()}login.html`
-  });
+  // Always show the same message whether or not an account was found,
+  // so this can't be used to discover which emails are registered.
+  const genericMsg = '<div class="msg-ok">If an account exists with that email, a password reset link has been sent. Please check your inbox.<br><small style="color:var(--sub);font-size:11px;">Link expires in 1 hour.</small></div>';
+  showLoading('Sending reset link…');
+  const { data: result } = await db.rpc('request_password_reset', { p_email: em });
+  if (result?.exists && result?.token) {
+    const resetLink = `${location.origin}${rootPath()}login.html?reset=${result.token}`;
+    const [{ data: cu }, { data: re }] = await Promise.all([
+      db.from('customers').select('first_name').eq('email', em).single(),
+      db.from('representatives').select('first_name').eq('email', em).single()
+    ]);
+    await sendResetEmail(em, (cu || re)?.first_name || 'there', resetLink);
+  }
   hideLoading();
-  if (error) { setMsg('resetMsg', `<div class="msg-err">${error.message}</div>`); return; }
-  setMsg('resetMsg', `<div class="msg-ok">A password reset link has been sent to <strong>${em}</strong>. Please check your inbox.<br><small style="color:var(--sub);font-size:11px;">Link expires in 1 hour.</small></div>`);
+  setMsg('resetMsg', genericMsg);
 }
 
 // Supabase redirects back with a recovery session already active in the URL
 // hash — we detect that and show the reset-password modal directly.
 async function checkResetTokenInURL() {
   if (!dbReady()) return;
-  const hash = window.location.hash;
-  if (!hash.includes('type=recovery')) return;
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('reset');
+  if (!token) return;
   showLoading('Verifying reset link…');
-  const { data: { session } } = await db.auth.getSession();
+  const { data: result } = await db.rpc('verify_reset_token', { p_token: token });
   hideLoading();
-  if (!session) { alert('This reset link is invalid or has already been used.'); return; }
-  document.getElementById('resetTokenInfo').textContent = `Reset password for: ${session.user.email}`;
+  if (!result?.ok) { alert(result?.error || 'This reset link is invalid or has already been used.'); return; }
+  window._resetToken = token;
+  document.getElementById('resetTokenInfo').textContent = `Reset password for: ${result.email}`;
   showModal('resetPasswordModal');
 }
 
@@ -367,16 +369,33 @@ async function doResetPassword() {
   const confirmPw = document.getElementById('confirmPasswordInp').value.trim();
   if (!newPw || newPw.length < 6) { setMsg('resetPasswordMsg', '<div class="msg-err">Password must be at least 6 characters</div>'); return; }
   if (newPw !== confirmPw) { setMsg('resetPasswordMsg', '<div class="msg-err">Passwords do not match</div>'); return; }
+  if (!window._resetToken) { setMsg('resetPasswordMsg', '<div class="msg-err">Reset session expired. Please request a new link.</div>'); return; }
   showLoading('Updating password…');
-  const { error } = await db.auth.updateUser({ password: newPw });
-  hideLoading();
-  if (error) { setMsg('resetPasswordMsg', `<div class="msg-err">${error.message}</div>`); return; }
-  closeModal('resetPasswordModal');
-  document.getElementById('newPasswordInp').value = '';
-  document.getElementById('confirmPasswordInp').value = '';
-  window.history.replaceState({}, document.title, window.location.pathname);
-  await db.auth.signOut();
-  alert('Password updated successfully! You can now sign in with your new password.');
+  // Calls the reset-password Edge Function, which uses the service role
+  // key (server-side only) to update the password via the Admin API —
+  // this can't be done from client-side JS or a plain SQL RPC.
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+      body: JSON.stringify({ token: window._resetToken, newPassword: newPw })
+    });
+    const result = await res.json();
+    hideLoading();
+    if (!res.ok || result.error) {
+      setMsg('resetPasswordMsg', `<div class="msg-err">${result.error || 'Could not reset password. Please try again or contact support.'}</div>`);
+      return;
+    }
+    closeModal('resetPasswordModal');
+    document.getElementById('newPasswordInp').value = '';
+    document.getElementById('confirmPasswordInp').value = '';
+    window.history.replaceState({}, document.title, window.location.pathname);
+    window._resetToken = null;
+    alert('Password updated successfully! You can now sign in with your new password.');
+  } catch (e) {
+    hideLoading();
+    setMsg('resetPasswordMsg', '<div class="msg-err">Password reset is temporarily unavailable. Please contact support to reset your password manually.</div>');
+  }
 }
 
 // ═══════════════════════════════════════════════
