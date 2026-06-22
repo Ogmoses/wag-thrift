@@ -112,27 +112,41 @@ async function repDoSearch() {
   const raw = document.getElementById('repSearchInp').value.trim(); setMsg('repSearchMsg', '');
   if (!raw) { setMsg('repSearchMsg', '<div class="msg-err">Please enter a phone number</div>'); return; }
   const normPh = normPhone(raw); showLoading('Searching…');
-  let { data: cust } = await db.from('customers').select('*').eq('phone', normPh).single();
-  if (!cust) { const { data: c2 } = await db.from('customers').select('*').ilike('phone', '%' + normPh.slice(-9)); cust = c2?.[0] || null; }
+  const { data: result, error } = await db.rpc('rep_search_customer', { p_phone: normPh });
   hideLoading();
-  if (!cust) { setMsg('repSearchMsg', '<div class="msg-err">Customer not found. Check the phone number.</div>'); document.getElementById('repCustCard').style.display = 'none'; return; }
+  if (error || result?.ok === false) {
+    setMsg('repSearchMsg', `<div class="msg-err">${result?.error || error?.message || 'Customer not found. Check the phone number.'}</div>`);
+    document.getElementById('repCustCard').style.display = 'none';
+    return;
+  }
+  const cust = result.customer;
+  const plans = result.plans || [];
+  const disbs = result.disbursements || [];
   repFoundCust = cust;
   document.getElementById('repCustAv').textContent = cust.first_name[0].toUpperCase();
   document.getElementById('repCustNm').textContent = cust.first_name + ' ' + cust.last_name;
   document.getElementById('repCustPh').textContent = cust.phone;
-  const { data: plans } = await db.from('plan_balances').select('*').eq('customer_id', cust.id).eq('status', 'active').neq('status', 'deleted');
   const dd = document.getElementById('repPlanDd');
   dd.innerHTML = '<option value="">— Select a plan —</option>';
-  (plans || []).forEach(p => dd.innerHTML += `<option value="${p.plan_id}" data-bal="${p.balance}" data-tgt="${p.target_amount}">${p.name} — ${fmt(p.balance)}</option>`);
-  if (plans?.length === 1) { dd.value = plans[0].plan_id; repOnPlanChange(); } else document.getElementById('repPlanDetails').style.display = 'none';
-  await loadRepDisbList(cust.id);
+  plans.forEach(p => dd.innerHTML += `<option value="${p.plan_id}" data-bal="${p.balance}" data-tgt="${p.target_amount}">${p.name} — ${fmt(p.balance)}</option>`);
+  if (plans.length === 1) { dd.value = plans[0].plan_id; repOnPlanChange(); } else document.getElementById('repPlanDetails').style.display = 'none';
+  renderRepDisbList(cust.id, disbs);
   document.getElementById('repCustCard').style.display = 'block';
 }
 
-async function loadRepDisbList(custId) {
-  const { data: disbs } = await db.from('disbursements').select('*').eq('customer_id', custId).in('status', ['pending', 'reviewed', 'approved']);
+function renderRepDisbList(custId, disbs) {
   const dList = document.getElementById('repDisbList');
   dList.innerHTML = renderDisbCards(disbs || []);
+}
+
+// Legacy alias used by doMarkPaid/doRejectDisb refresh calls after actions
+async function loadRepDisbList(custId) {
+  if (!custId) return;
+  const { data: disbs } = await db.rpc('rep_search_customer',
+    { p_phone: repFoundCust?.phone || '' })
+    .then(r => ({ data: r.data?.disbursements || [] }))
+    .catch(() => ({ data: [] }));
+  renderRepDisbList(custId, disbs);
 }
 
 function renderDisbCards(disbs) {
@@ -283,7 +297,6 @@ async function _doMarkPaid(disbId, planId, amount, custId) {
   // RPC) reflects on the dashboard without needing a full re-login.
   if (typeof verifyRoleFromDB === 'function') await verifyRoleFromDB('representative');
   if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
-  if (document.getElementById('repAllRequestsList')) await loadAllRepRequests();
 }
 
 async function doRejectDisb(disbId, custId) { await guardedAction('rejectDisb_' + disbId, () => _doRejectDisb(disbId, custId)); }
@@ -298,34 +311,6 @@ async function _doRejectDisb(disbId, custId) {
   }
   alert('Withdrawal rejected');
   if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
-  if (document.getElementById('repAllRequestsList')) await loadAllRepRequests();
-}
-
-// ═══════════════════════════════════════════════
-// ALL WITHDRAWAL REQUESTS (representative/requests.html)
-// Platform-wide list of customer-submitted withdrawal requests
-// ═══════════════════════════════════════════════
-async function loadAllRepRequests() {
-  const el = document.getElementById('repAllRequestsList');
-  if (!el) return;
-  el.innerHTML = '<div class="tx-empty">Loading…</div>';
-  const { data: disbs } = await db.from('disbursements').select('*').in('status', ['pending', 'reviewed', 'approved']).order('requested_at', { ascending: false });
-  if (!disbs?.length) { el.innerHTML = '<div class="tx-empty">No pending withdrawal requests</div>'; return; }
-  const custIds = [...new Set(disbs.map(d => d.customer_id).filter(Boolean))];
-  let custMap = {};
-  if (custIds.length) {
-    const { data: custs } = await db.from('customers').select('id,first_name,last_name,phone').in('id', custIds);
-    (custs || []).forEach(c => custMap[c.id] = c);
-  }
-  el.innerHTML = disbs.map(d => {
-    const cu = custMap[d.customer_id] || {};
-    const cards = renderDisbCards([d]);
-    return `<div class="wcard" style="margin-bottom:10px;padding:10px;">
-      <div class="dis-cust-name">${cu.first_name || 'Customer'} ${cu.last_name || ''}</div>
-      <div style="font-size:11px;color:var(--sub);margin-bottom:8px;">${cu.phone || ''}</div>
-      ${cards}
-    </div>`;
-  }).join('');
 }
 
 // ═══════════════════════════════════════════════
