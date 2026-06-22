@@ -50,13 +50,11 @@
 </div>
 
 <script>
-requireRole(['representative']);
-initTheme();
-verifyRoleFromDB('representative').then(valid => {
-  if (!valid) return window.location.replace(rootPath() + 'login.html');
-  loadAllRepRequests();
-  startSuspendCheck();
-});
+// The global "all withdrawal requests" page has been removed.
+// Reps now only see a customer's withdrawal requests after searching
+// for them by phone number — which is the correct, privacy-preserving flow.
+// Redirect any direct links here to the search page.
+window.location.replace('customer-search.html');
 </script>
 </body>
 </html>
