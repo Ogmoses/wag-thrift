@@ -217,8 +217,12 @@ async function _doCollection() {
   if (!amtVal || +amtVal <= 0) { setMsg('colMsg', '<div class="msg-err">Enter a valid amount</div>'); return; }
   if (!method) { setMsg('colMsg', '<div class="msg-err">Select a payment method</div>'); return; }
   const amt = +amtVal; const rep = getUser(); const ref = genRef();
-  let regContrib = 0;
-  if (db && repSelectedPlan) { const { data: pl } = await db.from('plans').select('regular_contribution').eq('id', repSelectedPlan.id).single(); regContrib = Number(pl?.regular_contribution || 0); }
+  // Use regular_contribution from the cached dropdown option (set by the
+  // rep_search_customer RPC) — avoids a direct plans table query which
+  // reps no longer have RLS access to after the 049 policy rewrite.
+  const dd = document.getElementById('repPlanDd');
+  const opt = dd.options[dd.selectedIndex];
+  const regContrib = +(opt?.dataset?.contrib || 0);
   if (regContrib > 0 && amt % regContrib !== 0) {
     const multiples = [1, 2, 3].map(n => fmt(regContrib * n)).join(', ');
     setMsg('colMsg', `<div class="msg-err">Amount must be a multiple of the regular contribution (${fmt(regContrib)}).<br>e.g. ${multiples}…</div>`);
@@ -231,12 +235,14 @@ async function _doCollection() {
   await db.from('representatives').update({ confirmed_count: (rep.confirmed_count || 0) + 1 }).eq('id', rep.id);
   await checkLargeCollection(amt, rep.id, repSelectedPlan.id);
   await audit('deposit', rep.id, 'representative', `Collected ${fmt(amt)} for ${repFoundCust.first_name} ${repFoundCust.last_name} — Ref: ${ref}`, amt, repSelectedPlan.id);
-  const { data: newBal } = await db.from('plan_balances').select('balance').eq('plan_id', repSelectedPlan.id).single();
   hideLoading(); closeModal('collectModal');
-  showReceipt(amt, repSelectedPlan, rep, repFoundCust, ref, method, newBal?.balance || 0);
   setUser({ ...rep, confirmed_count: (rep.confirmed_count || 0) + 1 });
   document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = '';
-  await repDoSearch();
+  await repDoSearch(); // refreshes balance from RPC before showing receipt
+  const dd2 = document.getElementById('repPlanDd');
+  const opt2 = dd2.options[dd2.selectedIndex];
+  const newBal = +(opt2?.dataset?.bal || 0);
+  showReceipt(amt, repSelectedPlan, rep, repFoundCust, ref, method, newBal);
 }
 
 function showReceipt(amount, plan, rep, cust, ref, method, newBal) {
