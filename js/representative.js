@@ -70,7 +70,12 @@ let _repTxCache = [], _repCustMap = {};
 async function loadRepTxPreview() {
   if (!db) return;
   const rep = getUser();
-  const { data: txs } = await db.from('transactions').select('*').eq('agent_id', rep.id).order('created_at', { ascending: false });
+  const { data: txs, error: txErr } = await db.from('transactions').select('*').eq('agent_id', rep.id).order('created_at', { ascending: false });
+  if (txErr) {
+    const el = document.getElementById('repTxPreview');
+    if (el) el.innerHTML = `<div class="msg-err" style="font-size:11px;padding:8px;">TX ERR: ${txErr.message} | code: ${txErr.code}</div>`;
+    return;
+  }
   _repTxCache = txs || [];
   const custIds = [...new Set(_repTxCache.map(t => t.customer_id).filter(Boolean))];
   if (custIds.length) {
