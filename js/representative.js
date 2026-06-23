@@ -128,7 +128,7 @@ async function repDoSearch() {
   document.getElementById('repCustPh').textContent = cust.phone;
   const dd = document.getElementById('repPlanDd');
   dd.innerHTML = '<option value="">— Select a plan —</option>';
-  plans.forEach(p => dd.innerHTML += `<option value="${p.plan_id}" data-bal="${p.balance}" data-tgt="${p.target_amount}">${p.name} — ${fmt(p.balance)}</option>`);
+  plans.forEach(p => dd.innerHTML += `<option value="${p.plan_id}" data-bal="${p.balance}" data-tgt="${p.target_amount}" data-contrib="${p.regular_contribution || 0}" data-createdat="${p.plan_created_at || ''}" data-deposited="${p.total_deposited || 0}">${p.name} — ${fmt(p.balance)}</option>`);
   if (plans.length === 1) { dd.value = plans[0].plan_id; repOnPlanChange(); } else document.getElementById('repPlanDetails').style.display = 'none';
   renderRepDisbList(cust.id, disbs);
   document.getElementById('repCustCard').style.display = 'block';
@@ -176,21 +176,16 @@ async function repOnPlanChange() {
   const det = document.getElementById('repPlanDetails');
   if (!repSelectedPlan) { det.style.display = 'none'; return; }
   document.getElementById('rpBal').textContent = fmt(repSelectedPlan.balance);
-  let regContrib = 0, createdAt = null, totalDeposited = 0;
-  if (db) {
-    const [{ data: pl }, { data: deposits }] = await Promise.all([
-      db.from('plans').select('regular_contribution,created_at').eq('id', repSelectedPlan.id).single(),
-      db.from('transactions').select('amount').eq('plan_id', repSelectedPlan.id).in('type', ['opening', 'deposit'])
-    ]);
-    regContrib = pl?.regular_contribution || 0;
-    createdAt = pl?.created_at || null;
-    totalDeposited = (deposits || []).reduce((s, t) => s + Number(t.amount), 0);
-  }
-  document.getElementById('rpTgt').textContent = regContrib > 0 ? fmt(regContrib) : 'Not set';
 
-  // Missed contributions — uses TOTAL DEPOSITED (not current balance), same as
-  // the customer dashboard/calendar. Withdrawals reduce balance but shouldn't
-  // make past paid days look "missed" — only deposits count as days covered.
+  // All plan details come from the RPC response cached in the dropdown
+  // option's data attributes — no direct DB queries needed here, which
+  // avoids the RLS gap (reps can't read plans table directly anymore).
+  const regContrib = +opt.dataset.contrib || 0;
+  const createdAt = opt.dataset.createdat || null;
+  const totalDeposited = +opt.dataset.deposited || 0;
+
+  document.getElementById('rpTgt').textContent = regContrib > 0 ? fmt(regContrib) + ' / daily' : 'Not set';
+
   const missedEl = document.getElementById('rpMissed');
   if (missedEl) {
     if (regContrib > 0 && createdAt) {
@@ -208,6 +203,7 @@ async function repOnPlanChange() {
   }
   det.style.display = 'block';
 }
+
 
 function openCollectModal() {
   if (!repFoundCust) { alert('Search for a customer first'); return; }
