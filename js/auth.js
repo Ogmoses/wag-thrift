@@ -85,7 +85,14 @@ function requireRole(allowedRoles) {
 // AUDIT LOGGING
 // ═══════════════════════════════════════════════
 async function audit(action, userId, userRole, description, amount = null, planId = null) {
-  await db.from('audit_log').insert({ action, user_id: userId, user_role: userRole, description, amount, plan_id: planId });
+  const { error } = await db.from('audit_log').insert({ action, user_id: String(userId), user_role: userRole, description, amount, plan_id: planId });
+  if (error) {
+    // Surface audit failures visibly since they're otherwise silent
+    const msg = `[Audit failed: ${error.message}]`;
+    const el = document.getElementById('colMsg') || document.getElementById('regMsg') || document.getElementById('loginMsg');
+    if (el) el.innerHTML = `<div class="msg-err" style="font-size:10px;">${msg}</div>`;
+    console.error('audit() error:', error);
+  }
 }
 
 // ═══════════════════════════════════════════════
