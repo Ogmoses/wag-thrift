@@ -158,22 +158,36 @@ async function closePlan() {
   if (bal > 0) { alert('× Cannot close "' + pb.name + '"\n\nBalance remaining: ' + fmt(bal) + '\n\nPlease withdraw all your money first. Once your balance is ₦0.00, you can close this plan.'); return; }
   if (!confirm('Close "' + pb.name + '"? This will make it inactive. You can reactivate later.')) return;
   showLoading('Closing plan…');
+  const u = getUser();
   await db.from('plans').update({ status: 'closed' }).eq('id', activePlanId);
-  await audit('delete', getUser().id, 'customer', 'Closed plan "' + (pb.name || '') + '"', null, activePlanId);
+  await audit('plan', u.id, 'customer',
+    `${u.first_name} ${u.last_name} closed plan "${pb.name || ''}"`,
+    null, activePlanId);
   hideLoading(); await renderCustDash();
 }
+
 async function reactivatePlan() {
   if (!activePlanId) return;
+  const { data: pb } = await db.from('plan_balances').select('name').eq('plan_id', activePlanId).single();
   showLoading('Reactivating…');
+  const u = getUser();
   await db.from('plans').update({ status: 'active' }).eq('id', activePlanId);
+  await audit('plan', u.id, 'customer',
+    `${u.first_name} ${u.last_name} reactivated plan "${pb?.name || ''}"`,
+    null, activePlanId);
   hideLoading(); await renderCustDash();
 }
+
 async function permanentlyDeletePlan() {
   if (!activePlanId) return;
   const { data: pb } = await db.from('plan_balances').select('balance,name').eq('plan_id', activePlanId).single();
   if (!confirm('PERMANENTLY delete "' + (pb?.name || '') + '"? This cannot be undone.')) return;
   showLoading('Deleting…');
+  const u = getUser();
   await db.from('plans').update({ status: 'deleted' }).eq('id', activePlanId);
+  await audit('plan', u.id, 'customer',
+    `${u.first_name} ${u.last_name} permanently deleted plan "${pb?.name || ''}"`,
+    null, activePlanId);
   hideLoading(); activePlanId = null; await renderCustDash();
 }
 
