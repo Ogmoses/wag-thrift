@@ -87,11 +87,16 @@ function requireRole(allowedRoles) {
 async function audit(action, userId, userRole, description, amount = null, planId = null) {
   const { error } = await db.from('audit_log').insert({ action, user_id: String(userId), user_role: userRole, description, amount, plan_id: planId });
   if (error) {
-    // Surface audit failures visibly since they're otherwise silent
-    const msg = `[Audit failed: ${error.message}]`;
-    const el = document.getElementById('colMsg') || document.getElementById('regMsg') || document.getElementById('loginMsg');
-    if (el) el.innerHTML = `<div class="msg-err" style="font-size:10px;">${msg}</div>`;
-    console.error('audit() error:', error);
+    // Show error in a persistent banner so it's visible even after modals close
+    let banner = document.getElementById('_auditErrBanner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = '_auditErrBanner';
+      banner.style.cssText = 'position:fixed;bottom:80px;left:10px;right:10px;background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:8px;font-size:11px;z-index:9999;border-left:3px solid #dc2626;';
+      document.body.appendChild(banner);
+    }
+    banner.textContent = `Audit error: ${error.message} (code: ${error.code})`;
+    setTimeout(() => banner.remove(), 10000);
   }
 }
 
