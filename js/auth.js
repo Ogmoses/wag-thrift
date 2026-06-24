@@ -18,10 +18,32 @@ async function hashPin(pin) {
 }
 
 // ── SESSION HELPERS
-// getUser() now reads from the cached profile we store alongside the
-// Supabase session, populated by refreshUserProfile() after sign-in.
-function getUser() { try { return JSON.parse(sessionStorage.getItem('wagUser')); } catch (e) { return null; } }
-function setUser(u) { sessionStorage.setItem('wagUser', JSON.stringify(u)); }
+// When "Remember Me" is checked, profile cache goes to localStorage
+// (survives browser restarts). Otherwise sessionStorage (clears on close).
+const WAG_USER_KEY = 'wagUser';
+const WAG_REMEMBER_KEY = 'wagRememberMe';
+
+function isRemembered() { return localStorage.getItem(WAG_REMEMBER_KEY) === 'true'; }
+
+function getUser() {
+  try {
+    const raw = isRemembered()
+      ? localStorage.getItem(WAG_USER_KEY)
+      : (sessionStorage.getItem(WAG_USER_KEY) || localStorage.getItem(WAG_USER_KEY));
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function setUser(u) {
+  const json = JSON.stringify(u);
+  if (isRemembered()) {
+    localStorage.setItem(WAG_USER_KEY, json);
+    sessionStorage.removeItem(WAG_USER_KEY);
+  } else {
+    sessionStorage.setItem(WAG_USER_KEY, json);
+    localStorage.removeItem(WAG_USER_KEY);
+  }
+}
 
 // Re-fetches the customer/representative profile row for the CURRENTLY
 // signed-in Supabase Auth user, and caches it in sessionStorage as before
@@ -159,6 +181,10 @@ async function doLogin() {
       return;
     }
 
+    // Save remember-me preference BEFORE setUser so storage target is correct
+    const rememberMe = document.getElementById('rememberMe')?.checked || false;
+    localStorage.setItem(WAG_REMEMBER_KEY, rememberMe ? 'true' : 'false');
+
     await db.from('pin_attempts').upsert({ phone: normPh, attempts: 0 });
     await audit('login', profile.id, 'customer', `Customer signed in: ${profile.first_name} ${profile.last_name}`);
     hideLoading();
@@ -195,8 +221,9 @@ async function doLogout() {
   const u = getUser();
   if (u) await audit('login', u.id, u.role || 'unknown', `${u.first_name} ${u.last_name} signed out`);
   if (db) await db.auth.signOut();
-  sessionStorage.removeItem('wagUser');
-  localStorage.removeItem('wagActiveUser');
+  sessionStorage.removeItem(WAG_USER_KEY);
+  localStorage.removeItem(WAG_USER_KEY);
+  // Keep WAG_REMEMBER_KEY so the checkbox stays checked next visit
   window.location.href = rootPath() + 'login.html';
 }
 

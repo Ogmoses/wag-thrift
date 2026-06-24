@@ -5,6 +5,10 @@
 // ═══════════════════════════════════════════════
 
 let activePlanId = null, activePlanBalance = 0, balHidden = false;
+
+function _balKey() { const u = getUser(); return u ? `wagBalHidden_${u.id}` : 'wagBalHidden'; }
+function loadBalPref() { balHidden = localStorage.getItem(_balKey()) === 'true'; }
+function saveBalPref() { localStorage.setItem(_balKey(), balHidden ? 'true' : 'false'); }
 let _payPinCallback = null;
 
 // ═══════════════════════════════════════════════
@@ -49,7 +53,7 @@ async function renderCustDash() {
 async function switchPlan(id) { activePlanId = id; await renderCustDash(); }
 
 async function renderPlanDetail(planId) {
-  // Fire all 3 queries in parallel instead of sequentially
+  loadBalPref(); // restore hidden/shown preference before rendering balance
   const [{ data: plan }, { data: planExtra }, { data: allDeposits }] = await Promise.all([
     db.from('plan_balances').select('*').eq('plan_id', planId).single(),
     db.from('plans').select('regular_contribution,maturity_date').eq('id', planId).single(),
@@ -64,6 +68,8 @@ async function renderPlanDetail(planId) {
   const totalDeposited = (allDeposits || []).reduce((s, t) => s + Number(t.amount), 0);
   const totalDaysCovered = Math.floor(totalDeposited / regularAmt);
   document.getElementById('planBal').textContent = balHidden ? '••••••' : fmt(activePlanBalance);
+  const eyeBtn = document.querySelector('.eye-btn');
+  if (eyeBtn) eyeBtn.innerHTML = balHidden ? EYE_CLOSED : EYE_OPEN;
   document.getElementById('planPct').textContent = '';
   const sched = getScheduleInfo(plan, activePlanBalance, totalDaysCovered);
   const isOverdue = sched.missed > 0;
@@ -107,6 +113,7 @@ async function renderPlanDetail(planId) {
 
 function toggleBalVis() {
   balHidden = !balHidden;
+  saveBalPref();
   document.getElementById('planBal').textContent = balHidden ? '••••••' : fmt(activePlanBalance);
   const btn = document.querySelector('.eye-btn');
   if (btn) btn.innerHTML = balHidden ? EYE_CLOSED : EYE_OPEN;
