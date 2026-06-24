@@ -125,6 +125,10 @@ body.dark .forgot-link{color:var(--yellow);}
    </div>
   </div>
   <div id="loginMsg"></div>
+  <div style="display:flex;align-items:center;gap:8px;margin:4px 0 12px;">
+    <input type="checkbox" id="rememberMe" style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer;">
+    <label for="rememberMe" style="font-size:13px;color:var(--sub);cursor:pointer;user-select:none;">Remember me on this device</label>
+  </div>
   <button class="submit-btn" id="loginBtn" onclick="doLogin()">Sign In as Customer</button>
   <a class="forgot-link" onclick="showForgotModal();return false;">Forgot Password?</a>
  </div>
@@ -195,6 +199,12 @@ checkResetTokenInURL();
 
 document.getElementById('loginPin')?.addEventListener('keypress', e=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('loginRepPin')?.addEventListener('keypress', e=>{ if(e.key==='Enter') doLogin(); });
+
+// Restore remember-me checkbox state from previous visit
+(function() {
+  const cb = document.getElementById('rememberMe');
+  if (cb) cb.checked = localStorage.getItem('wagRememberMe') === 'true';
+})();
 </script>
 </body>
 </html>
