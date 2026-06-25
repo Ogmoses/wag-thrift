@@ -247,7 +247,6 @@ async function _doWithdrawalRequest() {
   showLoading('Submitting request…');
   try {
     const { data, error } = await db.rpc('request_withdrawal', {
-      p_customer_id: user.id,
       p_plan_id: planId,
       p_amount: +amtVal,
       p_reason: reason,
