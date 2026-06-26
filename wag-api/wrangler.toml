@@ -1,0 +1,20 @@
+name = "wag-api"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Routes: your worker handles /api/* paths on your Pages domain.
+# Once you have a custom domain (e.g. wagenterprises.com), update this.
+# For now, the worker runs on its own *.workers.dev subdomain.
+
+[vars]
+# Non-secret config — set secrets separately via `wrangler secret put`
+# or the Cloudflare dashboard (Workers → Settings → Variables & Secrets)
+# SUPABASE_URL = "https://rrrwzximztwrctbasgto.supabase.co"
+# RESEND_FROM_EMAIL = "WAG Enterprises <noreply@yourdomain.com>"
+
+# Optional: Cloudflare KV for rate limiting verification emails
+# Uncomment and create the KV namespace first:
+# wrangler kv:namespace create RATE_LIMIT_KV
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT_KV"
+# id = "your-kv-namespace-id"
