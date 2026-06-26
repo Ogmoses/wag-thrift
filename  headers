@@ -1,0 +1,31 @@
+# Cloudflare Pages — security headers applied to every response.
+# These are not possible on GitHub Pages. This file is picked up
+# automatically by Cloudflare Pages with no extra configuration.
+
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  X-XSS-Protection: 1; mode=block
+
+# JS and CSS — cache aggressively (1 year) since filenames are versioned
+/js/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/css/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML pages — never cache (always fresh)
+/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/customer/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/representative/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/admin/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  X-Robots-Tag: noindex
