@@ -9,7 +9,12 @@
 const SUPABASE_URL = 'https://rrrwzximztwrctbasgto.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJycnd6eGltenR3cmN0YmFzZ3RvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNDc2ODksImV4cCI6MjA5NTgyMzY4OX0.8KNIalAkbIihTB1KesPebbKkBM2p8FLB1WGyKW-3OVA';
 
-// STEP 2: EmailJS credentials (get a free account at emailjs.com)
+// STEP 2a: Cloudflare Worker URL — set this once your Worker is deployed.
+// Format: 'https://wag-api.<your-subdomain>.workers.dev'
+// Leave as null to fall back to EmailJS for verification emails.
+const WORKER_URL = null; // e.g. 'https://wag-api.ogmoses.workers.dev'
+
+// STEP 2b: EmailJS credentials (fallback while Worker isn't deployed yet)
 const EMAILJS_PUBLIC_KEY = 'uh_tr5EcVjvujnnfJ';
 const EMAILJS_SERVICE_ID = 'service_a8zgp0k';
 const EMAILJS_VERIFY_TMPL = 'template_9o3yvr8';
@@ -48,16 +53,27 @@ function initEmailJS() {
 }
 
 async function sendVerificationEmail(toEmail, toName, code) {
-  if (EMAILJS_PUBLIC_KEY.includes('YOUR_')) {
-    // EmailJS not configured — show code on screen (demo mode)
-    return { demo: true };
+  // Prefer the Cloudflare Worker (keeps Resend API key server-side).
+  // Falls back to EmailJS if Worker isn't deployed yet.
+  if (WORKER_URL) {
+    try {
+      const res = await fetch(`${WORKER_URL}/api/send-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toEmail, toName, code })
+      });
+      const data = await res.json();
+      return res.ok ? { ok: true } : { error: data.error || 'Failed to send email' };
+    } catch (e) {
+      console.error('Worker verification email error:', e);
+      return { error: e.message };
+    }
   }
+  // EmailJS fallback
+  if (EMAILJS_PUBLIC_KEY.includes('YOUR_')) return { demo: true };
   try {
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_VERIFY_TMPL, {
-      to_email: toEmail,
-      to_name: toName,
-      code: code,
-      app_name: 'WAG Enterprises'
+      to_email: toEmail, to_name: toName, code, app_name: 'WAG Enterprises'
     });
     return { ok: true };
   } catch (e) {
@@ -67,15 +83,10 @@ async function sendVerificationEmail(toEmail, toName, code) {
 }
 
 async function sendResetEmail(toEmail, toName, resetLink) {
-  if (EMAILJS_PUBLIC_KEY.includes('YOUR_')) {
-    return { demo: true, link: resetLink };
-  }
+  if (EMAILJS_PUBLIC_KEY.includes('YOUR_')) return { demo: true, link: resetLink };
   try {
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_RESET_TMPL, {
-      to_email: toEmail,
-      to_name: toName,
-      reset_link: resetLink,
-      app_name: 'WAG Enterprises'
+      to_email: toEmail, to_name: toName, reset_link: resetLink, app_name: 'WAG Enterprises'
     });
     return { ok: true };
   } catch (e) {

@@ -398,13 +398,15 @@ async function doResetPassword() {
   if (newPw !== confirmPw) { setMsg('resetPasswordMsg', '<div class="msg-err">Passwords do not match</div>'); return; }
   if (!window._resetToken) { setMsg('resetPasswordMsg', '<div class="msg-err">Reset session expired. Please request a new link.</div>'); return; }
   showLoading('Updating password…');
-  // Calls the reset-password Edge Function, which uses the service role
-  // key (server-side only) to update the password via the Admin API —
-  // this can't be done from client-side JS or a plain SQL RPC.
+  if (!WORKER_URL) {
+    hideLoading();
+    setMsg('resetPasswordMsg', '<div class="msg-err">Password reset completion is not yet available. Please contact support to reset your password manually.</div>');
+    return;
+  }
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/reset-password`, {
+    const res = await fetch(`${WORKER_URL}/api/reset-password`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: window._resetToken, newPassword: newPw })
     });
     const result = await res.json();
@@ -421,7 +423,7 @@ async function doResetPassword() {
     alert('Password updated successfully! You can now sign in with your new password.');
   } catch (e) {
     hideLoading();
-    setMsg('resetPasswordMsg', '<div class="msg-err">Password reset is temporarily unavailable. Please contact support to reset your password manually.</div>');
+    setMsg('resetPasswordMsg', '<div class="msg-err">Password reset is temporarily unavailable. Please contact support.</div>');
   }
 }
 
