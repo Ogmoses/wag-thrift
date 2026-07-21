@@ -50,7 +50,17 @@ async function renderCustDash() {
   else { document.getElementById('noPlanMsg').style.display = 'none'; document.getElementById('planArea').style.display = 'block'; await renderPlanDetail(activePlanId); }
 }
 
-async function switchPlan(id) { activePlanId = id; await renderCustDash(); }
+async function switchPlan(id) {
+  const area = document.getElementById('planArea');
+  if (area) area.classList.add('plan-fade-out');
+  activePlanId = id;
+  await renderCustDash();
+  if (area) {
+    area.classList.remove('plan-fade-out');
+    area.classList.add('plan-fade-in');
+    setTimeout(() => area.classList.remove('plan-fade-in'), 380);
+  }
+}
 
 async function renderPlanDetail(planId) {
   loadBalPref(); // restore hidden/shown preference before rendering balance
@@ -566,4 +576,87 @@ async function changeCustPayPin() {
   await audit('login', u.id, 'customer', `Customer ${u.first_name} ${u.last_name} changed their withdrawal PIN`);
   hideLoading(); setMsg('cpPinMsg', '<div class="msg-ok">Withdrawal PIN updated</div>');
   document.getElementById('cpCurPin').value = ''; document.getElementById('cpNewPin').value = '';
+}
+
+// ═══════════════════════════════════════════════
+// STANDALONE STREAKS & CALENDAR TAB (customer/calendar.html)
+// Reuses the existing renderCalendar()/drawCal()/calState machinery
+// from the mini-calendar above — nothing here duplicates or replaces
+// that logic, it's called as-is and simply read from afterward.
+// ═══════════════════════════════════════════════
+async function loadCalendarPage() {
+  if (!db) return;
+  const user = getUser();
+  const { data: plans } = await db.from('plan_balances').select('*').eq('customer_id', user.id).neq('status', 'deleted');
+  if (!activePlanId || !plans?.find(p => p.plan_id === activePlanId)) activePlanId = plans?.[0]?.plan_id || null;
+  const bar = document.getElementById('calPlanTabsBar');
+  if (bar) {
+    bar.innerHTML = (plans || []).map(p =>
+      `<div class="plan-tab${p.plan_id === activePlanId ? ' active' : ''}" onclick="switchCalPlan('${p.plan_id}')">${p.name}</div>`
+    ).join('');
+  }
+  const noPlanEl = document.getElementById('calNoPlanMsg');
+  const contentEl = document.getElementById('calStandaloneContent');
+  if (!activePlanId) {
+    if (noPlanEl) noPlanEl.style.display = 'block';
+    if (contentEl) contentEl.style.display = 'none';
+    return;
+  }
+  if (noPlanEl) noPlanEl.style.display = 'none';
+  if (contentEl) contentEl.style.display = 'block';
+  const [{ data: plan }, { data: planExtra }] = await Promise.all([
+    db.from('plan_balances').select('*').eq('plan_id', activePlanId).single(),
+    db.from('plans').select('regular_contribution,created_at').eq('id', activePlanId).single()
+  ]);
+  if (!plan) return;
+  plan.regular_contribution = planExtra?.regular_contribution || plan.regular_contribution;
+  plan.created_at = planExtra?.created_at || plan.created_at;
+  const planLbl = document.getElementById('calActivePlanName');
+  if (planLbl) planLbl.textContent = plan.name || '—';
+  await renderCalendar(plan, Number(plan.balance || 0));
+  renderStreakStats();
+  requestAnimationFrame(() => initCalSwipe());
+}
+
+function switchCalPlan(id) { activePlanId = id; loadCalendarPage(); }
+
+function renderStreakStats() {
+  const { covered } = calState;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // Current streak — walk backward from today while each day is covered
+  let current = 0;
+  const walker = new Date(today);
+  while (covered.has(dateKey(walker))) { current++; walker.setDate(walker.getDate() - 1); }
+
+  // Longest streak — longest run of consecutive covered days on record
+  const sortedDates = [...covered].sort();
+  let longest = 0, run = 0, prevDate = null;
+  sortedDates.forEach(ds => {
+    if (prevDate) {
+      const diffDays = Math.round((new Date(ds) - new Date(prevDate)) / 86400000);
+      run = diffDays === 1 ? run + 1 : 1;
+    } else run = 1;
+    longest = Math.max(longest, run);
+    prevDate = ds;
+  });
+
+  const totalPaid = covered.size;
+  const goal = 30; // visual "days" goal used purely for the ring's fill %
+  const pct = Math.max(0, Math.min(1, current / goal));
+
+  const curEl = document.getElementById('streakCurrentVal');
+  const longEl = document.getElementById('streakLongestVal');
+  const totalEl = document.getElementById('streakTotalVal');
+  const ringNumEl = document.getElementById('streakRingNum');
+  const ringFg = document.getElementById('streakRingFg');
+  if (curEl) curEl.textContent = current;
+  if (longEl) longEl.textContent = longest;
+  if (totalEl) totalEl.textContent = totalPaid;
+  if (ringNumEl) ringNumEl.textContent = current;
+  if (ringFg) {
+    const r = 57.5, c = 2 * Math.PI * r;
+    ringFg.style.strokeDasharray = c.toFixed(2);
+    ringFg.style.strokeDashoffset = (c * (1 - pct)).toFixed(2);
+  }
 }
