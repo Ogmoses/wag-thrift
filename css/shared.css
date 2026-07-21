@@ -486,8 +486,8 @@ body.dark .cal-day-hdr{color:#fff;}
 body.dark .cal-cell{border-color:#fff;color:#fff;}
 .cal-cell.c-green{background:#d1fae5;color:#111;border-color:#111;}
 body.dark .cal-cell.c-green{background:#064e3b;color:#fff;border-color:#fff;}
-.cal-cell.c-red{background:#fee2e2;color:#111;border-color:#111;}
-body.dark .cal-cell.c-red{background:#450a0a;color:#fff;border-color:#fff;}
+.cal-cell.c-red{background:#f87171;color:#fff;border-color:#b91c1c;}
+body.dark .cal-cell.c-red{background:#7f1d1d;color:#fff;border-color:#f87171;}
 .cal-cell.c-grey{color:#111;border-color:#111;}
 body.dark .cal-cell.c-grey{color:#fff;border-color:#fff;}
 .cal-cell.c-today{border-color:var(--blue);color:var(--blue);font-weight:900;border-width:2px;}
