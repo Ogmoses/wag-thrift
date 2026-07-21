@@ -90,7 +90,7 @@ async function loadRepTxPreview() {
       : isRejected ? 'Rejected Withdrawal'
       : 'Deposit';
     const refDisplay = isReserved ? (isConfirmedPaid ? 'Cash delivered' : 'Withdrawal request') : (tx.ref || '—');
-    return `<div class="tx-row">
+    return `<div class="tx-row" onclick="showTxReceipt('${tx.id}')" style="cursor:pointer;">
  <div class="tx-ico ${isIn || isConfirmedPaid ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
  <div class="tx-body">
  <div class="tx-name">${_repCustMap[tx.customer_id] || 'Customer'}</div>
@@ -264,6 +264,80 @@ function showReceipt(amount, plan, rep, cust, ref, method, newBal) {
   showModal('receiptModal');
 }
 
+// ── TAP-TO-VIEW RECEIPT — used when a rep taps any past transaction on
+// the dashboard preview or the full "All Transactions" list. Builds the
+// receipt from the cached row itself (so it works instantly, no re-fetch)
+// and prefers the customer_name snapshot (see sql/002) over a live lookup,
+// so the receipt still shows the correct name even if that customer's
+// account has since been deleted by an admin.
+function _findCachedTx(txId) {
+  return (_repTxCache || []).find(t => t.id === txId) || (_repTxAll || []).find(t => t.id === txId) || null;
+}
+
+function buildReceiptHTML(tx, custName) {
+  const isPayout = tx.type === 'payout';
+  const isRejected = tx.type === 'rejected_disb' || tx.type === 'rejected';
+  const isReserved = tx.ref?.startsWith('RESERVE-');
+  const isConfirmedPaid = isReserved && tx.method === 'Cash';
+  const label = tx.type === 'opening' ? 'Opening Contribution'
+    : isRejected ? 'Rejected Withdrawal'
+    : isPayout ? (isConfirmedPaid ? 'Withdrawal Paid' : isReserved ? 'Withdrawal Request' : 'Payout')
+    : 'Deposit';
+  return `
+ <div class="receipt-wrap">
+ <div class="receipt-logo"></div>
+ <div class="receipt-title">WAG ${label} Receipt</div>
+ <div class="receipt-amount">${fmt(tx.amount)}</div>
+ <div class="receipt-row"><span class="receipt-lbl">Date</span><span class="receipt-val">${fmtDate(tx.created_at)}</span></div>
+ <div class="receipt-row"><span class="receipt-lbl">Time</span><span class="receipt-val">${fmtTime(tx.created_at)}</span></div>
+ <div class="receipt-row"><span class="receipt-lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Customer</span><span class="receipt-val">${custName || 'Customer'}</span></div>
+ ${tx.method ? `<div class="receipt-row"><span class="receipt-lbl">Method</span><span class="receipt-val">${tx.method}</span></div>` : ''}
+ <div class="receipt-ref">${tx.ref || '—'}</div>
+ </div>`;
+}
+
+function showTxReceipt(txId) {
+  const tx = _findCachedTx(txId);
+  if (!tx) return;
+  // Priority: DB snapshot > live cache from search/history lookups > fallback
+  const custName = tx.customer_name || _repCustMap[tx.customer_id] || _repCustMapHist[tx.customer_id] || 'Customer';
+  document.getElementById('receiptContent').innerHTML = buildReceiptHTML(tx, custName);
+  showModal('receiptModal');
+}
+
+// ── SHARE / SAVE RECEIPT — renders #receiptContent to a PNG image, then
+// either opens the native share sheet (so the rep can send it to the
+// customer via WhatsApp, SMS, etc.) or falls back to downloading it
+// straight to the device if sharing images isn't supported.
+async function shareReceipt() {
+  const el = document.getElementById('receiptContent');
+  if (!el || typeof html2canvas === 'undefined') { alert('Could not prepare the receipt image. Please try again.'); return; }
+  showLoading('Preparing receipt…');
+  try {
+    const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
+    canvas.toBlob(async (blob) => {
+      hideLoading();
+      if (!blob) { alert('Could not generate the receipt image.'); return; }
+      const fileName = `WAG-Receipt-${Date.now()}.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: 'WAG Receipt', text: 'WAG Enterprises — Receipt' }); return; }
+        catch (e) { if (e?.name === 'AbortError') return; /* else fall through to save */ }
+      }
+      // Fallback: save straight to the device
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    }, 'image/png');
+  } catch (e) {
+    hideLoading();
+    console.error('Receipt share/save error:', e);
+    alert('Could not prepare the receipt image. Please try again.');
+  }
+}
+
 // ═══════════════════════════════════════════════
 // WITHDRAWAL REQUEST ACTIONS — approve/reject (used by both
 // customer-search.html (per-customer) and requests.html (global list))
@@ -331,7 +405,7 @@ async function loadRepTxPage() {
     (custs || []).forEach(cu => cMap[cu.id] = cu.first_name + ' ' + cu.last_name);
   }
   const { data: rd } = await db.from('disbursements').select('*').eq('confirmed_by', u.id).eq('status', 'rejected');
-  const rejRows = (rd || []).map(d => ({ id: d.id, type: 'rejected_disb', amount: d.amount, created_at: d.requested_at || d.created_at, ref: d.ref, customer_id: d.customer_id }));
+  const rejRows = (rd || []).map(d => ({ id: d.id, type: 'rejected_disb', amount: d.amount, created_at: d.requested_at || d.created_at, ref: d.ref, customer_id: d.customer_id, customer_name: d.customer_name }));
   _repTxAll = [...(allTx || []), ...rejRows].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   _repCustMapHist = cMap;
   renderRepTxList();
@@ -354,7 +428,7 @@ function renderRepTxList() {
     const refDisplay = isReserved ? (isConfirmedPaid ? 'Cash delivered' : 'Withdrawal request') : (tx.ref || '—');
     const badgeText = isConfirmedPaid ? 'paid' : isReserved ? 'pending' : tx.type;
     const badge = `<span style="background:${isIn ? '#d1fae5' : isConfirmedPaid ? '#d1fae5' : '#fee2e2'};color:${isIn ? '#065f46' : isConfirmedPaid ? '#065f46' : '#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${badgeText}</span>`;
-    return `<div class="tx-row">
+    return `<div class="tx-row" onclick="showTxReceipt('${tx.id}')" style="cursor:pointer;">
      <div class="tx-ico ${isIn || isConfirmedPaid ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
      <div class="tx-body"><div class="tx-name">${_repCustMapHist[tx.customer_id] || 'Customer'}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${lbl}</div><div class="tx-ref">${refDisplay}</div><div style="margin-top:3px;">${badge}</div></div>
      <div class="${isIn ? 'tx-amt-g' : 'tx-amt-r'}">${isIn ? '+' : '-'}${fmt(tx.amount)}</div>
