@@ -8,11 +8,22 @@
    redefined).
    ══════════════════════════════════════════════════════════════ */
 
-/* ── PAGE / VIEW REVEALS ── */
-.view.active{animation:polishViewIn .42s cubic-bezier(.22,1,.36,1) both;}
-@keyframes polishViewIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
-.subpage.active{animation:polishSubpageIn .38s cubic-bezier(.22,1,.36,1) both;}
-@keyframes polishSubpageIn{from{opacity:0;transform:translateY(16px) scale(.985);}to{opacity:1;transform:translateY(0) scale(1);}}
+/* ── PAGE / VIEW REVEALS ──
+   NOTE: opacity-only on purpose. Animating `transform` here (even
+   translateY(0) at 100%) would, with fill-mode:both, permanently
+   leave a non-"none" transform on this ancestor — which makes it
+   the containing block for any position:fixed descendant (like
+   .bnav), breaking "stays fixed while scrolling". Opacity never
+   creates a containing block, so this is safe. */
+.view.active{animation:polishViewIn .42s ease both;}
+@keyframes polishViewIn{from{opacity:0;}to{opacity:1;}}
+.subpage.active{animation:polishSubpageIn .38s ease both;}
+@keyframes polishSubpageIn{from{opacity:0;}to{opacity:1;}}
+
+/* ── PERSISTENT FLOATING NAV ──
+   Belt-and-suspenders: force the containing block back to the
+   viewport even if some other ancestor ever gains a transform. */
+.bnav.visible{position:fixed!important;}
 
 /* ── MODAL / SHEET SPRING POP ── */
 .modal.active{animation:fadeIn .18s ease;}
@@ -126,3 +137,65 @@ body.dark .streak-card .sv{color:var(--yellow);}
 .streak-card .sl{font-size:9.5px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-top:5px;}
 
 .cal-standalone-wrap{margin:0 13px 90px;}
+
+/* ══════════════════════════════════════════════════════════════
+   BALANCE AREA → CARD CAROUSEL (mirrors the reference: a horizontal
+   row of bank-card tiles sitting with the balance). Reuses the exact
+   same .plan-tab / .active / .overdue-tab / .add-tab classes and
+   switchPlan()/openNewPlanModal() calls already in customer.js —
+   only the visual presentation changes, from pill to card tile.
+   The inner <span class="plan-tab-name">/<span class="plan-tab-bal">
+   markup is added by customer.js (additive — same element/classes,
+   richer content).
+   ══════════════════════════════════════════════════════════════ */
+.plan-tabs-bar{
+ padding:13px 13px 15px;gap:10px;
+ scroll-snap-type:x proximity;
+ -webkit-mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 14px),transparent);
+ mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 14px),transparent);
+}
+.plan-tab{
+ display:flex!important;flex-direction:column;align-items:flex-start;justify-content:space-between;
+ min-width:140px;height:84px;padding:13px 14px;border-radius:18px;border:none;
+ background:linear-gradient(135deg,var(--brand-light),var(--brand-deep));color:#fff;
+ position:relative;overflow:hidden;scroll-snap-align:start;flex-shrink:0;
+ opacity:.62;transform:scale(.96);
+ box-shadow:0 8px 18px -8px rgba(1,31,123,.35);
+}
+.plan-tab::before{
+ content:'';position:absolute;top:-70%;left:-25%;width:75%;height:240%;
+ background:linear-gradient(120deg,rgba(255,255,255,.16),rgba(255,255,255,0) 60%);
+ transform:rotate(18deg);pointer-events:none;
+}
+.plan-tab.active{opacity:1;transform:scale(1);box-shadow:0 12px 26px -10px rgba(1,31,123,.55),0 0 0 2px var(--yellow);}
+body.dark .plan-tab.active{box-shadow:0 12px 26px -10px rgba(0,0,0,.6),0 0 0 2px var(--yellow);}
+.plan-tab.overdue-tab{box-shadow:0 8px 18px -8px rgba(1,31,123,.35),0 0 0 2px var(--orange);}
+.plan-tab.overdue-tab.active{box-shadow:0 12px 26px -10px rgba(1,31,123,.55),0 0 0 2px var(--orange);}
+.plan-tab-name{font-size:12.5px;font-weight:700;position:relative;z-index:1;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.plan-tab-bal{font-size:14.5px;font-weight:800;letter-spacing:-.2px;position:relative;z-index:1;}
+.plan-tab.add-tab{
+ background:transparent;border:2px dashed var(--border);opacity:1;
+ align-items:center;justify-content:center;flex-direction:row;gap:7px;color:var(--sub);
+ box-shadow:none;min-width:118px;
+}
+.plan-tab.add-tab::before{display:none;}
+body.dark .plan-tab.add-tab{border-color:#3a3a3a;color:#999;}
+.plan-tab-add-ic{
+ width:24px;height:24px;border-radius:50%;background:var(--border);
+ display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:var(--sub);flex-shrink:0;
+}
+body.dark .plan-tab-add-ic{background:#2a2a2a;color:#aaa;}
+.plan-tab-add-lbl{font-size:12px;font-weight:700;}
+
+/* ══════════════════════════════════════════════════════════════
+   TRANSACTION LIST → clean grouped-list look (rounder avatar icons,
+   airier spacing) — same .tx-section/.tx-row/.tx-ico classes and
+   markup from customer.js, styling only.
+   ══════════════════════════════════════════════════════════════ */
+.tx-section,#repTxPreview{border-radius:20px;padding:18px 16px;}
+.tx-title{font-size:14px;letter-spacing:.2px;}
+.tx-row{padding:11px 0;gap:12px;}
+.tx-ico{width:42px;height:42px;border-radius:50%;font-size:16px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.03);}
+.tx-name{font-size:13.5px;}
+.tx-row:hover{background:rgba(1,31,123,.025);border-radius:12px;margin:0 -8px;padding:11px 8px;}
+body.dark .tx-row:hover{background:rgba(255,255,255,.03);}
