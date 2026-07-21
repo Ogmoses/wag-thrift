@@ -1,0 +1,128 @@
+/* ══════════════════════════════════════════════════════════════
+   css/polish.css
+   ADDITIVE visual + motion layer for customer + representative
+   dashboards. Loaded AFTER shared.css (+ role css) on every page,
+   so it only ENHANCES existing classes — nothing here removes or
+   replaces functionality, IDs, or brand colors (var(--blue)/
+   var(--yellow) from shared.css are reused throughout, never
+   redefined).
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── PAGE / VIEW REVEALS ── */
+.view.active{animation:polishViewIn .42s cubic-bezier(.22,1,.36,1) both;}
+@keyframes polishViewIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+.subpage.active{animation:polishSubpageIn .38s cubic-bezier(.22,1,.36,1) both;}
+@keyframes polishSubpageIn{from{opacity:0;transform:translateY(16px) scale(.985);}to{opacity:1;transform:translateY(0) scale(1);}}
+
+/* ── MODAL / SHEET SPRING POP ── */
+.modal.active{animation:fadeIn .18s ease;}
+.msheet{animation:polishSheetIn .4s cubic-bezier(.34,1.56,.64,1) both;}
+@keyframes polishSheetIn{from{transform:translateY(64px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+
+/* ── PLAN SWITCH TRANSITION (hooks added in js/customer.js) ── */
+.plan-fade-out{opacity:.35;transform:translateY(5px);transition:opacity .16s ease,transform .16s ease;}
+.plan-fade-in{animation:polishViewIn .38s cubic-bezier(.22,1,.36,1) both;}
+
+/* ── FLOATING GLASS BOTTOM NAV (retains .bnav / .bnav-tab structure) ── */
+.bnav.visible{
+ left:12px;right:12px;bottom:14px;
+ border-radius:22px;
+ border:1px solid rgba(0,0,0,.06);
+ background:rgba(255,255,255,.88);
+ -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+ box-shadow:0 14px 32px -10px rgba(1,31,123,.28);
+ padding:6px;height:58px;max-width:456px;
+}
+body.dark .bnav.visible{background:rgba(20,20,20,.86);border-color:rgba(255,255,255,.08);}
+.bnav-tab{border-radius:16px;transition:color .2s ease,background .25s ease,transform .16s ease;}
+.bnav-tab:active{transform:scale(.92);}
+.bnav-tab.active{background:var(--blue);color:var(--yellow)!important;animation:polishTabPop .32s cubic-bezier(.34,1.56,.64,1);}
+.bnav-tab.active svg{stroke:var(--yellow)!important;}
+body.dark .bnav-tab.active{background:var(--yellow);color:#111!important;}
+body.dark .bnav-tab.active svg{stroke:#111!important;}
+@keyframes polishTabPop{from{transform:scale(.86);}to{transform:scale(1);}}
+
+/* ── HEADER polish ── */
+.dash-header{-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);}
+.avatar-c{box-shadow:0 4px 12px rgba(0,0,0,.18);transition:transform .2s ease;}
+.avatar-c:hover{transform:scale(1.05);}
+
+/* ── CARD-STYLE HERO / STAT SHEEN (mimics a bank-card surface) ── */
+.bal-hero{box-shadow:0 16px 34px -12px rgba(1,31,123,.5);transition:transform .22s ease,box-shadow .22s ease;}
+.bal-hero:active{transform:scale(.986);}
+.bal-hero::before{
+ content:'';position:absolute;top:-70%;left:-25%;width:75%;height:240%;
+ background:linear-gradient(120deg,rgba(255,255,255,.16),rgba(255,255,255,0) 60%);
+ transform:rotate(18deg);pointer-events:none;
+}
+.stat-dark{position:relative;overflow:hidden;box-shadow:0 10px 26px -10px rgba(1,31,123,.45);transition:transform .22s ease;}
+.stat-dark::before{
+ content:'';position:absolute;top:-70%;left:-25%;width:75%;height:240%;
+ background:linear-gradient(120deg,rgba(255,255,255,.14),rgba(255,255,255,0) 60%);
+ transform:rotate(18deg);pointer-events:none;
+}
+.stat-dark:hover,.stat-light:hover,.icard:hover,.analytics-card:hover{transform:translateY(-3px);}
+.stat-light,.icard,.wcard,.search-card,.cust-result-card,.tx-section,.profile-card,
+.dis-card,.analytics-card,.bar-chart-wrap,.receipt-wrap{
+ transition:transform .22s ease,box-shadow .22s ease;
+}
+.receipt-wrap{position:relative;overflow:hidden;}
+.receipt-wrap::before{
+ content:'';position:absolute;top:-70%;left:-25%;width:75%;height:240%;
+ background:linear-gradient(120deg,rgba(255,255,255,.12),rgba(255,255,255,0) 60%);
+ transform:rotate(18deg);pointer-events:none;
+}
+
+/* ── STAGGERED LIST REVEALS ── */
+.tx-row,.plan-tab,.dis-card,.cust-result-card,.audit-item,.agent-card,.tok-row{animation:fadeUp .32s cubic-bezier(.22,1,.36,1) both;}
+.tx-row:nth-child(1),.plan-tab:nth-child(1){animation-delay:.02s;}
+.tx-row:nth-child(2),.plan-tab:nth-child(2){animation-delay:.06s;}
+.tx-row:nth-child(3),.plan-tab:nth-child(3){animation-delay:.10s;}
+.tx-row:nth-child(4),.plan-tab:nth-child(4){animation-delay:.14s;}
+.tx-row:nth-child(5),.plan-tab:nth-child(5){animation-delay:.18s;}
+.tx-row:nth-child(n+6),.plan-tab:nth-child(n+6){animation-delay:.20s;}
+
+/* ── BUTTON PRESS FEEDBACK (adds to existing hover states) ── */
+.btn:active,.cbtn:active,.collect-btn:active,.search-btn:active,.gen-tok-btn:active{transform:scale(.97);}
+.btn,.cbtn,.collect-btn,.search-btn{transition:transform .16s ease,box-shadow .2s ease,background .2s ease,opacity .2s ease;}
+
+/* ── PLAN TABS BAR — smoother active swap ── */
+.plan-tab{transition:all .22s cubic-bezier(.22,1,.36,1);}
+
+/* ══════════════════════════════════════════════════════════════
+   STREAK / CALENDAR TAB — new components (customer/calendar.html)
+   ══════════════════════════════════════════════════════════════ */
+.streak-ring-card{
+ background:linear-gradient(135deg,var(--brand-light),var(--brand-deep));
+ border-radius:22px;padding:26px 20px;margin:11px 13px 14px;text-align:center;
+ position:relative;overflow:hidden;box-shadow:0 16px 34px -12px rgba(1,31,123,.5);
+ animation:polishViewIn .4s cubic-bezier(.22,1,.36,1) both;
+}
+.streak-ring-card::before{
+ content:'';position:absolute;top:-70%;left:-25%;width:75%;height:240%;
+ background:linear-gradient(120deg,rgba(255,255,255,.14),rgba(255,255,255,0) 60%);
+ transform:rotate(18deg);pointer-events:none;
+}
+.streak-ring-svg{width:132px;height:132px;transform:rotate(-90deg);}
+.streak-ring-bg{fill:none;stroke:rgba(255,255,255,.18);stroke-width:9;}
+.streak-ring-fg{fill:none;stroke:var(--yellow);stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset 1.1s cubic-bezier(.22,1,.36,1);}
+.streak-ring-wrap{position:relative;width:132px;height:132px;margin:0 auto 14px;}
+.streak-ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.streak-ring-num{font-size:30px;font-weight:800;color:#fff;line-height:1;}
+.streak-ring-lbl{font-size:9.5px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+.streak-ring-sub{color:rgba(255,255,255,.75);font-size:12px;position:relative;z-index:1;}
+.streak-ring-goal{color:var(--yellow);font-weight:700;}
+
+.streak-stats-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 13px;margin-bottom:14px;}
+.streak-card{
+ background:#fff;border-radius:14px;padding:15px 12px;text-align:center;
+ box-shadow:0 2px 8px rgba(0,0,0,.06);transition:transform .2s ease,box-shadow .2s ease;
+ animation:fadeUp .34s ease both;
+}
+body.dark .streak-card{background:#1c1c1c;}
+.streak-card:hover{transform:translateY(-3px);}
+.streak-card .sv{font-size:21px;font-weight:800;color:var(--blue);}
+body.dark .streak-card .sv{color:var(--yellow);}
+.streak-card .sl{font-size:9.5px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-top:5px;}
+
+.cal-standalone-wrap{margin:0 13px 90px;}
