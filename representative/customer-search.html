@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="../css/representative.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="../js/supabase.js"></script>
 <script src="../js/utils.js"></script>
 <script src="../js/auth.js"></script>
@@ -68,7 +69,7 @@
 <!-- MODALS -->
 <div id="collectModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('collectModal')">×</button><div class="m-handle"></div><div class="m-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;color:var(--green);"><path d="M12 22V9M5 15l7 7 7-7"/><path d="M4 2h16"/></svg>Record Deposit</div><div class="mform-group"><label class="form-lbl">Amount (₦)</label><input type="number" id="colAmt" class="form-inp" placeholder="5000" min="1"></div><div class="mform-group"><label class="form-lbl">Payment Method</label><select id="colMethod" class="form-inp"><option value="">Select method</option><option value="Cash">Cash</option><option value="Bank Transfer">Bank Transfer</option><option value="Mobile Money">Mobile Money</option></select></div><div class="mform-group"><label class="form-lbl">Notes (Optional)</label><textarea id="colNotes" class="form-inp" style="resize:vertical;min-height:55px;"></textarea></div><div id="colMsg"></div><button class="btn" style="background:var(--green);color:#fff;margin-top:8px;box-shadow:0 3px 10px rgba(5,150,105,.25);" onclick="doCollection()">Confirm Deposit</button></div></div>
 
-<div id="receiptModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('receiptModal')">×</button><div class="m-handle"></div><div class="m-title">Deposit Receipt</div><div id="receiptContent"></div><button class="btn btn-blue" onclick="closeModal('receiptModal')" style="margin-top:6px;">Done</button></div></div>
+<div id="receiptModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('receiptModal')">×</button><div class="m-handle"></div><div class="m-title">Deposit Receipt</div><div id="receiptContent"></div><button class="btn btn-outline" style="margin-top:6px;" onclick="shareReceipt()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:6px;"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>Share / Save Receipt</button><button class="btn btn-blue" onclick="closeModal('receiptModal')" style="margin-top:6px;">Done</button></div></div>
 
 <div id="payPinModal" class="modal">
  <div class="msheet" style="max-width:480px;position:relative;">
