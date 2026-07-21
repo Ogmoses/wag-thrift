@@ -5,20 +5,595 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Dashboard – WAG Enterprises</title>
 <link rel="stylesheet" href="../css/shared.css?v=cal5">
-<style>
-.cal-nav-btn{width:30px!important;height:30px!important;min-width:30px!important;border-radius:50%!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:0!important;font-size:20px!important;line-height:1!important;background:var(--border)!important;border:none!important;cursor:pointer!important;flex-shrink:0!important;}
-body.dark .cal-nav-btn{background:#2a2a2a!important;color:#f0f0f0!important;}
-.mini-cal-month-lbl{flex:1!important;text-align:center!important;padding:0!important;font-size:15px!important;font-weight:800!important;}
-.mini-cal-hdr{display:flex!important;align-items:center!important;gap:6px!important;margin-bottom:16px!important;}
-</style>
 <link rel="stylesheet" href="../css/customer.css">
-<link rel="stylesheet" href="../css/polish.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="../js/supabase.js"></script>
 <script src="../js/utils.js"></script>
 <script src="../js/auth.js"></script>
 <script src="../js/customer.js"></script>
+<style>
+/* ═══════════════════════════════════════
+   DASHBOARD REDESIGN — Finance App Style
+═══════════════════════════════════════ */
+
+/* Reset body background to light grey like reference */
+body{
+  background:#f0f3f8;
+  min-height:100vh;
+}
+body.dark{
+  background:#0d0d0f;
+}
+
+/* ── TOP HEADER ── */
+.dash-header{
+  background:transparent;
+  padding:14px 18px 10px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  position:sticky;
+  top:0;
+  z-index:200;
+  box-shadow:none;
+  backdrop-filter:none;
+}
+body.dark .dash-header{
+  background:transparent;
+}
+
+.avatar-c{
+  width:42px;
+  height:42px;
+  min-width:42px;
+  background:var(--yellow);
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:17px;
+  font-weight:800;
+  color:#111;
+  flex-shrink:0;
+  box-shadow:0 2px 8px rgba(255,186,9,.35);
+}
+
+.hdr-name{
+  color:#111;
+  font-size:15px;
+  font-weight:700;
+}
+body.dark .hdr-name{ color:#f0f0f0; }
+
+.hdr-sub{
+  color:#888;
+  font-size:12px;
+  margin-top:1px;
+}
+body.dark .hdr-sub{ color:#666; }
+
+.hdr-right{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.hdr-icon-btn{
+  width:38px;
+  height:38px;
+  border-radius:12px;
+  background:#fff;
+  border:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  box-shadow:0 1px 6px rgba(0,0,0,.08);
+  color:#555;
+  transition:transform .15s;
+  -webkit-tap-highlight-color:transparent;
+  flex-shrink:0;
+}
+body.dark .hdr-icon-btn{
+  background:#1e1e22;
+  color:#bbb;
+  box-shadow:0 1px 6px rgba(0,0,0,.35);
+}
+.hdr-icon-btn:active{ transform:scale(.92); }
+
+/* ── OVERDUE BANNER ── */
+.overdue-banner{
+  margin:0 16px 12px;
+  border-radius:14px;
+}
+
+/* ── PLAN TABS ── */
+.plan-tabs-bar{
+  padding:0 16px;
+  margin-bottom:8px;
+}
+
+/* ── BALANCE HERO — full-bleed card ── */
+.bal-hero{
+  background:linear-gradient(135deg, #011f7b 0%, #0a2fa8 55%, #1a3fbf 100%);
+  border-radius:24px;
+  margin:4px 16px 14px;
+  padding:22px 22px 20px;
+  position:relative;
+  overflow:hidden;
+  box-shadow:0 8px 32px rgba(1,31,123,.28);
+  animation:balFadeIn .45s ease both;
+}
+
+@keyframes balFadeIn{
+  from{ opacity:0; transform:translateY(10px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+
+/* decorative circles */
+.bal-hero::before{
+  content:'';
+  position:absolute;
+  right:-30px; top:-40px;
+  width:160px; height:160px;
+  background:rgba(255,255,255,.06);
+  border-radius:50%;
+}
+.bal-hero::after{
+  content:'';
+  position:absolute;
+  right:30px; bottom:-50px;
+  width:120px; height:120px;
+  background:rgba(255,255,255,.04);
+  border-radius:50%;
+}
+
+.bal-header-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:4px;
+}
+
+.bal-label-text{
+  color:rgba(255,255,255,.55);
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.9px;
+  text-transform:uppercase;
+}
+
+.eye-btn{
+  background:rgba(255,255,255,.12);
+  border:none;
+  border-radius:8px;
+  color:rgba(255,255,255,.7);
+  width:28px;
+  height:28px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:background .2s;
+}
+.eye-btn:active{ background:rgba(255,255,255,.22); }
+
+.bal-amt{
+  color:#fff;
+  font-size:38px;
+  font-weight:800;
+  letter-spacing:-1.5px;
+  margin:6px 0 2px;
+  line-height:1;
+}
+
+.bal-amt-naira{
+  font-size:22px;
+  font-weight:700;
+  opacity:.8;
+  vertical-align:super;
+  margin-right:2px;
+}
+
+.bal-footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-top:14px;
+}
+
+.bal-plan-pill{
+  background:rgba(255,255,255,.12);
+  color:rgba(255,255,255,.85);
+  font-size:11px;
+  font-weight:700;
+  padding:5px 12px;
+  border-radius:50px;
+  letter-spacing:.3px;
+  max-width:55%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.bal-badge{
+  font-size:10px;
+  font-weight:800;
+  padding:4px 11px;
+  border-radius:50px;
+  letter-spacing:.6px;
+}
+.badge-active{
+  background:rgba(16,185,129,.2);
+  color:#6ee7b7;
+  border:1px solid rgba(110,231,183,.25);
+}
+.badge-overdue{
+  background:rgba(239,68,68,.2);
+  color:#fca5a5;
+  border:1px solid rgba(252,165,165,.25);
+}
+.badge-done{
+  background:rgba(255,186,9,.15);
+  color:#FFBA09;
+  border:1px solid rgba(255,186,9,.25);
+}
+
+/* ── QUICK STATS ROW under balance ── */
+.qs-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:0 16px 14px;
+  animation:balFadeIn .45s .1s ease both;
+}
+
+.qs-card{
+  background:#fff;
+  border-radius:18px;
+  padding:14px 16px;
+  box-shadow:0 1px 8px rgba(0,0,0,.06);
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+body.dark .qs-card{
+  background:#1a1a1e;
+  box-shadow:0 1px 8px rgba(0,0,0,.3);
+}
+
+.qs-icon{
+  width:40px;
+  height:40px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  font-size:18px;
+}
+
+.qs-icon.green{ background:rgba(16,185,129,.12); }
+.qs-icon.red{ background:rgba(220,38,38,.1); }
+
+.qs-label{
+  font-size:10px;
+  font-weight:700;
+  color:#888;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  margin-bottom:2px;
+}
+body.dark .qs-label{ color:#666; }
+
+.qs-val{
+  font-size:15px;
+  font-weight:800;
+  color:#111;
+}
+body.dark .qs-val{ color:#f0f0f0; }
+
+/* ── ACTION BUTTONS ── */
+.cust-btns{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:0 16px 16px;
+  animation:balFadeIn .45s .15s ease both;
+}
+
+.cbtn{
+  border:none;
+  border-radius:16px;
+  padding:14px 10px;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  line-height:1.2;
+  transition:transform .15s, box-shadow .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.cbtn:active{ transform:scale(.96); }
+
+.cbtn svg{ width:22px; height:22px; flex-shrink:0; }
+
+.cbtn-wd{
+  background:linear-gradient(135deg,#dc2626,#b91c1c);
+  color:#fff;
+  box-shadow:0 4px 14px rgba(220,38,38,.3);
+}
+.cbtn-del{
+  background:#fff;
+  color:#555;
+  box-shadow:0 1px 8px rgba(0,0,0,.07);
+}
+body.dark .cbtn-del{
+  background:#1a1a1e;
+  color:#aaa;
+  box-shadow:0 1px 8px rgba(0,0,0,.3);
+}
+
+/* ── SECTION TITLE ── */
+.section-title{
+  font-size:16px;
+  font-weight:800;
+  color:#111;
+  padding:0 16px;
+  margin-bottom:12px;
+}
+body.dark .section-title{ color:#f0f0f0; }
+
+/* ── SCHEDULE BLOCK ── */
+.wcard{
+  background:#fff;
+  border-radius:20px;
+  margin:0 16px 14px;
+  padding:16px;
+  box-shadow:0 1px 8px rgba(0,0,0,.06);
+}
+body.dark .wcard{
+  background:#1a1a1e;
+  box-shadow:0 1px 8px rgba(0,0,0,.3);
+}
+
+/* ── CALENDAR ── */
+.cal-nav-btn{
+  width:30px!important;height:30px!important;min-width:30px!important;
+  border-radius:50%!important;display:flex!important;align-items:center!important;
+  justify-content:center!important;padding:0!important;font-size:20px!important;
+  line-height:1!important;background:rgba(0,0,0,.06)!important;border:none!important;
+  cursor:pointer!important;flex-shrink:0!important;color:#555!important;
+}
+body.dark .cal-nav-btn{background:#2a2a2a!important;color:#f0f0f0!important;}
+.mini-cal-month-lbl{flex:1!important;text-align:center!important;padding:0!important;font-size:15px!important;font-weight:800!important;}
+.mini-cal-hdr{display:flex!important;align-items:center!important;gap:6px!important;margin-bottom:14px!important;}
+
+/* ── TX LIST — finance app style ── */
+.tx-section{
+  background:#fff;
+  border-radius:20px 20px 0 0;
+  margin:0 16px;
+  padding:16px 16px 100px;
+  box-shadow:0 -2px 16px rgba(0,0,0,.05);
+  min-height:200px;
+  animation:slideUp .4s .2s ease both;
+}
+body.dark .tx-section{
+  background:#1a1a1e;
+  box-shadow:0 -2px 16px rgba(0,0,0,.3);
+}
+
+@keyframes slideUp{
+  from{ opacity:0; transform:translateY(20px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+
+.tx-title{
+  font-size:16px;
+  font-weight:800;
+  color:#111;
+  margin-bottom:14px;
+}
+body.dark .tx-title{ color:#f0f0f0; }
+
+.tx-viewall{
+  font-size:13px;
+  font-weight:700;
+  color:var(--blue);
+  text-decoration:none;
+  transition:opacity .2s;
+}
+.tx-viewall:active{ opacity:.6; }
+
+/* Transaction rows — finance style */
+.tx-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:11px 0;
+  border-bottom:1px solid #f3f4f6;
+  transition:background .15s;
+  animation:txRowIn .3s ease both;
+}
+body.dark .tx-row{ border-bottom-color:#252528; }
+.tx-row:last-child{ border-bottom:none; }
+
+@keyframes txRowIn{
+  from{ opacity:0; transform:translateX(-6px); }
+  to{ opacity:1; transform:translateX(0); }
+}
+
+.tx-ico{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:16px;
+  font-weight:900;
+  flex-shrink:0;
+}
+.tx-ico-g{ background:#d1fae5; color:#059669; }
+.tx-ico-r{ background:#fee2e2; color:#dc2626; }
+body.dark .tx-ico-g{ background:#064e3b; color:#6ee7b7; }
+body.dark .tx-ico-r{ background:#450a0a; color:#fca5a5; }
+
+.tx-body{ flex:1; min-width:0; }
+.tx-name{ font-size:14px; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body.dark .tx-name{ color:#f0f0f0; }
+.tx-dt{ font-size:11px; color:#aaa; margin-top:2px; }
+.tx-ref{ font-size:10px; color:#bbb; }
+
+.tx-amt-g{ color:#059669; font-size:15px; font-weight:800; flex-shrink:0; }
+.tx-amt-r{ color:#dc2626; font-size:15px; font-weight:800; flex-shrink:0; }
+
+.tx-empty{
+  text-align:center;
+  padding:32px 0;
+  color:#bbb;
+  font-size:13px;
+}
+
+/* ── CLOSED PLAN NOTICE ── */
+#planClosedNotice .inner{
+  background:#f9fafb;
+  border-radius:16px;
+  padding:16px;
+  border:1.5px solid #e5e7eb;
+}
+body.dark #planClosedNotice .inner{
+  background:#1a1a1e;
+  border-color:#2a2a2a;
+}
+
+/* ── NO PLAN EMPTY STATE ── */
+.no-plan{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:60px 24px;
+  text-align:center;
+  color:#aaa;
+}
+.no-plan-ico{
+  width:64px;height:64px;
+  background:rgba(1,31,123,.08);
+  border-radius:20px;
+  margin-bottom:16px;
+}
+
+/* ── BOTTOM NAV PILL — persistent floating style ── */
+.bnav{
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#fff;
+  border:none;
+  border-radius:28px;
+  display:none;
+  align-items:center;
+  z-index:500;
+  height:56px;
+  padding:0 8px;
+  gap:4px;
+  box-shadow:0 8px 32px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.1);
+  width:calc(100% - 48px);
+  max-width:380px;
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  /* always on top of everything while scrolling */
+  will-change:transform;
+}
+body.dark .bnav{
+  background:rgba(22,22,26,.95);
+  box-shadow:0 8px 32px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.4);
+}
+.bnav.visible{ display:flex; }
+
+.bnav-tab{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  padding:8px 6px;
+  color:#aaa;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.3px;
+  border-radius:22px;
+  transition:color .2s, background .2s;
+  -webkit-tap-highlight-color:transparent;
+  text-decoration:none;
+  min-height:44px;
+}
+.bnav-tab svg{ flex-shrink:0; transition:stroke .2s; }
+.bnav-tab.active{
+  color:#fff;
+  background:var(--blue);
+}
+body.dark .bnav-tab.active{
+  color:#111;
+  background:var(--yellow);
+}
+body.dark .bnav-tab.active svg{ stroke:#111; }
+
+/* Push content above persistent nav */
+.view{ padding-bottom:100px; }
+
+/* Responsive: keep nav below max-width centred */
+@media(min-width:480px){
+  .bnav{
+    left:50%;
+    transform:translateX(-50%);
+  }
+}
+
+/* ── INFO PAIR (plan type / started) ── */
+.info-pair{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:0 16px 14px;
+}
+.icard{
+  background:#fff;
+  border-radius:16px;
+  padding:13px 14px;
+  box-shadow:0 1px 6px rgba(0,0,0,.06);
+}
+body.dark .icard{
+  background:#1a1a1e;
+  box-shadow:0 1px 6px rgba(0,0,0,.3);
+}
+.icard-lbl{ font-size:10px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.icard-val{ font-size:13px; font-weight:700; color:#111; }
+body.dark .icard-val{ color:#f0f0f0; }
+
+/* ── PLAN NAME DISPLAY ── */
+.plan-name-display{
+  font-size:13px;
+  font-weight:700;
+  color:#888;
+  padding:0 16px;
+  margin-bottom:2px;
+}
+body.dark .plan-name-display{ color:#666; }
+</style>
 </head>
 <body>
 
@@ -29,87 +604,188 @@ body.dark .cal-nav-btn{background:#2a2a2a!important;color:#f0f0f0!important;}
 
 <!-- CUSTOMER DASHBOARD -->
 <div id="customerView" class="view active">
+
+ <!-- HEADER -->
  <div class="dash-header">
- <div class="avatar-c" id="custAv">?</div>
- <div class="hdr-info"><div class="hdr-name" id="custName">—</div><div class="hdr-sub" id="custPhone">—</div></div>
- <div class="hdr-right"><button class="signout-btn" onclick="doLogout()" style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.25);color:#fff;cursor:pointer;flex-shrink:0;font-size:12px;font-weight:700;letter-spacing:.3px;display:flex;align-items:center;gap:5px;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign Out</button></div>
+  <div class="avatar-c" id="custAv">?</div>
+  <div class="hdr-info">
+   <div class="hdr-name" id="custName">—</div>
+   <div class="hdr-sub" id="custPhone">—</div>
+  </div>
+  <div class="hdr-right">
+   <button class="hdr-icon-btn" onclick="doLogout()" title="Sign Out">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+     <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+     <polyline points="16 17 21 12 16 7"/>
+     <line x1="21" y1="12" x2="9" y2="12"/>
+    </svg>
+   </button>
+  </div>
  </div>
- <div class="plan-tabs-bar" id="planTabsBar"><div class="plan-tab add-tab" onclick="openNewPlanModal()">+ New Plan</div></div>
- <div id="noPlanMsg" class="no-plan"><div class="no-plan-ico"></div><div style="font-size:16px;font-weight:700;margin-bottom:7px;">No savings plans yet</div><div style="font-size:12px;color:var(--sub);">Tap "+ New Plan" to get started</div></div>
+
+ <!-- PLAN TABS -->
+ <div class="plan-tabs-bar" id="planTabsBar">
+  <div class="plan-tab add-tab" onclick="openNewPlanModal()">+ New Plan</div>
+ </div>
+
+ <!-- NO PLAN STATE -->
+ <div id="noPlanMsg" class="no-plan">
+  <div class="no-plan-ico"></div>
+  <div style="font-size:16px;font-weight:700;margin-bottom:7px;color:#555;">No savings plans yet</div>
+  <div style="font-size:13px;color:#aaa;">Tap "+ New Plan" to get started</div>
+ </div>
+
+ <!-- PLAN AREA -->
  <div id="planArea" style="display:none;">
- <div id="overdueBanner" style="display:none;" class="overdue-banner"><div class="overdue-banner-icon">!</div><div><div class="overdue-banner-text">Missed contributions</div><div class="overdue-banner-count" id="overdueCount">0 overdue</div></div></div>
- <div style="display:flex;align-items:center;gap:8px;padding:14px 13px 0;">
-  <div id="planNameDisplay" style="font-size:17px;font-weight:800;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" class="plan-name-display">—</div>
-  <button onclick="openRenamePlanModal()" title="Rename plan" style="background:none;border:none;color:var(--sub);cursor:pointer;padding:4px;display:flex;align-items:center;flex-shrink:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
- </div>
- <div class="bal-hero">
- <div class="bal-lbl">CURRENT BALANCE <button class="eye-btn" onclick="toggleBalVis()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
- <div class="bal-amt" id="planBal">₦0.00</div>
- <div class="bal-footer"><span class="bal-pct" id="planPct"></span><span class="bal-badge badge-active" id="planBadge">ACTIVE</span></div>
- </div>
- <div class="info-pair">
- <div class="icard"><div class="icard-lbl">Plan Type</div><div class="icard-val" id="planType">—</div></div>
- <div class="icard"><div class="icard-lbl">Started</div><div class="icard-val" id="planStart">—</div></div>
- </div>
- <div class="wcard" style="margin:0 13px 11px;">
- <div class="mini-cal-hdr">
- <button class="cal-nav-btn" onclick="prevCalMonth()">&#8249;</button>
- <span class="mini-cal-month-lbl" id="calMonthLbl">—</span>
- <button class="cal-nav-btn" onclick="nextCalMonth()">&#8250;</button>
- </div>
- <div class="mini-cal-days-hdr" id="calDaysHdr"></div>
- <div id="calGrid"></div>
- <div class="cal-legend">
- <div class="cal-legend-item"><span class="cal-dot" style="background:#d1fae5;"></span>Paid</div>
- <div class="cal-legend-item"><span class="cal-dot" style="background:#fee2e2;"></span>Missed</div>
- <div class="cal-legend-item"><span class="cal-dot" style="background:#fef3c7;border:1px solid #f59e0b;"></span>Payout</div>
- </div>
- </div>
- <div id="planActionBtns" class="cust-btns">
- <button class="cbtn cbtn-wd" onclick="openWithdrawalModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M12 2v13M5 9l7-7 7 7"/><path d="M4 22h16"/></svg>Withdraw Money</button>
- <button class="cbtn cbtn-del" onclick="closePlan()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:5px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Close Plan</button>
- </div>
- <div id="planClosedNotice" style="display:none;margin:0 13px 11px;">
- <div style="background:#f3f4f6;border-radius:13px;padding:14px;border:2px solid var(--border);">
- <div style="font-size:13px;font-weight:700;color:var(--sub);margin-bottom:4px;"> Plan Closed — Balance: <span id="closedPlanBal">₦0.00</span></div>
- <div style="font-size:12px;color:var(--sub);margin-bottom:12px;">This plan is inactive. Reactivate it or delete it permanently.</div>
- <div style="display:flex;gap:8px;">
- <button class="btn-sm btn-sm-blue" style="flex:1;padding:11px;" onclick="reactivatePlan()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 019.9-1"/></svg>Reactivate</button>
- <button class="btn-sm" style="flex:1;padding:11px;background:#fee2e2;color:var(--red);border-radius:8px;border:none;font-weight:700;cursor:pointer;" onclick="permanentlyDeletePlan()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>Delete</button>
- </div>
- </div>
- </div>
- <div class="wcard" style="margin:0 13px 11px;padding:13px;" id="scheduleBlock"></div>
- <div class="tx-section" style="margin-bottom:80px;">
- <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;">
- <div class="tx-title" style="margin-bottom:0;">Recent Transactions</div>
- <a href="transactions.html" class="tx-viewall">View all →</a>
- </div>
- <div id="txList"><div class="tx-empty">No transactions yet</div></div>
- </div>
- </div>
- <!-- Customer bottom nav -->
+
+  <!-- OVERDUE BANNER -->
+  <div id="overdueBanner" style="display:none;" class="overdue-banner">
+   <div class="overdue-banner-icon">!</div>
+   <div><div class="overdue-banner-text">Missed contributions</div><div class="overdue-banner-count" id="overdueCount">0 overdue</div></div>
+  </div>
+
+  <!-- PLAN NAME -->
+  <div style="display:flex;align-items:center;gap:6px;padding:0 16px;margin-bottom:6px;">
+   <div id="planNameDisplay" class="plan-name-display" style="padding:0;margin-bottom:0;">—</div>
+   <button onclick="openRenamePlanModal()" title="Rename" style="background:none;border:none;color:#bbb;cursor:pointer;padding:2px;display:flex;align-items:center;flex-shrink:0;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+     <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+   </button>
+  </div>
+
+  <!-- BALANCE HERO -->
+  <div class="bal-hero">
+   <div class="bal-header-row">
+    <div class="bal-label-text">Current Balance</div>
+    <button class="eye-btn" onclick="toggleBalVis()">
+     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+     </svg>
+    </button>
+   </div>
+   <div class="bal-amt" id="planBal">
+    <span class="bal-amt-naira">₦</span><span id="planBalNum">0.00</span>
+   </div>
+   <div class="bal-footer">
+    <div class="bal-plan-pill" id="planType">Daily Plan</div>
+    <span class="bal-badge badge-active" id="planBadge">ACTIVE</span>
+   </div>
+  </div>
+
+  <!-- QUICK STATS -->
+  <div class="qs-row">
+   <div class="qs-card">
+    <div class="qs-icon green">
+     <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+      <path d="M12 22V9M5 15l7 7 7-7"/><path d="M4 2h16"/>
+     </svg>
+    </div>
+    <div>
+     <div class="qs-label">Plan Type</div>
+     <div class="qs-val" id="planTypeCard">—</div>
+    </div>
+   </div>
+   <div class="qs-card">
+    <div class="qs-icon red">
+     <svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+     </svg>
+    </div>
+    <div>
+     <div class="qs-label">Started</div>
+     <div class="qs-val" id="planStart">—</div>
+    </div>
+   </div>
+  </div>
+
+  <!-- ACTION BUTTONS -->
+  <div id="planActionBtns" class="cust-btns">
+   <button class="cbtn cbtn-wd" onclick="openWithdrawalModal()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+     <path d="M12 2v13M5 9l7-7 7 7"/><path d="M4 22h16"/>
+    </svg>
+    Withdraw Money
+   </button>
+   <button class="cbtn cbtn-del" onclick="closePlan()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+     <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+    </svg>
+    Close Plan
+   </button>
+  </div>
+
+  <!-- CLOSED PLAN NOTICE -->
+  <div id="planClosedNotice" style="display:none;margin:0 16px 14px;">
+   <div class="inner">
+    <div style="font-size:13px;font-weight:700;color:#888;margin-bottom:4px;">Plan Closed — Balance: <span id="closedPlanBal">₦0.00</span></div>
+    <div style="font-size:12px;color:#aaa;margin-bottom:12px;">This plan is inactive. Reactivate it or delete it permanently.</div>
+    <div style="display:flex;gap:8px;">
+     <button class="btn-sm btn-sm-blue" style="flex:1;padding:11px;border-radius:12px;" onclick="reactivatePlan()">Reactivate</button>
+     <button class="btn-sm" style="flex:1;padding:11px;background:#fee2e2;color:#dc2626;border-radius:12px;border:none;font-weight:700;cursor:pointer;" onclick="permanentlyDeletePlan()">Delete</button>
+    </div>
+   </div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div class="wcard">
+   <div class="mini-cal-hdr">
+    <button class="cal-nav-btn" onclick="prevCalMonth()">&#8249;</button>
+    <span class="mini-cal-month-lbl" id="calMonthLbl">—</span>
+    <button class="cal-nav-btn" onclick="nextCalMonth()">&#8250;</button>
+   </div>
+   <div class="mini-cal-days-hdr" id="calDaysHdr"></div>
+   <div id="calGrid"></div>
+   <div class="cal-legend" style="margin-top:12px;">
+    <div class="cal-legend-item"><span class="cal-dot" style="background:#d1fae5;"></span>Paid</div>
+    <div class="cal-legend-item"><span class="cal-dot" style="background:#fee2e2;"></span>Missed</div>
+    <div class="cal-legend-item"><span class="cal-dot" style="background:#FFBA09;border:1px solid #cc9200;"></span>Payout</div>
+   </div>
+  </div>
+
+  <!-- SCHEDULE BLOCK (missed/regular contribution) -->
+  <div class="wcard" id="scheduleBlock"></div>
+
+  <!-- RECENT TRANSACTIONS -->
+  <div class="tx-section">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div class="tx-title" style="margin-bottom:0;">Recent Transactions</div>
+    <a href="transactions.html" class="tx-viewall">View all →</a>
+   </div>
+   <div id="txList"><div class="tx-empty">No transactions yet</div></div>
+  </div>
+
+ </div><!-- /planArea -->
+
+ <!-- BOTTOM NAV PILL -->
  <nav class="bnav visible" id="custBnav">
   <button class="bnav-tab active" id="bnCH">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+    <polyline points="9 22 9 12 15 12 15 22"/>
+   </svg>
    Home
   </button>
   <button class="bnav-tab" onclick="window.location.href='transactions.html'">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+    <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+   </svg>
    Transactions
   </button>
-  <button class="bnav-tab" onclick="window.location.href='calendar.html'">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-   Streaks
-  </button>
   <button class="bnav-tab" onclick="window.location.href='settings.html'">
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+   </svg>
    Profile
   </button>
  </nav>
+
 </div>
 
-<!-- MODALS -->
+<!-- ═══ MODALS ═══ -->
 <div id="newPlanModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('newPlanModal')">×</button><div class="m-handle"></div><div class="m-title">New Savings Plan</div><div class="mform-group"><label class="form-lbl">Plan Name</label><input type="text" id="npName" class="form-inp" placeholder="e.g. School Fees"></div><div class="mform-group"><label class="form-lbl">Savings Frequency</label><select id="npFreq" class="form-inp"><option value="Daily" selected>Daily</option></select></div><div class="mform-group"><label class="form-lbl">Regular Contribution (₦)</label><input type="number" id="npContrib" class="form-inp" placeholder="2000" min="1"></div><div id="npMsg"></div><button class="btn btn-blue" onclick="doCreatePlan()" style="margin-top:8px;">Create Plan</button></div></div>
 
 <div id="renamePlanModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('renamePlanModal')">×</button><div class="m-handle"></div><div class="m-title">Rename Plan</div><div class="mform-group"><label class="form-lbl">Plan Name</label><input type="text" id="renamePlanInp" class="form-inp" placeholder="e.g. School Fees" maxlength="40"></div><div id="renamePlanMsg"></div><button class="btn btn-blue" onclick="doRenamePlan()" style="margin-top:8px;">Save Name</button></div></div>
@@ -120,17 +796,16 @@ body.dark .cal-nav-btn{background:#2a2a2a!important;color:#f0f0f0!important;}
 
 <div id="payPinModal" class="modal">
  <div class="msheet" style="max-width:480px;position:relative;">
- <button class="m-close" onclick="closeModal('payPinModal')">×</button>
- <div class="m-handle"></div>
- <div class="m-title" id="payPinTitle">Enter Payment PIN</div>
- <p style="color:var(--sub);font-size:13px;margin-bottom:16px;" id="payPinDesc">Enter your 4–6 digit payment PIN to continue.</p>
- <div class="pin-wrap"><input type="password" id="payPinInp" class="field-input" placeholder="····" maxlength="6" inputmode="numeric" style="font-size:24px;letter-spacing:8px;text-align:center;width:100%;"><button type="button" class="pw-eye" onclick="togglePw('payPinInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
- <div id="payPinMsg" style="margin-top:8px;"></div>
- <button class="btn btn-blue" onclick="confirmPayPin()" style="margin-top:14px;">Confirm</button>
+  <button class="m-close" onclick="closeModal('payPinModal')">×</button>
+  <div class="m-handle"></div>
+  <div class="m-title" id="payPinTitle">Enter Payment PIN</div>
+  <p style="color:var(--sub);font-size:13px;margin-bottom:16px;" id="payPinDesc">Enter your 4–6 digit payment PIN to continue.</p>
+  <div class="pin-wrap"><input type="password" id="payPinInp" class="field-input" placeholder="····" maxlength="6" inputmode="numeric" style="font-size:24px;letter-spacing:8px;text-align:center;width:100%;"><button type="button" class="pw-eye" onclick="togglePw('payPinInp')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+  <div id="payPinMsg" style="margin-top:8px;"></div>
+  <button class="btn btn-blue" onclick="confirmPayPin()" style="margin-top:14px;">Confirm</button>
  </div>
 </div>
 
-<!-- PAYMENT PIN SETUP MODAL -->
 <div class="modal" id="payPinSetupModal">
  <div class="msheet" style="max-width:480px;position:relative;text-align:center;">
   <div style="width:56px;height:56px;background:rgba(1,31,123,.1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;animation:paypinPop .4s cubic-bezier(.34,1.56,.64,1) .15s both;">
@@ -149,13 +824,35 @@ body.dark .cal-nav-btn{background:#2a2a2a!important;color:#f0f0f0!important;}
 </div>
 
 <script>
-// Route guard — only customers may view this page
+// ── patch: keep planBal element in sync since we split it into #planBalNum ──
+// We override the textContent setter so existing customer.js code
+// setting planBal.textContent still works seamlessly
+(function(){
+  const el = document.getElementById('planBal');
+  const numEl = document.getElementById('planBalNum');
+  if(!el || !numEl) return;
+  const orig = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+  Object.defineProperty(el, 'textContent', {
+    set(v){
+      // v looks like "₦1,234.56" or "••••••"
+      if(v && v.startsWith('₦')){
+        numEl.textContent = v.slice(1); // strip ₦ symbol since our HTML already has it
+        el.querySelector('.bal-amt-naira').style.display = '';
+      } else {
+        numEl.textContent = v;
+        el.querySelector('.bal-amt-naira').style.display = 'none';
+      }
+    },
+    get(){ return el.innerText; }
+  });
+})();
+
 requireRole(['customer']);
 initTheme();
-document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
-// Fix 10: verify role server-side before rendering sensitive data
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('active'); }));
+
 verifyRoleFromDB('customer').then(valid => {
-  if (!valid) return window.location.replace(rootPath() + 'login.html');
+  if(!valid) return window.location.replace('../login.html');
   renderCustDash().then(() => {
     requestAnimationFrame(() => {
       startSuspendCheck();
