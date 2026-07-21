@@ -215,6 +215,16 @@ async function doLogout() {
   window.location.href = rootPath() + 'login.html';
 }
 
+// Fix: sql/002's cross-role phone trigger raises a raw Postgres exception
+// (PHONE_ALREADY_AGENT / PHONE_ALREADY_CUSTOMER) as a last line of defense.
+// Translate it into a friendly message if it ever surfaces here.
+function friendlyRegError(msg) {
+  if (!msg) return msg;
+  if (msg.includes('PHONE_ALREADY_AGENT')) return 'This phone number is already registered to a Field Agent account. Please use a different phone number.';
+  if (msg.includes('PHONE_ALREADY_CUSTOMER')) return 'This phone number is already registered to a Customer account. Please use a different phone number.';
+  return msg;
+}
+
 // ═══════════════════════════════════════════════
 // REGISTRATION (customer) — email verification flow unchanged in UX;
 // the actual account creation now goes through supabase.auth.signUp()
@@ -230,8 +240,14 @@ async function doRegister() {
   const normPh = normPhone(ph);
   showLoading('Checking details…');
   const { data: existing } = await db.from('customers').select('id').eq('phone', normPh).single();
+  if (existing) { hideLoading(); setMsg('regMsg', '<div class="msg-err">Phone number already registered</div>'); return; }
+  // Fix: block registering a customer account with a phone number that's
+  // already in use by a Field Agent (strict, cross-role uniqueness).
+  // The DB also enforces this server-side (see sql/002), so it's blocked
+  // even if this client-side check is bypassed.
+  const { data: existingRep } = await db.from('representatives').select('id').eq('phone', normPh).neq('status', 'deleted').maybeSingle();
   hideLoading();
-  if (existing) { setMsg('regMsg', '<div class="msg-err">Phone number already registered</div>'); return; }
+  if (existingRep) { setMsg('regMsg', '<div class="msg-err">This phone number is already registered to a Field Agent account. Please use a different phone number.</div>'); return; }
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   sessionStorage.setItem('wagVerify', JSON.stringify({ code, fn, ln, em, ph: normPh, addr, pin, expires: Date.now() + 600000 }));
   showLoading('Sending verification code…');
@@ -281,7 +297,7 @@ async function doVerifyCode() {
   });
   hideLoading();
   if (regErr || regResult?.ok === false) {
-    setMsg('verifyMsg', `<div class="msg-err">${regResult?.error || regErr?.message || 'Registration failed'}</div>`);
+    setMsg('verifyMsg', `<div class="msg-err">${friendlyRegError(regResult?.error || regErr?.message) || 'Registration failed'}</div>`);
     return;
   }
 
@@ -308,6 +324,12 @@ async function doRepRegister() {
   const normPh = normPhone(ph);
   const repPayPinRaw = document.getElementById('repRegPayPin')?.value?.trim() || '';
   const repPayPinHash = repPayPinRaw ? await hashPin(repPayPinRaw) : null;
+
+  // Fix: block registering a Field Agent account with a phone number
+  // that's already in use by a Customer (strict, cross-role uniqueness).
+  // The DB also enforces this server-side (see sql/002).
+  const { data: existingCust } = await db.from('customers').select('id').eq('phone', normPh).neq('status', 'deleted').maybeSingle();
+  if (existingCust) { hideLoading(); setMsg('repRegMsg', '<div class="msg-err">This phone number is already registered to a Customer account. Please use a different phone number.</div>'); return; }
 
   // Step 1: reserve a unique Agent ID and validate the token BEFORE signup,
   // so we can build the correct final internal email upfront — no fragile
@@ -338,7 +360,7 @@ async function doRepRegister() {
   });
   hideLoading();
   if (regErr || regResult?.ok === false) {
-    setMsg('repRegMsg', `<div class="msg-err">${regResult?.error || regErr?.message || 'Registration failed'}</div>`);
+    setMsg('repRegMsg', `<div class="msg-err">${friendlyRegError(regResult?.error || regErr?.message) || 'Registration failed'}</div>`);
     return;
   }
 

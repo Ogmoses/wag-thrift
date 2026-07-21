@@ -342,6 +342,12 @@ function renderDisbCard(d, compact) {
   const stages = ['pending', 'reviewed', 'approved', 'paid'];
   const curIdx = stages.indexOf(d.status);
   const cust = d.customers || {};
+  // Fix: use the name/phone snapshot captured at request time (sql/002)
+  // first — falls back to the live join for any row created before that
+  // migration. This keeps the disbursement card showing the real name
+  // even if the customer account has since been deleted.
+  const custName = d.customer_name || `${cust.first_name || 'Unknown'} ${cust.last_name || ''}`.trim();
+  const custPhone = ((d.customer_phone || cust.phone) || '').replace('+234', '0');
   const canReview = d.status === 'pending';
   const canApprove = d.status === 'reviewed';
   const isApproved = d.status === 'approved';
@@ -367,12 +373,12 @@ function renderDisbCard(d, compact) {
     ? `<div class="disb-actions">${rejectBtn}</div>`
     : '';
 
-  const phone = (cust.phone || '').replace('+234', '0');
+  const phone = custPhone;
 
   return `<div class="disb-item">
     <div class="disb-header">
       <div>
-        <div class="disb-name">${cust.first_name || 'Unknown'} ${cust.last_name || ''}</div>
+        <div class="disb-name">${custName}</div>
         <div class="disb-phone">${phone}</div>
       </div>
       <div style="text-align:right;">
@@ -499,14 +505,29 @@ async function restoreCustomer(id, name) {
 }
 
 async function deleteCustomer(id, name) {
+  showLoading('Checking…');
+  // Fix: a customer account can only be permanently deleted once it has
+  // been suspended first — suspension alone never requires a zero balance,
+  // but deletion always does, checked below.
+  const { data: custRow } = await db.from('customers').select('status').eq('id', id).single();
+  if (!custRow || custRow.status !== 'suspended') {
+    hideLoading();
+    alert(`Cannot delete ${name} — the account must be suspended before it can be permanently deleted.`);
+    return;
+  }
   const { data: balRows } = await db.from('plan_balances').select('balance').eq('customer_id', id);
   const totalBal = (balRows || []).reduce((s, r) => s + Number(r.balance), 0);
+  hideLoading();
   if (totalBal > 0) {
     alert(`Cannot delete ${name} — they still have ${fmt(totalBal)} in their plans.\nResolve the balance first.`);
     return;
   }
   if (!confirm(`Permanently delete ${name}? This cannot be undone.`)) return;
   showLoading('Deleting…');
+  // Fix: transactions/disbursements already snapshot the customer's name
+  // at the moment they were created (see sql/002) — so overwriting the
+  // name here no longer erases it from historical/transactional records,
+  // receipts, or the audit log. Only this LIVE profile becomes [DELETED].
   await db.from('customers').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id }).eq('id', id);
   await audit('delete', `Admin permanently deleted customer ${name} (${id})`);
   hideLoading();
@@ -580,8 +601,18 @@ async function restoreAgent(id, name) {
 }
 
 async function deleteAgent(id, name) {
+  showLoading('Checking…');
+  const { data: repRow } = await db.from('representatives').select('status').eq('id', id).single();
+  hideLoading();
+  if (!repRow || repRow.status !== 'suspended') {
+    alert(`Cannot delete ${name} — the account must be suspended before it can be permanently deleted.`);
+    return;
+  }
   if (!confirm(`Permanently delete agent ${name}? This cannot be undone.`)) return;
   showLoading('Deleting…');
+  // Fix: transactions already snapshot the agent's name at the moment
+  // they were created (see sql/002), so this no longer erases the agent's
+  // name from historical/transactional records or the audit log.
   await db.from('representatives').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id }).eq('id', id);
   await audit('delete', `Admin permanently deleted agent ${name} (${id})`);
   hideLoading();
