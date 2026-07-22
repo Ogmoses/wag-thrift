@@ -35,10 +35,18 @@ async function confirmPayPin() {
 // AGENT RELIABILITY SCORE
 // ═══════════════════════════════════════════════
 async function getAgentScore(repId) {
-  const { data } = await db.from('fraud_flags').select('severity').eq('user_id', repId).eq('resolved', false);
-  let score = 100;
-  (data || []).forEach(f => { score -= f.severity === 'medium' ? 8 : f.severity === 'high' ? 15 : 3; });
-  return Math.max(0, Math.min(100, Math.round(score)));
+  // Was previously a direct SELECT on fraud_flags. Same RLS gap already
+  // documented elsewhere in this file for `plans` — reps can't read
+  // fraud_flags directly, even their own rows, so this silently always
+  // got back zero rows (Supabase doesn't throw on an RLS-blocked SELECT)
+  // and the score permanently sat at 100% no matter what real flags
+  // existed, with nothing in the UI hinting anything was wrong. Routed
+  // through a SECURITY DEFINER RPC instead — see sql/003 — which is
+  // hard-scoped to auth.uid() so a rep can only ever fetch their own
+  // score, never anyone else's or the raw flag rows.
+  const { data, error } = await db.rpc('rep_get_own_reliability_score');
+  if (error) { console.warn('Reliability score fetch failed — is sql/003 applied in Supabase?', error.message); return null; }
+  return data;
 }
 
 // ═══════════════════════════════════════════════
@@ -65,9 +73,17 @@ async function renderRepDash() {
   document.getElementById('repAllAmt').textContent = fmt((allTx || []).reduce((s, t) => s + Number(t.amount), 0));
   document.getElementById('repConfirmed').textContent = rep.confirmed_count || 0;
   const score = await getAgentScore(rep.id);
-  document.getElementById('repScoreVal').textContent = score + '%';
-  document.getElementById('repScoreVal').style.color = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--yellow)' : 'var(--red)';
-  document.getElementById('repScoreLbl').textContent = score >= 80 ? 'excellent' : score >= 60 ? 'good' : 'needs review';
+  const scoreEl = document.getElementById('repScoreVal');
+  const lblEl = document.getElementById('repScoreLbl');
+  if (score === null) {
+    scoreEl.textContent = '—%';
+    scoreEl.style.color = 'var(--sub)';
+    lblEl.textContent = 'unavailable';
+  } else {
+    scoreEl.textContent = score + '%';
+    scoreEl.style.color = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--yellow)' : 'var(--red)';
+    lblEl.textContent = score >= 80 ? 'excellent' : score >= 60 ? 'good' : 'needs review';
+  }
   loadRepTxPreview();
 }
 
