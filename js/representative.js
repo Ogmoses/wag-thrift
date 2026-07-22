@@ -45,7 +45,12 @@ async function getAgentScore(repId) {
   // hard-scoped to auth.uid() so a rep can only ever fetch their own
   // score, never anyone else's or the raw flag rows.
   const { data, error } = await db.rpc('rep_get_own_reliability_score');
-  if (error) { console.warn('Reliability score fetch failed — is sql/003 applied in Supabase?', error.message); return null; }
+  if (error) {
+    console.warn('Reliability score fetch failed — is sql/003 applied in Supabase?', {
+      message: error.message, code: error.code, details: error.details, hint: error.hint
+    });
+    return null;
+  }
   return data;
 }
 
