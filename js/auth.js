@@ -392,7 +392,7 @@ async function doForgotPin() {
   showLoading('Sending reset link…');
   const { data: result } = await db.rpc('request_password_reset', { p_email: em });
   if (result?.exists && result?.token) {
-    const resetLink = `${location.origin}${rootPath()}login.html?reset=${result.token}`;
+    const resetLink = `${location.origin}/login.html?reset=${result.token}`;
     const [{ data: cu }, { data: re }] = await Promise.all([
       db.from('customers').select('first_name').eq('email', em).single(),
       db.from('representatives').select('first_name').eq('email', em).single()
