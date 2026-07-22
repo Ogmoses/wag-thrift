@@ -187,6 +187,12 @@ async function doLogin() {
     const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email: emailResult, password: pin });
     if (authErr || !authData?.session) { hideLoading(); setMsg('loginRepMsg', '<div class="msg-err">Invalid Agent ID or password</div>'); return; }
 
+    // Save remember-me preference BEFORE refreshUserProfile (which calls
+    // setUser internally) so the storage target — localStorage vs.
+    // sessionStorage — is already correct by the time the profile is cached.
+    const rememberMeRep = document.getElementById('rememberMeRep')?.checked || false;
+    localStorage.setItem(WAG_REMEMBER_KEY, rememberMeRep ? 'true' : 'false');
+
     const profile = await refreshUserProfile('representative');
     if (!profile) {
       hideLoading();
