@@ -331,7 +331,7 @@ function dateKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-let calState = { yr: 0, mo: 0, covered: new Set(), missed: new Set(), payouts: new Set() };
+let calState = { yr: 0, mo: 0, covered: new Set(), missed: new Set(), payouts: new Set(), actualPayDays: new Set() };
 
 async function renderCalendar(plan, balance) {
   const regularAmt = Number(plan.regular_contribution) || 1000;
@@ -356,6 +356,15 @@ async function renderCalendar(plan, balance) {
   calState.covered = new Set();
   calState.missed = new Set();
   calState.payouts = new Set();
+  // Distinct real calendar days a deposit actually landed on — independent
+  // of `covered` above. `covered` is a cumulative "how many day-units has
+  // your money paid for" abstraction (lets a catch-up lump sum retroactively
+  // paint past missed days green), which is correct for the calendar's job
+  // but wrong as a streak basis: a single catch-up deposit shouldn't be able
+  // to hand back a broken streak. actualPayDays only ever reflects days a
+  // transaction genuinely happened, so a streak built from it truly resets
+  // on a missed day and can't be patched retroactively.
+  calState.actualPayDays = new Set(txs.map(t => dateKey(new Date(t.created_at))));
 
   paidDisbs.forEach(d => {
     if (d.confirmed_at) {
@@ -628,16 +637,28 @@ async function loadCalendarPage() {
 function switchCalPlan(id) { activePlanId = id; loadCalendarPage(); }
 
 function renderStreakStats() {
-  const { covered } = calState;
+  const { covered, actualPayDays } = calState;
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayKey = dateKey(today);
 
-  // Current streak — walk backward from today while each day is covered
+  // Current streak — based on actualPayDays (real transaction dates), NOT
+  // `covered`. This is deliberate: `covered` can be retroactively filled in
+  // by a single catch-up payment, which would let a broken streak silently
+  // "heal" itself. actualPayDays only contains days a deposit genuinely
+  // landed, so a missed day truly breaks the count and a later lump-sum
+  // catch-up cannot restore it.
+  //
+  // Grace period: if today has no deposit yet, the streak isn't broken
+  // until the day actually ends — so we start counting from yesterday
+  // instead of zeroing out the moment the clock hits midnight with no
+  // deposit yet made.
   let current = 0;
   const walker = new Date(today);
-  while (covered.has(dateKey(walker))) { current++; walker.setDate(walker.getDate() - 1); }
+  if (!actualPayDays.has(todayKey)) walker.setDate(walker.getDate() - 1);
+  while (actualPayDays.has(dateKey(walker))) { current++; walker.setDate(walker.getDate() - 1); }
 
-  // Longest streak — longest run of consecutive covered days on record
-  const sortedDates = [...covered].sort();
+  // Longest streak — longest run of consecutive *real* deposit days on record
+  const sortedDates = [...actualPayDays].sort();
   let longest = 0, run = 0, prevDate = null;
   sortedDates.forEach(ds => {
     if (prevDate) {
@@ -648,6 +669,10 @@ function renderStreakStats() {
     prevDate = ds;
   });
 
+  // Total Days Paid intentionally stays tied to the calendar's own
+  // `covered` count (unchanged) — it's a running "days-worth covered"
+  // total, same number the calendar itself is built from, and isn't
+  // meant to claim every one of those days was an individual deposit.
   const totalPaid = covered.size;
   const goal = 30; // visual "days" goal used purely for the ring's fill %
   const pct = Math.max(0, Math.min(1, current / goal));
