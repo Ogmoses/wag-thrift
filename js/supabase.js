@@ -83,6 +83,23 @@ async function sendVerificationEmail(toEmail, toName, code) {
 }
 
 async function sendResetEmail(toEmail, toName, resetLink) {
+  // Prefer the Cloudflare Worker (sends via Resend, keeps API key server-side).
+  // Falls back to EmailJS only if the Worker isn't deployed yet.
+  if (WORKER_URL) {
+    try {
+      const res = await fetch(`${WORKER_URL}/api/send-reset-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toEmail, toName, resetLink })
+      });
+      const data = await res.json();
+      return res.ok ? { ok: true } : { error: data.error || 'Failed to send email' };
+    } catch (e) {
+      console.error('Worker reset email error:', e);
+      return { error: e.message };
+    }
+  }
+  // EmailJS fallback
   if (EMAILJS_PUBLIC_KEY.includes('YOUR_')) return { demo: true, link: resetLink };
   try {
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_RESET_TMPL, {
