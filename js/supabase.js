@@ -12,7 +12,7 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // STEP 2a: Cloudflare Worker URL — set this once your Worker is deployed.
 // Format: 'https://wag-api.<your-subdomain>.workers.dev'
 // Leave as null to fall back to EmailJS for verification emails.
-const WORKER_URL = null; // e.g. 'https://wag-api.ogmoses.workers.dev'
+const WORKER_URL = 'https://wag-api.ogmoses321.workers.dev'; // e.g. 'https://wag-api.ogmoses.workers.dev'
 
 // STEP 2b: EmailJS credentials (fallback while Worker isn't deployed yet)
 const EMAILJS_PUBLIC_KEY = 'uh_tr5EcVjvujnnfJ';
