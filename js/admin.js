@@ -448,6 +448,7 @@ async function renderCustomersPage() {
 
 function renderCustomersList(custs) {
   const el = document.getElementById('custPageList');
+  if (!el) return;
   if (!custs?.length) { el.innerHTML = '<div class="empty-state">No customers found</div>'; return; }
   el.innerHTML = `<div class="section-card"><div style="font-size:11px;color:var(--sub);margin-bottom:11px;">${custs.length} customer(s)</div>` +
     custs.map(c => {
@@ -547,6 +548,7 @@ async function getAgentReliability(repId) {
 async function renderAgentsPage() {
   const { data: reps } = await db.from('representatives').select('*').order('created_at', { ascending: false });
   const el = document.getElementById('agentsPageList');
+  if (!el) return;
   if (!reps?.length) { el.innerHTML = '<div class="empty-state">No agents registered</div>'; return; }
   const agentRows = await Promise.all((reps || []).map(async r => {
     const reliability = await getAgentReliability(r.id);
@@ -722,16 +724,88 @@ async function renderAnalytics() {
 // ═══════════════════════════════════════════════
 // FRAUD FLAGS (admin/analytics.html)
 // ═══════════════════════════════════════════════
+// fraud_flags.user_id means a different thing depending on `type` — there's
+// no explicit role column on the table, so the type tells us which table
+// (and which key) to look the account up by:
+//   LARGE_COLLECTION      → user_id is a representatives.id
+//   EXCESS_WITHDRAWAL     → user_id is a customers.id
+//   FAILED_PIN_ATTEMPTS   → user_id is actually a raw phone string (see
+//                            checkFailedPin in auth.js), not a foreign key —
+//                            look up customers by phone instead, and it may
+//                            not resolve to any real account at all (e.g. a
+//                            mistyped number on the login screen).
 async function renderFraudFlags() {
   const { data: flags } = await db.from('fraud_flags').select('*').eq('resolved', false).order('created_at', { ascending: false });
   const el = document.getElementById('fraudFlagsList');
   if (!el) return;
   if (!flags?.length) { el.innerHTML = '<div class="empty-state">No active fraud flags</div>'; return; }
-  el.innerHTML = flags.map(f => {
-    const desc = (f.description || '').replace(/emergency/gi, 'withdrawal').replace(/EXCESS_EMERGENCY/g, 'EXCESS_WITHDRAWAL');
-    const type = (f.type || '').replace(/emergency/gi, 'withdrawal').replace(/EXCESS_EMERGENCY/g, 'EXCESS_WITHDRAWAL');
-    return `<div class="fraud-flag-card"><div class="ff-header"><span class="ff-type">${type.replace(/_/g, ' ')} · ${(f.severity||'').toUpperCase()}</span><span class="ff-time">${fmtDate(f.created_at)}</span></div><div class="ff-desc">${desc}</div><button class="btn btn-green" style="margin-top:9px;font-size:12px;padding:7px 12px;" onclick="resolveFlag('${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark Resolved</button></div>`;
-  }).join('');
+  const cards = await Promise.all(flags.map(renderFraudFlagCard));
+  el.innerHTML = cards.join('');
+}
+
+async function renderFraudFlagCard(f) {
+  const desc = (f.description || '').replace(/emergency/gi, 'withdrawal').replace(/EXCESS_EMERGENCY/g, 'EXCESS_WITHDRAWAL');
+  const type = (f.type || '').replace(/emergency/gi, 'withdrawal').replace(/EXCESS_EMERGENCY/g, 'EXCESS_WITHDRAWAL');
+
+  let accountHtml;
+  try {
+    if (type === 'LARGE_COLLECTION') accountHtml = await buildAgentFlagContext(f.user_id);
+    else if (type === 'EXCESS_WITHDRAWAL') accountHtml = await buildCustomerFlagContext(f.user_id, true);
+    else if (type === 'FAILED_PIN_ATTEMPTS') {
+      const { data: cust } = await db.from('customers').select('id').eq('phone', f.user_id).maybeSingle();
+      accountHtml = cust
+        ? await buildCustomerFlagContext(cust.id, false)
+        : `<div class="ff-not-found">No account matches ${f.user_id} — likely a mistyped number at login, not a real customer to act on.</div>`;
+    } else {
+      accountHtml = `<div class="ff-not-found">Unrecognized flag type — no automatic account lookup available for "${f.type}".</div>`;
+    }
+  } catch (e) {
+    accountHtml = `<div class="ff-not-found">Couldn't load account details (${e.message || 'unknown error'}).</div>`;
+  }
+
+  return `<div class="fraud-flag-card"><div class="ff-header"><span class="ff-type">${type.replace(/_/g, ' ')} · ${(f.severity||'').toUpperCase()}</span><span class="ff-time">${fmtDate(f.created_at)}</span></div><div class="ff-desc">${desc}</div>${accountHtml}<div class="ff-actions"><button class="btn btn-green" style="font-size:12px;padding:7px 12px;" onclick="resolveFlag('${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark Resolved</button></div></div>`;
+}
+
+async function buildCustomerFlagContext(custId, withEvidence) {
+  const { data: c } = await db.from('customers').select('*').eq('id', custId).maybeSingle();
+  if (!c) return '<div class="ff-not-found">Customer account not found — may have been deleted.</div>';
+  const isSuspended = c.status === 'suspended';
+  const statusTag = isSuspended ? '<span class="ff-status-tag">SUSPENDED</span>' : '';
+  const actionBtn = isSuspended
+    ? `<button class="btn btn-green" onclick="suspendFlagAccount('customer','restore','${c.id}','${(c.first_name||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:5px 11px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.51"/></svg>Restore</button>`
+    : `<button class="btn btn-red" onclick="suspendFlagAccount('customer','suspend','${c.id}','${(c.first_name||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:5px 11px;">Suspend Account</button>`;
+
+  let evidence = '';
+  if (withEvidence) {
+    const { data: withdrawals } = await db.from('disbursements').select('*').eq('customer_id', custId).eq('type', 'withdrawal').order('requested_at', { ascending: false }).limit(5);
+    if (withdrawals?.length) {
+      evidence = `<div class="ff-evidence"><div class="ff-evidence-title">Recent withdrawal requests</div>` +
+        withdrawals.map(w => `<div class="ff-evidence-row"><span>${fmt(w.amount)}</span><span>${(w.status || 'pending').toUpperCase()} · ${fmtDate(w.requested_at)}</span></div>`).join('') +
+        `</div>`;
+    }
+  }
+
+  return `<div class="ff-account"><div class="ff-account-row"><div><div class="ff-account-name">${c.first_name} ${c.last_name}<span class="ff-role-tag">CUSTOMER</span>${statusTag}</div><div class="ff-account-sub">${(c.phone || '').replace('+234', '0')} · Joined ${fmtDate(c.created_at)}</div></div><div>${actionBtn}</div></div>${evidence}</div>`;
+}
+
+async function buildAgentFlagContext(agentId) {
+  const { data: r } = await db.from('representatives').select('*').eq('id', agentId).maybeSingle();
+  if (!r) return '<div class="ff-not-found">Agent account not found — may have been deleted.</div>';
+  const reliability = await getAgentReliability(r.id);
+  const reliabilityColor = reliability >= 80 ? 'var(--green)' : reliability >= 60 ? 'var(--yellow)' : 'var(--red)';
+  const isSuspended = r.status === 'suspended';
+  const statusTag = isSuspended ? '<span class="ff-status-tag">SUSPENDED</span>' : '';
+  const actionBtn = isSuspended
+    ? `<button class="btn btn-green" onclick="suspendFlagAccount('agent','restore','${r.id}','${(r.first_name||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:5px 11px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.51"/></svg>Restore</button>`
+    : `<button class="btn btn-red" onclick="suspendFlagAccount('agent','suspend','${r.id}','${(r.first_name||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:5px 11px;">Suspend Account</button>`;
+
+  return `<div class="ff-account"><div class="ff-account-row"><div><div class="ff-account-name">${r.first_name} ${r.last_name}<span class="ff-role-tag">AGENT</span>${statusTag}</div><div class="ff-account-sub">${r.rep_id} · ${(r.phone || '').replace('+234', '0')} · Reliability <span style="color:${reliabilityColor};font-weight:800;">${reliability}%</span></div></div><div>${actionBtn}</div></div></div>`;
+}
+
+async function suspendFlagAccount(role, action, id, name) {
+  if (role === 'customer') { action === 'suspend' ? await suspendCustomer(id, name) : await restoreCustomer(id, name); }
+  else { action === 'suspend' ? await suspendAgent(id, name) : await restoreAgent(id, name); }
+  await renderFraudFlags();
 }
 
 async function resolveFlag(id) {
