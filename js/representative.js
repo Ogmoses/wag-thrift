@@ -50,8 +50,14 @@ async function renderRepDash() {
   document.getElementById('repAv').textContent = rep.first_name[0].toUpperCase();
   document.getElementById('repName').textContent = rep.first_name + ' ' + rep.last_name;
   document.getElementById('repCode').textContent = 'Code: ' + rep.rep_id;
-  const today = new Date().toISOString().split('T')[0];
-  const { data: todayTx } = await db.from('transactions').select('amount').eq('agent_id', rep.id).in('type', ['deposit', 'opening']).gte('created_at', today);
+  // Local midnight, converted to the correct UTC instant — NOT the UTC
+  // calendar date. The old `new Date().toISOString().split('T')[0]`
+  // truncated to *UTC's* date, which for WAT (UTC+1) users lags the
+  // real local day by up to an hour right after local midnight, silently
+  // dropping deposits made in that window from "today"'s total.
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const { data: todayTx } = await db.from('transactions').select('amount').eq('agent_id', rep.id).in('type', ['deposit', 'opening']).gte('created_at', startOfToday);
   const todayAmt = (todayTx || []).reduce((s, t) => s + Number(t.amount), 0);
   document.getElementById('repTodayAmt').textContent = fmt(todayAmt);
   document.getElementById('repTodayCnt').textContent = (todayTx || []).length + ' transaction' + ((todayTx || []).length !== 1 ? 's' : '');

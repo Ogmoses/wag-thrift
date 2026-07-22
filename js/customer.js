@@ -45,7 +45,7 @@ async function renderCustDash() {
   bar.innerHTML = (plans || []).map(p => {
     const isOverdue = p.balance < p.target_amount && p.status === 'active';
     return `<div class="plan-tab${p.plan_id === activePlanId ? ' active' : ''}${isOverdue ? ' overdue-tab' : ''}" onclick="switchPlan('${p.plan_id}')">
-      <span class="plan-tab-name">${p.name}${isOverdue ? ' !' : ''}</span>
+      <span class="plan-tab-name">${p.name}</span>
       <span class="plan-tab-bal">${fmt(p.balance)}</span>
     </div>`;
   }).join('') + `<div class="plan-tab add-tab" onclick="openNewPlanModal()"><span class="plan-tab-add-ic">+</span><span class="plan-tab-add-lbl">New Plan</span></div>`;
