@@ -384,9 +384,10 @@ async function renderCalendar(plan, balance) {
 function drawCal() {
   const { yr, mo, covered, missed, payouts } = calState;
   const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const DN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const DN = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const todayStr = dateKey(new Date());
-  const firstDay = new Date(yr, mo, 1).getDay();
+  const rawFirstDay = new Date(yr, mo, 1).getDay(); // 0=Sun..6=Sat
+  const firstDay = (rawFirstDay + 6) % 7; // shifted to 0=Mon..6=Sun
   const daysInMonth = new Date(yr, mo + 1, 0).getDate();
   const lbl = document.getElementById('calMonthLbl');
   const hdr = document.getElementById('calDaysHdr');
