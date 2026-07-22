@@ -43,7 +43,25 @@ body.dark .cal-nav-btn{background:#2a2a2a!important;color:#f0f0f0!important;}
 
  <div id="calStandaloneContent" style="display:none;padding-top:14px;">
 
-  <!-- Streak ring — signature visual for this tab -->
+  <!-- Full calendar — now the primary, large focal element of this tab -->
+  <div class="cal-standalone-wrap cal-big">
+   <div class="wcard" style="padding:18px;">
+    <div class="mini-cal-hdr">
+     <button class="cal-nav-btn" onclick="prevCalMonth()">&#8249;</button>
+     <span class="mini-cal-month-lbl" id="calMonthLbl">—</span>
+     <button class="cal-nav-btn" onclick="nextCalMonth()">&#8250;</button>
+    </div>
+    <div class="mini-cal-days-hdr" id="calDaysHdr"></div>
+    <div id="calGrid"></div>
+    <div class="cal-legend">
+     <div class="cal-legend-item"><span class="cal-dot" style="background:#d1fae5;"></span>Paid</div>
+     <div class="cal-legend-item"><span class="cal-dot" style="background:#fee2e2;"></span>Missed</div>
+     <div class="cal-legend-item"><span class="cal-dot" style="background:#fef3c7;border:1px solid #f59e0b;"></span>Payout</div>
+    </div>
+   </div>
+  </div>
+
+  <!-- Streak ring — signature visual, now below the calendar -->
   <div class="streak-ring-card">
    <div class="streak-ring-wrap">
     <svg class="streak-ring-svg" viewBox="0 0 128 128">
@@ -65,24 +83,6 @@ body.dark .cal-nav-btn{background:#2a2a2a!important;color:#f0f0f0!important;}
   </div>
   <div class="streak-stats-row" style="grid-template-columns:1fr;">
    <div class="streak-card"><div class="sv" id="streakTotalVal">0</div><div class="sl">Total Days Paid</div></div>
-  </div>
-
-  <!-- Full calendar, same paid/missed/payout legend as the Home tab -->
-  <div class="cal-standalone-wrap">
-   <div class="wcard" style="padding:16px;">
-    <div class="mini-cal-hdr">
-     <button class="cal-nav-btn" onclick="prevCalMonth()">&#8249;</button>
-     <span class="mini-cal-month-lbl" id="calMonthLbl">—</span>
-     <button class="cal-nav-btn" onclick="nextCalMonth()">&#8250;</button>
-    </div>
-    <div class="mini-cal-days-hdr" id="calDaysHdr"></div>
-    <div id="calGrid"></div>
-    <div class="cal-legend">
-     <div class="cal-legend-item"><span class="cal-dot" style="background:#d1fae5;"></span>Paid</div>
-     <div class="cal-legend-item"><span class="cal-dot" style="background:#fee2e2;"></span>Missed</div>
-     <div class="cal-legend-item"><span class="cal-dot" style="background:#fef3c7;border:1px solid #f59e0b;"></span>Payout</div>
-    </div>
-   </div>
   </div>
 
  </div>
