@@ -439,7 +439,15 @@ function nextCalMonth() { calState.mo++; if (calState.mo > 11) { calState.mo = 0
 
 function initCalSwipe() {
   const wrap = document.getElementById('calGrid');
-  if (!wrap) return;
+  if (!wrap || !wrap.parentElement) return;
+  // Guard against duplicate binding: loadCalendarPage() (and therefore this
+  // function) reruns every time the plan switcher is used on the standalone
+  // Streaks tab. Without this guard, each switch stacked another pair of
+  // touch listeners on the same element with nothing ever removing the old
+  // ones — so after switching plans twice, a single swipe fired
+  // next/prevCalMonth() three times, only ever landing on every 3rd month.
+  if (wrap.parentElement.dataset.swipeBound === '1') return;
+  wrap.parentElement.dataset.swipeBound = '1';
   let sx = 0;
   wrap.parentElement.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive: true });
   wrap.parentElement.addEventListener('touchend', e => {
