@@ -1000,6 +1000,33 @@ async function removeReportRecipient(id, email) {
   await renderReportRecipients();
 }
 
+async function sendDigestNow(reportType) {
+  if (!WORKER_URL) {
+    setMsg('sendNowMsg', '<div class="msg-err">This needs the Worker to be set up first — ask your developer.</div>');
+    return;
+  }
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) { setMsg('sendNowMsg', '<div class="msg-err">Please sign in again</div>'); return; }
+  showLoading(reportType === 'weekly' ? 'Sending weekly report…' : 'Sending daily report…');
+  try {
+    const res = await fetch(`${WORKER_URL}/api/send-digest-now`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ report_type: reportType }),
+    });
+    const result = await res.json();
+    hideLoading();
+    if (!res.ok || result.error) {
+      setMsg('sendNowMsg', `<div class="msg-err">${result.error || 'Could not send the report. Please try again.'}</div>`);
+      return;
+    }
+    setMsg('sendNowMsg', `<div class="msg-ok">Sent to ${result.sentTo?.length || 0} recipient(s)</div>`);
+  } catch (e) {
+    hideLoading();
+    setMsg('sendNowMsg', '<div class="msg-err">Could not reach the server. Please try again.</div>');
+  }
+}
+
 
 async function deleteInactiveUsers() {
   if (!confirm('Remove all customers with no plans and no transactions? This cannot be undone.')) return;
