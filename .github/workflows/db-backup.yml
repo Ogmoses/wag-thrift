@@ -11,8 +11,12 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Install PostgreSQL client (for pg_dump)
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      -       - name: Install PostgreSQL 17 client (for pg_dump)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
 
       - name: Install AWS CLI (R2 is S3-compatible)
         run: |
