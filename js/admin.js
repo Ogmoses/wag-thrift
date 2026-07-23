@@ -942,8 +942,55 @@ async function renderAdminsList() {
 }
 
 // ═══════════════════════════════════════════════
-// USER MANAGEMENT — bulk cleanup
+// ADMIN DIGEST RECIPIENTS — who gets the daily/weekly activity email.
+// Managed here in Settings instead of a hardcoded GitHub secret, so any
+// admin can add/remove recipients without touching code.
 // ═══════════════════════════════════════════════
+async function renderReportRecipients() {
+  const el = document.getElementById('reportRecipientsList');
+  if (!el) return;
+  const { data: rows } = await db.from('report_recipients').select('*').order('added_at', { ascending: true });
+  if (!rows?.length) { el.innerHTML = '<div class="empty-state">No recipients added yet — the digest won\'t send until at least one is added.</div>'; return; }
+  el.innerHTML = rows.map(r => `
+    <div class="agent-row">
+      <div>
+        <div class="agent-row-name">${r.label || r.email}</div>
+        ${r.label ? `<div class="agent-row-sub">${r.email}</div>` : ''}
+      </div>
+      <button class="btn-sm btn-sm-ghost" onclick="removeReportRecipient('${r.id}','${(r.email || '').replace(/'/g, "\\'")}')">Remove</button>
+    </div>`).join('');
+}
+
+async function addReportRecipient() {
+  const emailInp = document.getElementById('newRecipientEmail');
+  const labelInp = document.getElementById('newRecipientLabel');
+  const email = emailInp.value.trim().toLowerCase();
+  const label = labelInp.value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    setMsg('recipientMsg', '<div class="msg-err">Please enter a valid email address</div>');
+    return;
+  }
+  showLoading('Adding recipient…');
+  const { error } = await db.from('report_recipients').insert({ email, label: label || null });
+  hideLoading();
+  if (error) {
+    setMsg('recipientMsg', `<div class="msg-err">${error.code === '23505' ? 'That email is already on the list' : 'Could not add recipient'}</div>`);
+    return;
+  }
+  emailInp.value = ''; labelInp.value = '';
+  setMsg('recipientMsg', '<div class="msg-ok">Recipient added</div>');
+  await renderReportRecipients();
+}
+
+async function removeReportRecipient(id, email) {
+  if (!confirm(`Remove ${email} from the digest recipient list?`)) return;
+  showLoading('Removing…');
+  await db.from('report_recipients').delete().eq('id', id);
+  hideLoading();
+  await renderReportRecipients();
+}
+
+
 async function deleteInactiveUsers() {
   if (!confirm('Remove all customers with no plans and no transactions? This cannot be undone.')) return;
   showLoading('Removing inactive users…');
