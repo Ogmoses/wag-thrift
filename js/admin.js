@@ -949,8 +949,13 @@ async function renderAdminsList() {
 async function renderReportRecipients() {
   const el = document.getElementById('reportRecipientsList');
   if (!el) return;
-  const { data: rows } = await db.from('report_recipients').select('*').order('added_at', { ascending: true });
-  if (!rows?.length) { el.innerHTML = '<div class="empty-state">No recipients added yet — the digest won\'t send until at least one is added.</div>'; return; }
+  const { data: rows, error } = await db.from('report_recipients').select('*').order('added_at', { ascending: true });
+  if (error) {
+    el.innerHTML = `<div class="empty-state">Couldn't load the list. ${error.code === '42P01' ? 'This feature needs one more setup step — ask your developer to run the report_recipients database update.' : 'Please try again.'}</div>`;
+    return;
+  }
+  if (!rows?.length) { el.innerHTML = '<div class="empty-state">No one added yet — reports won\'t go out until you add at least one email.</div>'; return; }
+  const me = getAdminSession();
   el.innerHTML = rows.map(r => `
     <div class="agent-row">
       <div>
@@ -970,20 +975,23 @@ async function addReportRecipient() {
     setMsg('recipientMsg', '<div class="msg-err">Please enter a valid email address</div>');
     return;
   }
-  showLoading('Adding recipient…');
+  showLoading('Adding…');
   const { error } = await db.from('report_recipients').insert({ email, label: label || null });
   hideLoading();
   if (error) {
-    setMsg('recipientMsg', `<div class="msg-err">${error.code === '23505' ? 'That email is already on the list' : 'Could not add recipient'}</div>`);
+    let msg = 'Something went wrong. Please try again.';
+    if (error.code === '23505') msg = 'That email is already on the list';
+    else if (error.code === '42P01') msg = 'This feature needs one more setup step — ask your developer to run the report_recipients database update.';
+    setMsg('recipientMsg', `<div class="msg-err">${msg}</div>`);
     return;
   }
   emailInp.value = ''; labelInp.value = '';
-  setMsg('recipientMsg', '<div class="msg-ok">Recipient added</div>');
+  setMsg('recipientMsg', '<div class="msg-ok">Added</div>');
   await renderReportRecipients();
 }
 
 async function removeReportRecipient(id, email) {
-  if (!confirm(`Remove ${email} from the digest recipient list?`)) return;
+  if (!confirm(`Stop sending reports to ${email}?`)) return;
   showLoading('Removing…');
   await db.from('report_recipients').delete().eq('id', id);
   hideLoading();
