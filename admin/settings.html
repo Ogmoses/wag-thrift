@@ -74,6 +74,26 @@
         </div>
 
         <div class="section-card">
+          <div class="section-card-title">Activity Digest Recipients</div>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:12px;">
+            Anyone on this list receives the daily summary and weekly rollup email —
+            a plain-language logbook of new accounts, deposits, withdrawals, and admin actions.
+            Add or remove addresses any time; no code changes needed.
+          </div>
+          <div id="reportRecipientsList"><div class="empty-state">Loading…</div></div>
+          <div class="settings-group" style="margin-top:14px;">
+            <label class="settings-label">Email Address</label>
+            <input type="email" id="newRecipientEmail" class="settings-inp" placeholder="e.g. finance@wagenterprises.com">
+          </div>
+          <div class="settings-group">
+            <label class="settings-label">Label (optional)</label>
+            <input type="text" id="newRecipientLabel" class="settings-inp" placeholder="e.g. Finance Team">
+          </div>
+          <div id="recipientMsg"></div>
+          <button class="btn btn-yellow" onclick="addReportRecipient()" style="margin-top:4px;">Add Recipient</button>
+        </div>
+
+        <div class="section-card">
           <div class="section-card-title">Invite New Admin</div>
           <div class="settings-group">
             <label class="settings-label">First Name</label>
@@ -132,7 +152,7 @@ if (!(await verifyAdminFromDB())) return;
       n.classList.toggle('active', n.getAttribute('href') === (page === 'auditlog' ? 'settings.html#auditlog' : 'settings.html'));
     });
     history.replaceState(null, '', page === 'auditlog' ? '#auditlog' : location.pathname);
-    if (page === 'auditlog') renderAuditLog(); else { renderSecurityLog(); renderAdminSessionInfo(); renderAdminsList(); }
+    if (page === 'auditlog') renderAuditLog(); else { renderSecurityLog(); renderAdminSessionInfo(); renderAdminsList(); renderReportRecipients(); }
   }
 
   document.querySelectorAll('.nav-item').forEach(n => {
