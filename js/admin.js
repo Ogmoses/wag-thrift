@@ -979,9 +979,11 @@ async function addReportRecipient() {
   const { error } = await db.from('report_recipients').insert({ email, label: label || null });
   hideLoading();
   if (error) {
+    console.error('Add recipient error:', error);
     let msg = 'Something went wrong. Please try again.';
     if (error.code === '23505') msg = 'That email is already on the list';
     else if (error.code === '42P01') msg = 'This feature needs one more setup step — ask your developer to run the report_recipients database update.';
+    else if (error.message) msg = `${msg} (${error.code || 'no code'}: ${error.message})`;
     setMsg('recipientMsg', `<div class="msg-err">${msg}</div>`);
     return;
   }
