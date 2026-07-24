@@ -74,6 +74,22 @@ function fmtNairaPDF(n) {
   return 'NGN ' + Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
 }
 
+// pdf-lib's built-in font only supports WinAnsi encoding (~Latin-1 range).
+// Admin-typed text (customer names, notes) can contain characters outside
+// that — smart quotes, en/em dashes, ellipses — especially likely to show
+// up somewhere across a full week of entries, which is why this crashed
+// on the weekly report specifically but not the daily one. This sanitizes
+// anything going into PDF text so it can never crash again.
+function pdfSafe(str) {
+  return String(str ?? '')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/₦/g, 'NGN ')
+    .replace(/[^\x00-\xFF]/g, '?');
+}
+
 function fmtDateTime(iso) {
   return new Date(iso).toLocaleString('en-NG', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -173,7 +189,7 @@ async function buildPDF(d) {
   line(18);
   text(PERIOD_LABEL, MARGIN, 20, bold, NAVY);
   line(16);
-  text(`${fmtDateTime(PERIOD_START.toISOString())}  —  ${fmtDateTime(NOW.toISOString())}`, MARGIN, 10, font, GREY);
+  text(`${fmtDateTime(PERIOD_START.toISOString())}  -  ${fmtDateTime(NOW.toISOString())}`, MARGIN, 10, font, GREY);
   line(30);
 
   // Stat summary
@@ -227,10 +243,10 @@ async function buildPDF(d) {
   } else {
     d.auditRows.forEach(a => {
       newPageIfNeeded(30);
-      const details = (a.description || '—');
-      const wrapped = details.length > 60 ? details.slice(0, 57) + '…' : details;
+      const details = pdfSafe(a.description || '-');
+      const wrapped = details.length > 60 ? details.slice(0, 57) + '...' : details;
       text(fmtDateTime(a.created_at), colTime, 8.5, font, GREY);
-      text((a.action || '').toUpperCase(), colAction, 8.5, bold, NAVY);
+      text(pdfSafe((a.action || '').toUpperCase()), colAction, 8.5, bold, NAVY);
       text(wrapped, colDetails, 8.5, font, BLACK);
       line(16);
     });
