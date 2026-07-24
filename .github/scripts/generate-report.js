@@ -236,8 +236,9 @@ async function buildPDF(d) {
   text('REF', txColRef, 9, bold, GREY);
   text('CUSTOMER', txColCust, 9, bold, GREY);
   text('AMOUNT', txColAmt - bold.widthOfTextAtSize('AMOUNT', 9), 9, bold, GREY);
-  line(14);
+  line(20);
   page.drawLine({ start: { x: MARGIN, y: y + 6 }, end: { x: PAGE_W - MARGIN, y: y + 6 }, thickness: 0.5, color: GREY });
+  line(8);
 
   if (!allTx.length) {
     line(16);
@@ -264,8 +265,9 @@ async function buildPDF(d) {
   text('TIME', colTime, 9, bold, GREY);
   text('ACTION', colAction, 9, bold, GREY);
   text('DETAILS', colDetails, 9, bold, GREY);
-  line(14);
+  line(20);
   page.drawLine({ start: { x: MARGIN, y: y + 6 }, end: { x: PAGE_W - MARGIN, y: y + 6 }, thickness: 0.5, color: GREY });
+  line(8);
 
   if (!d.auditRows.length) {
     line(16);
