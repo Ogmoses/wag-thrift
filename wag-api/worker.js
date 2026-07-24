@@ -331,6 +331,35 @@ async function buildDigestPDF(reportType, periodLabel, periodStart, now, d) {
   });
   line(14);
 
+  const allTx = [...d.deposits, ...d.payouts].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  newPageIfNeeded(60);
+  text(`TRANSACTIONS THIS PERIOD (${allTx.length} total)`, MARGIN, 11, bold, NAVY);
+  line(18);
+  const txColTime = MARGIN, txColRef = MARGIN + 100, txColCust = MARGIN + 210, txColAmt = PAGE_W - MARGIN;
+  text('TIME', txColTime, 9, bold, GREY);
+  text('REF', txColRef, 9, bold, GREY);
+  text('CUSTOMER', txColCust, 9, bold, GREY);
+  text('AMOUNT', txColAmt - bold.widthOfTextAtSize('AMOUNT', 9), 9, bold, GREY);
+  line(14);
+  page.drawLine({ start: { x: MARGIN, y: y + 6 }, end: { x: PAGE_W - MARGIN, y: y + 6 }, thickness: 0.5, color: GREY });
+
+  if (!allTx.length) {
+    line(16);
+    text('No transactions this period.', MARGIN, 10, font, GREY);
+  } else {
+    allTx.forEach(t => {
+      newPageIfNeeded(16);
+      const isIn = t.type === 'deposit' || t.type === 'opening';
+      const amtStr = `${isIn ? '+' : '-'}${fmtNairaPDF(t.amount)}`;
+      text(fmtDT(t.created_at), txColTime, 8.5, font, GREY);
+      text(pdfSafe(t.ref || '-'), txColRef, 8.5, font, BLACK);
+      text(pdfSafe(t.customer_name || 'Customer'), txColCust, 8.5, font, BLACK);
+      text(amtStr, txColAmt - bold.widthOfTextAtSize(amtStr, 8.5), 8.5, bold, isIn ? rgb(0.08, 0.5, 0.18) : rgb(0.73, 0.11, 0.11));
+      line(15);
+    });
+  }
+  line(14);
+
   newPageIfNeeded(60);
   text('ADMIN ACTION LOGBOOK', MARGIN, 11, bold, NAVY);
   line(18);
@@ -422,7 +451,7 @@ async function handleSendDigestNow(request, env) {
       fetchCount('representatives', `created_at=gte.${since}`),
       fetchCount('customers', `status=eq.active`),
       fetchCount('representatives', `status=eq.active`),
-      fetchRows('transactions', `created_at=gte.${since}&select=type,amount,customer_name,agent_name,created_at&order=created_at.asc`),
+      fetchRows('transactions', `created_at=gte.${since}&select=ref,type,amount,customer_name,agent_name,created_at&order=created_at.asc`),
       fetchRows('disbursements', `requested_at=gte.${since}&select=status,amount,customer_name,requested_at`),
       fetchRows('audit_log', `created_at=gte.${since}&select=action,description,amount,created_at&order=created_at.asc`),
       fetchRows('plan_balances', `select=balance`),
@@ -509,6 +538,32 @@ async function handleSendDigestNow(request, env) {
           <tr><td style="padding:3px 0;">${icon('check', '#15803d')}Approved</td><td style="text-align:right;font-weight:700;">${disbByStatus.approved || 0}</td></tr>
           <tr><td style="padding:3px 0;">${icon('cash', '#011f7b')}Paid</td><td style="text-align:right;font-weight:700;">${disbByStatus.paid || 0}</td></tr>
           <tr><td style="padding:3px 0;">${icon('x', '#b91c1c')}Rejected</td><td style="text-align:right;font-weight:700;">${disbByStatus.rejected || 0}</td></tr>
+        </table>
+      </div>
+      <div style="margin-top:24px;">
+        <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Transactions This Period (${deposits.length + payouts.length} total)</div>
+        <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+          <thead>
+            <tr style="background:#f9fafb;">
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;">Time</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;">Ref</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;">Customer</th>
+              <th style="padding:8px 10px;text-align:right;font-size:11px;color:#6b7280;text-transform:uppercase;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>${
+            [...deposits, ...payouts]
+              .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+              .map(t => {
+                const isIn = t.type === 'deposit' || t.type === 'opening';
+                return `<tr>
+                  <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#6b7280;white-space:nowrap;">${fmtDateTime(t.created_at)}</td>
+                  <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;font-family:monospace;color:#374151;">${t.ref || '—'}</td>
+                  <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#111827;">${t.customer_name || 'Customer'}</td>
+                  <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:13px;font-weight:700;text-align:right;color:${isIn ? '#15803d' : '#b91c1c'};">${isIn ? '+' : '-'}${fmtNaira(t.amount)}</td>
+                </tr>`;
+              }).join('') || `<tr><td colspan="4" style="padding:14px;text-align:center;color:#9ca3af;font-size:13px;">No transactions this period.</td></tr>`
+          }</tbody>
         </table>
       </div>
       <div style="margin-top:24px;">
