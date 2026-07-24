@@ -332,6 +332,17 @@ async function handleSendDigestNow(request, env) {
         </tr>`).join('')
     : `<tr><td colspan="3" style="padding:14px;text-align:center;color:#9ca3af;font-size:13px;">No admin actions logged this period.</td></tr>`;
 
+  const icon = (name, color) => {
+    const paths = {
+      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+      eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+      check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+      cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+      x: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
+    };
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block;margin-right:6px;">${paths[name]}</svg>`;
+  };
+
   const html = `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;background:#f4f6fb;padding:24px 16px;">
     <div style="background:#011f7b;border-radius:14px 14px 0 0;padding:24px 28px;">
@@ -375,11 +386,11 @@ async function handleSendDigestNow(request, env) {
       <div style="margin-top:20px;">
         <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Withdrawal Requests This Period (${disbRows.length} total)</div>
         <table style="width:100%;font-size:13px;">
-          <tr><td style="padding:3px 0;">🕐 Pending</td><td style="text-align:right;font-weight:700;">${disbByStatus.pending || 0}</td></tr>
-          <tr><td style="padding:3px 0;">👁️ Reviewed</td><td style="text-align:right;font-weight:700;">${disbByStatus.reviewed || 0}</td></tr>
-          <tr><td style="padding:3px 0;">✅ Approved</td><td style="text-align:right;font-weight:700;">${disbByStatus.approved || 0}</td></tr>
-          <tr><td style="padding:3px 0;">💸 Paid</td><td style="text-align:right;font-weight:700;">${disbByStatus.paid || 0}</td></tr>
-          <tr><td style="padding:3px 0;">❌ Rejected</td><td style="text-align:right;font-weight:700;">${disbByStatus.rejected || 0}</td></tr>
+          <tr><td style="padding:3px 0;">${icon('clock', '#b45309')}Pending</td><td style="text-align:right;font-weight:700;">${disbByStatus.pending || 0}</td></tr>
+          <tr><td style="padding:3px 0;">${icon('eye', '#4338ca')}Reviewed</td><td style="text-align:right;font-weight:700;">${disbByStatus.reviewed || 0}</td></tr>
+          <tr><td style="padding:3px 0;">${icon('check', '#15803d')}Approved</td><td style="text-align:right;font-weight:700;">${disbByStatus.approved || 0}</td></tr>
+          <tr><td style="padding:3px 0;">${icon('cash', '#011f7b')}Paid</td><td style="text-align:right;font-weight:700;">${disbByStatus.paid || 0}</td></tr>
+          <tr><td style="padding:3px 0;">${icon('x', '#b91c1c')}Rejected</td><td style="text-align:right;font-weight:700;">${disbByStatus.rejected || 0}</td></tr>
         </table>
       </div>
       <div style="margin-top:24px;">
