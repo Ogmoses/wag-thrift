@@ -35,6 +35,9 @@ jobs:
             echo "type=daily" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Install PDF library
+        run: npm install pdf-lib
+
       - name: Generate and send report
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
