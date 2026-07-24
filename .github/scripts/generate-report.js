@@ -66,6 +66,14 @@ function fmtNaira(n) {
   return '₦' + Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
 }
 
+// pdf-lib's built-in Helvetica font can't encode the ₦ symbol (it's outside
+// WinAnsi encoding) — this would crash PDF generation entirely if used
+// there. PDFs use this ASCII-safe version instead; the HTML email keeps
+// the real ₦ symbol since phones/browsers render it natively.
+function fmtNairaPDF(n) {
+  return 'NGN ' + Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
+}
+
 function fmtDateTime(iso) {
   return new Date(iso).toLocaleString('en-NG', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -129,6 +137,121 @@ async function gatherReport() {
 }
 
 // ─── BUILD HTML ───────────────────────────────────────────────────────────
+
+const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
+
+// ─── BUILD PDF ────────────────────────────────────────────────────────────
+// A proper downloadable/printable record of this period — mainly for the
+// audit logbook, since that's the part worth keeping for reference (the
+// email itself is easy to lose in a crowded inbox; a PDF is easy to save,
+// forward, or file away).
+
+async function buildPDF(d) {
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const NAVY = rgb(0.004, 0.122, 0.482);
+  const GOLD = rgb(1, 0.729, 0.035);
+  const GREY = rgb(0.42, 0.45, 0.5);
+  const BLACK = rgb(0.07, 0.09, 0.14);
+  const PAGE_W = 595, PAGE_H = 842, MARGIN = 50;
+
+  let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+  let y = PAGE_H - MARGIN;
+
+  const newPageIfNeeded = (need) => {
+    if (y - need < MARGIN) {
+      page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+      y = PAGE_H - MARGIN;
+    }
+  };
+  const text = (str, x, size, f, color) => page.drawText(String(str), { x, y, size, font: f || font, color: color || BLACK });
+  const line = (h) => { y -= h; };
+
+  // Header
+  text('WONDERFUL & ABLE GOD ENTERPRISES', MARGIN, 10, bold, rgb(0.7, 0.5, 0));
+  line(18);
+  text(PERIOD_LABEL, MARGIN, 20, bold, NAVY);
+  line(16);
+  text(`${fmtDateTime(PERIOD_START.toISOString())}  —  ${fmtDateTime(NOW.toISOString())}`, MARGIN, 10, font, GREY);
+  line(30);
+
+  // Stat summary
+  const stats = [
+    ['New customers', String(d.newCustomers)],
+    ['New agents', String(d.newAgents)],
+    ['Deposits collected', `${fmtNairaPDF(d.depositTotal)} (${d.deposits.length} txn)`],
+    ['Withdrawals paid', `${fmtNairaPDF(d.payoutTotal)} (${d.payouts.length} txn)`],
+    ['Total funds held across all plans', fmtNairaPDF(d.totalHeld)],
+    ['Active customers', String(d.totalActiveCustomers)],
+    ['Active agents', String(d.totalActiveAgents)],
+  ];
+  text('SUMMARY', MARGIN, 11, bold, NAVY);
+  line(18);
+  stats.forEach(([label, value]) => {
+    newPageIfNeeded(16);
+    text(label, MARGIN, 10, font, BLACK);
+    text(value, PAGE_W - MARGIN - bold.widthOfTextAtSize(value, 10), 10, bold, BLACK);
+    line(16);
+  });
+  line(10);
+
+  // Withdrawal pipeline
+  newPageIfNeeded(100);
+  text(`WITHDRAWAL REQUESTS THIS PERIOD (${d.disbCount} total)`, MARGIN, 11, bold, NAVY);
+  line(18);
+  [['Pending', d.disbByStatus.pending || 0], ['Reviewed', d.disbByStatus.reviewed || 0],
+   ['Approved', d.disbByStatus.approved || 0], ['Paid', d.disbByStatus.paid || 0],
+   ['Rejected', d.disbByStatus.rejected || 0]].forEach(([label, value]) => {
+    newPageIfNeeded(16);
+    text(label, MARGIN, 10, font, BLACK);
+    text(String(value), PAGE_W - MARGIN - bold.widthOfTextAtSize(String(value), 10), 10, bold, BLACK);
+    line(16);
+  });
+  line(14);
+
+  // Audit logbook — the part worth keeping for reference
+  newPageIfNeeded(60);
+  text('ADMIN ACTION LOGBOOK', MARGIN, 11, bold, NAVY);
+  line(18);
+  const colTime = MARGIN, colAction = MARGIN + 110, colDetails = MARGIN + 190;
+  text('TIME', colTime, 9, bold, GREY);
+  text('ACTION', colAction, 9, bold, GREY);
+  text('DETAILS', colDetails, 9, bold, GREY);
+  line(14);
+  page.drawLine({ start: { x: MARGIN, y: y + 6 }, end: { x: PAGE_W - MARGIN, y: y + 6 }, thickness: 0.5, color: GREY });
+
+  if (!d.auditRows.length) {
+    line(16);
+    text('No admin actions logged this period.', MARGIN, 10, font, GREY);
+  } else {
+    d.auditRows.forEach(a => {
+      newPageIfNeeded(30);
+      const details = (a.description || '—');
+      const wrapped = details.length > 60 ? details.slice(0, 57) + '…' : details;
+      text(fmtDateTime(a.created_at), colTime, 8.5, font, GREY);
+      text((a.action || '').toUpperCase(), colAction, 8.5, bold, NAVY);
+      text(wrapped, colDetails, 8.5, font, BLACK);
+      line(16);
+    });
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes).toString('base64');
+}
+
+// ─── BUILD EMAIL HTML ─────────────────────────────────────────────────────
+
+function icon(name, color) {
+  const paths = {
+    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+    check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+    cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+    x: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
+  };
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block;margin-right:6px;">${paths[name]}</svg>`;
+}
 
 function buildHTML(d) {
   const auditRowsHTML = d.auditRows.length
@@ -195,11 +318,11 @@ function buildHTML(d) {
       <div style="margin-top:20px;">
         <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Withdrawal Requests This Period (${d.disbCount} total)</div>
         <table style="width:100%;font-size:13px;">
-          <tr><td style="padding:3px 0;">🕐 Pending</td><td style="text-align:right;font-weight:700;">${d.disbByStatus.pending || 0}</td></tr>
-          <tr><td style="padding:3px 0;">👁️ Reviewed</td><td style="text-align:right;font-weight:700;">${d.disbByStatus.reviewed || 0}</td></tr>
-          <tr><td style="padding:3px 0;">✅ Approved</td><td style="text-align:right;font-weight:700;">${d.disbByStatus.approved || 0}</td></tr>
-          <tr><td style="padding:3px 0;">💸 Paid</td><td style="text-align:right;font-weight:700;">${d.disbByStatus.paid || 0}</td></tr>
-          <tr><td style="padding:3px 0;">❌ Rejected</td><td style="text-align:right;font-weight:700;">${d.disbByStatus.rejected || 0}</td></tr>
+          <tr><td style="padding:3px 0;">${icon('clock', '#b45309')}Pending</td><td style="text-align:right;font-weight:700;">${d.disbByStatus.pending || 0}</td></tr>
+          <tr><td style="padding:3px 0;">${icon('eye', '#4338ca')}Reviewed</td><td style="text-align:right;font-weight:700;">${d.disbByStatus.reviewed || 0}</td></tr>
+          <tr><td style="padding:3px 0;">${icon('check', '#15803d')}Approved</td><td style="text-align:right;font-weight:700;">${d.disbByStatus.approved || 0}</td></tr>
+          <tr><td style="padding:3px 0;">${icon('cash', '#011f7b')}Paid</td><td style="text-align:right;font-weight:700;">${d.disbByStatus.paid || 0}</td></tr>
+          <tr><td style="padding:3px 0;">${icon('x', '#b91c1c')}Rejected</td><td style="text-align:right;font-weight:700;">${d.disbByStatus.rejected || 0}</td></tr>
         </table>
       </div>
 
@@ -220,6 +343,7 @@ function buildHTML(d) {
 
       <p style="color:#9ca3af;font-size:11px;margin-top:24px;text-align:center;">
         This is an automated ${REPORT_TYPE} digest generated from live platform data.<br>
+        A downloadable PDF copy of this report, including the full admin action logbook, is attached — save it for your records.<br>
         Full raw database backups are stored separately and privately in Cloudflare R2.
       </p>
     </div>
@@ -228,7 +352,7 @@ function buildHTML(d) {
 
 // ─── SEND EMAIL ───────────────────────────────────────────────────────────
 
-async function sendEmail(html) {
+async function sendEmail(html, pdfBase64) {
   const from = RESEND_FROM_EMAIL || 'WAG Enterprises <onboarding@resend.dev>';
 
   // Prefer recipients managed in-app (Settings → Activity Digest Recipients).
@@ -250,6 +374,8 @@ async function sendEmail(html) {
     return;
   }
 
+  const dateStr = NOW.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' });
+
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -259,8 +385,11 @@ async function sendEmail(html) {
     body: JSON.stringify({
       from,
       to,
-      subject: `WAG ${PERIOD_LABEL} — ${NOW.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+      subject: `WAG ${PERIOD_LABEL} — ${dateStr}`,
       html,
+      attachments: [
+        { filename: `WAG-${REPORT_TYPE}-${NOW.toISOString().slice(0, 10)}.pdf`, content: pdfBase64 },
+      ],
     }),
   });
 
@@ -276,5 +405,6 @@ async function sendEmail(html) {
 (async () => {
   const data = await gatherReport();
   const html = buildHTML(data);
-  await sendEmail(html);
+  const pdfBase64 = await buildPDF(data);
+  await sendEmail(html, pdfBase64);
 })();
