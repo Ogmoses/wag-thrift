@@ -1,0 +1,9 @@
+{
+  "name": "wag-api",
+  "private": true,
+  "version": "1.0.0",
+  "description": "WAG Enterprises Cloudflare Worker — password reset, verification emails, and the admin activity digest.",
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
+  }
+}

@@ -9,8 +9,10 @@
  *   SUPABASE_URL           — your Supabase project URL
  *   SUPABASE_SERVICE_KEY   — service role key (NEVER the anon key)
  *
- * Deploy with: wrangler deploy 
+ * Deploy with: git push (auto-deployed via Cloudflare Workers Builds)
  */
+
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -242,6 +244,108 @@ async function handleSendResetEmail(request, env) {
 // currently logged-in admin — verified against Supabase Auth + the
 // administrators table, not just trusted because the request arrived.
 
+// Converts a Uint8Array to base64 without Node's Buffer (not available in
+// Workers by default). Chunked to avoid call-stack limits on large PDFs.
+function uint8ToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+// Same PDF layout as .github/scripts/generate-report.js, so a manually
+// sent report matches a scheduled one. pdf-lib's built-in font can't
+// encode the ₦ symbol, so amounts use "NGN 1,234" here — the HTML email
+// keeps the real ₦ symbol since phones render that fine.
+async function buildDigestPDF(reportType, periodLabel, periodStart, now, d) {
+  const fmtNairaPDF = (n) => 'NGN ' + Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
+  const fmtDT = (iso) => new Date(iso).toLocaleString('en-NG', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const NAVY = rgb(0.004, 0.122, 0.482);
+  const GREY = rgb(0.42, 0.45, 0.5);
+  const BLACK = rgb(0.07, 0.09, 0.14);
+  const PAGE_W = 595, PAGE_H = 842, MARGIN = 50;
+
+  let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+  let y = PAGE_H - MARGIN;
+  const newPageIfNeeded = (need) => { if (y - need < MARGIN) { page = pdfDoc.addPage([PAGE_W, PAGE_H]); y = PAGE_H - MARGIN; } };
+  const text = (str, x, size, f, color) => page.drawText(String(str), { x, y, size, font: f || font, color: color || BLACK });
+  const line = (h) => { y -= h; };
+
+  text('WONDERFUL & ABLE GOD ENTERPRISES', MARGIN, 10, bold, rgb(0.7, 0.5, 0));
+  line(18);
+  text(`${periodLabel} (sent manually)`, MARGIN, 20, bold, NAVY);
+  line(16);
+  text(`${fmtDT(periodStart.toISOString())}  —  ${fmtDT(now.toISOString())}`, MARGIN, 10, font, GREY);
+  line(30);
+
+  text('SUMMARY', MARGIN, 11, bold, NAVY);
+  line(18);
+  [
+    ['New customers', String(d.newCustomers)],
+    ['New agents', String(d.newAgents)],
+    ['Deposits collected', `${fmtNairaPDF(d.depositTotal)} (${d.deposits.length} txn)`],
+    ['Withdrawals paid', `${fmtNairaPDF(d.payoutTotal)} (${d.payouts.length} txn)`],
+    ['Total funds held across all plans', fmtNairaPDF(d.totalHeld)],
+    ['Active customers', String(d.totalActiveCustomers)],
+    ['Active agents', String(d.totalActiveAgents)],
+  ].forEach(([label, value]) => {
+    newPageIfNeeded(16);
+    text(label, MARGIN, 10, font, BLACK);
+    text(value, PAGE_W - MARGIN - bold.widthOfTextAtSize(value, 10), 10, bold, BLACK);
+    line(16);
+  });
+  line(10);
+
+  newPageIfNeeded(100);
+  text(`WITHDRAWAL REQUESTS THIS PERIOD (${d.disbCount} total)`, MARGIN, 11, bold, NAVY);
+  line(18);
+  [['Pending', d.disbByStatus.pending || 0], ['Reviewed', d.disbByStatus.reviewed || 0],
+   ['Approved', d.disbByStatus.approved || 0], ['Paid', d.disbByStatus.paid || 0],
+   ['Rejected', d.disbByStatus.rejected || 0]].forEach(([label, value]) => {
+    newPageIfNeeded(16);
+    text(label, MARGIN, 10, font, BLACK);
+    text(String(value), PAGE_W - MARGIN - bold.widthOfTextAtSize(String(value), 10), 10, bold, BLACK);
+    line(16);
+  });
+  line(14);
+
+  newPageIfNeeded(60);
+  text('ADMIN ACTION LOGBOOK', MARGIN, 11, bold, NAVY);
+  line(18);
+  const colTime = MARGIN, colAction = MARGIN + 110, colDetails = MARGIN + 190;
+  text('TIME', colTime, 9, bold, GREY);
+  text('ACTION', colAction, 9, bold, GREY);
+  text('DETAILS', colDetails, 9, bold, GREY);
+  line(14);
+  page.drawLine({ start: { x: MARGIN, y: y + 6 }, end: { x: PAGE_W - MARGIN, y: y + 6 }, thickness: 0.5, color: GREY });
+
+  if (!d.auditRows.length) {
+    line(16);
+    text('No admin actions logged this period.', MARGIN, 10, font, GREY);
+  } else {
+    d.auditRows.forEach(a => {
+      newPageIfNeeded(30);
+      const details = a.description || '—';
+      const wrapped = details.length > 60 ? details.slice(0, 57) + '…' : details;
+      text(fmtDT(a.created_at), colTime, 8.5, font, GREY);
+      text((a.action || '').toUpperCase(), colAction, 8.5, bold, NAVY);
+      text(wrapped, colDetails, 8.5, font, BLACK);
+      line(16);
+    });
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  return uint8ToBase64(pdfBytes);
+}
+
 async function verifyRequestIsAdmin(request, env) {
   const authHeader = request.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '');
@@ -408,6 +512,7 @@ async function handleSendDigestNow(request, env) {
       </div>
       <p style="color:#9ca3af;font-size:11px;margin-top:24px;text-align:center;">
         This ${reportType} digest was sent manually from Admin Settings.<br>
+        A downloadable PDF copy, including the full admin action logbook, is attached — save it for your records.<br>
         Full raw database backups are stored separately and privately in Cloudflare R2.
       </p>
     </div>
@@ -419,6 +524,12 @@ async function handleSendDigestNow(request, env) {
     return json({ error: 'No recipients configured. Add at least one email under Email Reports first.' }, 400);
   }
 
+  const pdfBase64 = await buildDigestPDF(reportType, periodLabel, periodStart, now, {
+    newCustomers, newAgents, totalActiveCustomers, totalActiveAgents,
+    deposits, payouts, depositTotal, payoutTotal,
+    disbByStatus, disbCount: disbRows.length, auditRows, totalHeld,
+  });
+
   const from = env.RESEND_FROM_EMAIL || 'WAG Enterprises <onboarding@resend.dev>';
   const sendRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -427,6 +538,9 @@ async function handleSendDigestNow(request, env) {
       from, to,
       subject: `WAG ${periodLabel} — ${now.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' })}`,
       html,
+      attachments: [
+        { filename: `WAG-${reportType}-${now.toISOString().slice(0, 10)}.pdf`, content: pdfBase64 },
+      ],
     }),
   });
 
