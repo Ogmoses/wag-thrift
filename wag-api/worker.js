@@ -259,6 +259,20 @@ function uint8ToBase64(bytes) {
 // sent report matches a scheduled one. pdf-lib's built-in font can't
 // encode the ₦ symbol, so amounts use "NGN 1,234" here — the HTML email
 // keeps the real ₦ symbol since phones render that fine.
+// pdf-lib's built-in font only supports WinAnsi encoding (~Latin-1 range).
+// Admin-typed text can contain characters outside that — smart quotes,
+// en/em dashes, ellipses — especially across a full week of entries.
+// Sanitizes anything going into PDF text so it can never crash the send.
+function pdfSafe(str) {
+  return String(str ?? '')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/₦/g, 'NGN ')
+    .replace(/[^\x00-\xFF]/g, '?');
+}
+
 async function buildDigestPDF(reportType, periodLabel, periodStart, now, d) {
   const fmtNairaPDF = (n) => 'NGN ' + Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
   const fmtDT = (iso) => new Date(iso).toLocaleString('en-NG', {
@@ -283,7 +297,7 @@ async function buildDigestPDF(reportType, periodLabel, periodStart, now, d) {
   line(18);
   text(`${periodLabel} (sent manually)`, MARGIN, 20, bold, NAVY);
   line(16);
-  text(`${fmtDT(periodStart.toISOString())}  —  ${fmtDT(now.toISOString())}`, MARGIN, 10, font, GREY);
+  text(`${fmtDT(periodStart.toISOString())}  -  ${fmtDT(now.toISOString())}`, MARGIN, 10, font, GREY);
   line(30);
 
   text('SUMMARY', MARGIN, 11, bold, NAVY);
@@ -333,10 +347,10 @@ async function buildDigestPDF(reportType, periodLabel, periodStart, now, d) {
   } else {
     d.auditRows.forEach(a => {
       newPageIfNeeded(30);
-      const details = a.description || '—';
-      const wrapped = details.length > 60 ? details.slice(0, 57) + '…' : details;
+      const details = pdfSafe(a.description || '-');
+      const wrapped = details.length > 60 ? details.slice(0, 57) + '...' : details;
       text(fmtDT(a.created_at), colTime, 8.5, font, GREY);
-      text((a.action || '').toUpperCase(), colAction, 8.5, bold, NAVY);
+      text(pdfSafe((a.action || '').toUpperCase()), colAction, 8.5, bold, NAVY);
       text(wrapped, colDetails, 8.5, font, BLACK);
       line(16);
     });
