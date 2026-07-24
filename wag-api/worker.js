@@ -9,7 +9,7 @@
  *   SUPABASE_URL           — your Supabase project URL
  *   SUPABASE_SERVICE_KEY   — service role key (NEVER the anon key)
  *
- * Deploy with: wrangler deploy
+ * Deploy with: wrangler deploy 
  */
 
 const CORS = {
