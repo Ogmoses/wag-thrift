@@ -146,8 +146,10 @@ function renderAdminShell(activePage, title) {
 
 let loginAttempts = 0;
 let lockoutUntil = 0;
+let _pendingMfaFactorId = null;
+let _pendingMfaChallengeId = null;
 
-// Called from admin/login.html
+// Called from admin/login.html — step 1: password.
 async function doAdminLogin() {
   const btn = document.getElementById('loginBtn');
   const now = Date.now();
@@ -161,33 +163,135 @@ async function doAdminLogin() {
   btn.textContent = 'Verifying…';
 
   const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email, password: pw });
-  let success = false;
-  if (!authErr && authData?.session) {
-    const profile = await refreshAdminProfile();
-    success = !!profile;
-    if (!success) await db.auth.signOut(); // signed in but not an admin — reject
+
+  if (authErr || !authData?.session) {
+    await handleAdminLoginFailure('Invalid email or password');
+    btn.disabled = false;
+    btn.textContent = 'Access Super Admin Portal';
+    return;
   }
+
+  // Password is correct. Before treating this as a real admin session,
+  // check whether this account has 2FA enrolled and, if so, whether this
+  // particular session still needs to complete that step.
+  const { data: aal } = await db.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
+    const { data: factors } = await db.auth.mfa.listFactors();
+    const factor = factors?.totp?.find(f => f.status === 'verified');
+    if (!factor) {
+      // Shouldn't happen (nextLevel said aal2 is available) but fail safe.
+      await db.auth.signOut();
+      await handleAdminLoginFailure('Could not start 2FA verification. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Access Super Admin Portal';
+      return;
+    }
+    const { data: challenge, error: challengeErr } = await db.auth.mfa.challenge({ factorId: factor.id });
+    if (challengeErr) {
+      await db.auth.signOut();
+      await handleAdminLoginFailure('Could not start 2FA verification. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Access Super Admin Portal';
+      return;
+    }
+    _pendingMfaFactorId = factor.id;
+    _pendingMfaChallengeId = challenge.id;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mfaScreen').style.display = 'block';
+    document.getElementById('mfaCodeInp').value = '';
+    document.getElementById('mfaCodeInp').focus();
+    btn.disabled = false;
+    btn.textContent = 'Access Super Admin Portal';
+    return;
+  }
+
+  // No 2FA required for this account — finish login the normal way.
+  await finishAdminLogin();
+}
+
+// Step 2 (only shown if the account has 2FA enrolled) — called from the
+// "Verify" button on the 2FA screen in admin/login.html.
+async function doAdminMfaVerify() {
+  const btn = document.getElementById('mfaVerifyBtn');
+  const code = document.getElementById('mfaCodeInp').value.trim();
+  if (!/^\d{6}$/.test(code)) { setMsg('mfaMsg', '<div class="msg-err">Enter the 6-digit code from your authenticator app</div>'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+
+  const { error } = await db.auth.mfa.verify({
+    factorId: _pendingMfaFactorId,
+    challengeId: _pendingMfaChallengeId,
+    code,
+  });
+
+  if (error) {
+    loginAttempts++;
+    if (loginAttempts >= 5) {
+      await db.auth.signOut();
+      lockoutUntil = Date.now() + 30000;
+      document.getElementById('mfaScreen').style.display = 'none';
+      document.getElementById('loginScreen').style.display = 'block';
+      showLockout(30);
+      return;
+    }
+    setMsg('mfaMsg', `<div class="msg-err">Incorrect code — ${5 - loginAttempts} attempt(s) remaining</div>`);
+    document.getElementById('mfaCodeInp').value = '';
+    document.getElementById('mfaCodeInp').focus();
+    btn.disabled = false;
+    btn.textContent = 'Verify';
+    // A fresh challenge is needed after a failed attempt.
+    const { data: challenge } = await db.auth.mfa.challenge({ factorId: _pendingMfaFactorId });
+    if (challenge) _pendingMfaChallengeId = challenge.id;
+    return;
+  }
+
+  await finishAdminLogin();
+}
+
+// Lets someone back out of the 2FA screen (e.g. wrong account) without
+// leaving a half-authenticated session sitting open.
+async function cancelAdminMfa() {
+  await db.auth.signOut();
+  _pendingMfaFactorId = null;
+  _pendingMfaChallengeId = null;
+  document.getElementById('mfaScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'block';
+  setMsg('mfaMsg', '');
+}
+
+// Shared by both the no-2FA and post-2FA-verified paths.
+async function finishAdminLogin() {
+  const profile = await refreshAdminProfile();
+  const success = !!profile;
+  if (!success) await db.auth.signOut(); // signed in but not an active admin — reject
 
   await auditLoginAttempt(success);
   sessionLog.unshift({ type: success ? 'ok' : 'fail', time: new Date().toLocaleString() });
 
   if (success) {
     loginAttempts = 0;
-    document.getElementById('adminPinInp').value = '';
+    const pinInp = document.getElementById('adminPinInp');
+    if (pinInp) pinInp.value = '';
     window.location.href = rootPath() + 'admin/dashboard.html';
   } else {
-    loginAttempts++;
-    if (loginAttempts >= 5) {
-      lockoutUntil = Date.now() + 30000;
-      showLockout(30);
-      setMsg('loginMsg', '');
-    } else {
-      setMsg('loginMsg', `<div class="msg-err">Invalid email or password — ${5 - loginAttempts} attempt(s) remaining</div>`);
-    }
-    btn.disabled = false;
-    btn.textContent = 'Access Super Admin Portal';
+    await handleAdminLoginFailure('Access denied for this account');
   }
-  document.getElementById('adminPinInp').value = '';
+}
+
+async function handleAdminLoginFailure(message) {
+  loginAttempts++;
+  document.getElementById('mfaScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'block';
+  if (loginAttempts >= 5) {
+    lockoutUntil = Date.now() + 30000;
+    showLockout(30);
+    setMsg('loginMsg', '');
+  } else {
+    setMsg('loginMsg', `<div class="msg-err">${message} — ${5 - loginAttempts} attempt(s) remaining</div>`);
+  }
+  const pinInp = document.getElementById('adminPinInp');
+  if (pinInp) pinInp.value = '';
 }
 
 function showLockout(secs) {
@@ -931,6 +1035,91 @@ async function inviteNewAdmin() {
   ['newAdminFn', 'newAdminLn', 'newAdminEmail', 'newAdminPw'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   await renderAdminsList();
 }
+
+// ═══════════════════════════════════════════════
+// TWO-FACTOR AUTHENTICATION (Settings page)
+// Uses Supabase Auth's built-in MFA — this app never sees or stores the
+// raw secret; Supabase generates it, shows the QR code, and verifies
+// codes internally, upgrading the session to a real "aal2" JWT claim
+// that is_admin() checks directly (see sql/007_admin_2fa.sql).
+// ═══════════════════════════════════════════════
+
+async function get2FAStatus() {
+  const { data, error } = await db.auth.mfa.listFactors();
+  if (error) return { enrolled: false };
+  const factor = data?.totp?.find(f => f.status === 'verified');
+  return { enrolled: !!factor, factorId: factor?.id || null };
+}
+
+async function render2FASection() {
+  const el = document.getElementById('twoFASection');
+  if (!el) return;
+  const status = await get2FAStatus();
+  if (status.enrolled) {
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;"></span>
+        <span style="font-weight:700;color:var(--green);">2FA is turned on</span>
+      </div>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:14px;">
+        You'll be asked for a code from your authenticator app every time you sign in.
+      </div>
+      <button class="btn btn-outline" onclick="disable2FA('${status.factorId}')">Turn off 2FA</button>`;
+  } else {
+    el.innerHTML = `
+      <div style="font-size:12px;color:var(--sub);margin-bottom:14px;">
+        Add an extra layer of security — after your password, you'll also need a code from an
+        authenticator app (like Google Authenticator or Authy) to sign in.
+      </div>
+      <button class="btn btn-yellow" onclick="start2FAEnrollment()">Set up 2FA</button>`;
+  }
+}
+
+async function start2FAEnrollment() {
+  showLoading('Setting up…');
+  const { data, error } = await db.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Authenticator App ' + Date.now() });
+  hideLoading();
+  if (error) { alert('Could not start 2FA setup. Please try again.'); return; }
+
+  window._enrollFactorId = data.id;
+  document.getElementById('mfaQrImg').src = data.totp.qr_code;
+  document.getElementById('mfaManualSecret').textContent = data.totp.secret;
+  document.getElementById('mfaEnrollCodeInp').value = '';
+  setMsg('mfaEnrollMsg', '');
+  showModal('mfaEnrollModal');
+}
+
+async function confirm2FAEnrollment() {
+  const code = document.getElementById('mfaEnrollCodeInp').value.trim();
+  if (!/^\d{6}$/.test(code)) { setMsg('mfaEnrollMsg', '<div class="msg-err">Enter the 6-digit code from your authenticator app</div>'); return; }
+
+  showLoading('Confirming…');
+  const { data: challenge, error: challengeErr } = await db.auth.mfa.challenge({ factorId: window._enrollFactorId });
+  if (challengeErr) { hideLoading(); setMsg('mfaEnrollMsg', '<div class="msg-err">Something went wrong. Please try again.</div>'); return; }
+
+  const { error: verifyErr } = await db.auth.mfa.verify({ factorId: window._enrollFactorId, challengeId: challenge.id, code });
+  hideLoading();
+  if (verifyErr) {
+    setMsg('mfaEnrollMsg', '<div class="msg-err">Incorrect code. Please try again.</div>');
+    return;
+  }
+
+  closeModal('mfaEnrollModal');
+  await audit('flag', 'Admin enabled two-factor authentication');
+  await render2FASection();
+  alert('2FA is now turned on. You\'ll be asked for a code the next time you sign in.');
+}
+
+async function disable2FA(factorId) {
+  if (!confirm('Turn off two-factor authentication? Your account will only be protected by your password.')) return;
+  showLoading('Turning off 2FA…');
+  const { error } = await db.auth.mfa.unenroll({ factorId });
+  hideLoading();
+  if (error) { alert('Could not turn off 2FA. Please try again.'); return; }
+  await audit('flag', 'Admin disabled two-factor authentication');
+  await render2FASection();
+}
+
 
 async function renderAdminsList() {
   const el = document.getElementById('adminsList');
