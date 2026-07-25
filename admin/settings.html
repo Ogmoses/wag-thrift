@@ -69,6 +69,11 @@
         </div>
 
         <div class="section-card">
+          <div class="section-card-title">Two-Factor Authentication</div>
+          <div id="twoFASection"><div class="empty-state">Loading…</div></div>
+        </div>
+
+        <div class="section-card">
           <div class="section-card-title">Admin Accounts</div>
           <div id="adminsList"><div class="empty-state">Loading…</div></div>
         </div>
@@ -143,6 +148,31 @@
   </main>
 </div>
 
+<!-- MODALS -->
+<div id="mfaEnrollModal" class="modal">
+  <div class="msheet" style="max-width:420px;position:relative;">
+    <button class="m-close" onclick="closeModal('mfaEnrollModal')">×</button>
+    <div class="m-handle"></div>
+    <div class="m-title">Set Up Two-Factor Authentication</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:14px;">
+      Scan this code with Google Authenticator, Authy, or any similar app.
+    </div>
+    <div style="text-align:center;background:#fff;padding:16px;border-radius:12px;margin-bottom:14px;">
+      <img id="mfaQrImg" src="" alt="2FA QR code" style="width:180px;height:180px;">
+    </div>
+    <div style="font-size:11px;color:var(--sub);margin-bottom:4px;">Can't scan? Enter this code manually:</div>
+    <div id="mfaManualSecret" style="font-family:monospace;font-size:13px;background:rgba(100,100,100,.1);padding:10px;border-radius:8px;word-break:break-all;margin-bottom:16px;"></div>
+    <label class="settings-label">Enter the 6-digit code from your app</label>
+    <input type="text" id="mfaEnrollCodeInp" class="settings-inp" inputmode="numeric" maxlength="6" placeholder="123456" style="text-align:center;font-size:20px;letter-spacing:4px;">
+    <div id="mfaEnrollMsg"></div>
+    <button class="btn btn-yellow" onclick="confirm2FAEnrollment()" style="margin-top:10px;">Confirm & Turn On</button>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+</script>
+
 <script>
 const _a = requireAdmin();
 if (_a) (async () => {
@@ -160,7 +190,7 @@ if (!(await verifyAdminFromDB())) return;
       n.classList.toggle('active', n.getAttribute('href') === (page === 'auditlog' ? 'settings.html#auditlog' : 'settings.html'));
     });
     history.replaceState(null, '', page === 'auditlog' ? '#auditlog' : location.pathname);
-    if (page === 'auditlog') renderAuditLog(); else { renderSecurityLog(); renderAdminSessionInfo(); renderAdminsList(); renderReportRecipients(); }
+    if (page === 'auditlog') renderAuditLog(); else { renderSecurityLog(); renderAdminSessionInfo(); renderAdminsList(); renderReportRecipients(); render2FASection(); }
   }
 
   document.querySelectorAll('.nav-item').forEach(n => {
