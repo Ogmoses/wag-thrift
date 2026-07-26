@@ -13,6 +13,7 @@
 <script src="../js/supabase.js"></script>
 <script src="../js/utils.js"></script>
 <script src="../js/auth.js"></script>
+<script src="../js/offline-queue.js"></script>
 <script src="../js/representative.js"></script>
 </head>
 <body>
@@ -26,6 +27,10 @@
  <div class="dash-header">
   <button onclick="window.location.href='dashboard.html'" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;margin-right:8px;">←</button>
   <div class="hdr-info"><div class="hdr-name">Customer Search</div></div>
+ </div>
+ <div class="pending-sync-badge" style="display:none;align-items:center;justify-content:space-between;gap:10px;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:10px 14px;margin:10px 14px 0;font-size:12px;color:#92400e;">
+   <span><strong><span class="pending-sync-count">0</span> deposit(s)</strong> saved offline, waiting to sync</span>
+   <button onclick="syncPendingCollections()" style="background:#92400e;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Sync Now</button>
  </div>
  <div style="padding-bottom:90px;">
  <div class="search-card">

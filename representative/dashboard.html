@@ -13,6 +13,7 @@
 <script src="../js/supabase.js"></script>
 <script src="../js/utils.js"></script>
 <script src="../js/auth.js"></script>
+<script src="../js/offline-queue.js"></script>
 <script src="../js/representative.js"></script>
 </head>
 <body>
@@ -27,6 +28,10 @@
  <div class="avatar-c" id="repAv">?</div>
  <div class="hdr-info"><div class="hdr-name" id="repName">—</div><div class="hdr-sub" id="repCode">Code: —</div></div>
  <div class="hdr-right"><button class="signout-btn" onclick="doLogout()" style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.25);color:#fff;cursor:pointer;flex-shrink:0;font-size:12px;font-weight:700;letter-spacing:.3px;display:flex;align-items:center;gap:5px;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign Out</button></div>
+ </div>
+ <div class="pending-sync-badge" style="display:none;align-items:center;justify-content:space-between;gap:10px;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:10px 14px;margin:10px 14px 0;font-size:12px;color:#92400e;">
+   <span><strong><span class="pending-sync-count">0</span> deposit(s)</strong> saved offline, waiting to sync</span>
+   <button onclick="syncPendingCollections()" style="background:#92400e;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Sync Now</button>
  </div>
  <div style="padding-bottom:80px;">
  <div class="rep-stats">
