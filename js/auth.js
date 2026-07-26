@@ -159,7 +159,7 @@ async function checkFailedPin(phone) {
 // login (and other network calls) can show an accurate message instead of
 // a misleading "invalid credentials" when the real problem is signal.
 function isConnectivityError(error) {
-  return !navigator.onLine || /fetch|network/i.test(error?.message || '');
+  return !navigator.onLine || /fetch|network|load failed|timed out|timeout|offline/i.test(error?.message || '');
 }
 
 async function doLogin() {

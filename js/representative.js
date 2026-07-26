@@ -166,7 +166,7 @@ async function repDoSearch() {
   hideLoading();
 
   if (error || result?.ok === false) {
-    const isNetworkIssue = !navigator.onLine || /fetch|network/i.test(error?.message || '');
+    const isNetworkIssue = !navigator.onLine || /fetch|network|load failed|timed out|timeout|offline/i.test(error?.message || '');
     if (isNetworkIssue) {
       const cached = await getCachedCustomerLookup(normPh);
       if (cached) { renderRepCustomerCard(cached.payload, true, cached.cachedAt); return; }
@@ -335,7 +335,7 @@ async function _doCollection() {
     showReceipt(amt, repSelectedPlan, rep, repFoundCust, ref, method, newBal);
   } catch (e) {
     hideLoading();
-    const isNetworkIssue = !navigator.onLine || /fetch|network|failed/i.test(e?.message || '');
+    const isNetworkIssue = !navigator.onLine || /fetch|network|failed|load failed|timed out|timeout|offline/i.test(e?.message || '');
     if (isNetworkIssue) {
       await queueOfflineCollection(details);
     } else {

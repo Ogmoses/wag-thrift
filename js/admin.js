@@ -165,7 +165,7 @@ async function doAdminLogin() {
   const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email, password: pw });
 
   if (authErr || !authData?.session) {
-    const isConnectivityIssue = !navigator.onLine || /fetch|network/i.test(authErr?.message || '');
+    const isConnectivityIssue = !navigator.onLine || /fetch|network|load failed|timed out|timeout|offline/i.test(authErr?.message || '');
     if (isConnectivityIssue) {
       setMsg('loginMsg', '<div class="msg-err">No connection right now. Please check your signal and try again.</div>');
     } else {
