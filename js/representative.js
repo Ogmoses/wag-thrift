@@ -593,14 +593,18 @@ async function loadRepTxPage() {
   const u = getUser(); if (!u) return;
   const el = document.getElementById('repTxSubList');
   el.innerHTML = '<div class="tx-empty">Loading…</div>';
-  const { data: allTx } = await db.from('transactions').select('*').eq('agent_id', u.id).order('created_at', { ascending: false });
+  // These two only depend on the rep's own id, not on each other's
+  // result, so they run concurrently instead of one after another.
+  const [{ data: allTx }, { data: rd }] = await Promise.all([
+    db.from('transactions').select('*').eq('agent_id', u.id).order('created_at', { ascending: false }),
+    db.from('disbursements').select('*').eq('confirmed_by', u.id).eq('status', 'rejected'),
+  ]);
   const custIds = [...new Set((allTx || []).map(t => t.customer_id).filter(Boolean))];
   let cMap = {};
   if (custIds.length) {
     const { data: custs } = await db.from('customers').select('id,first_name,last_name').in('id', custIds);
     (custs || []).forEach(cu => cMap[cu.id] = cu.first_name + ' ' + cu.last_name);
   }
-  const { data: rd } = await db.from('disbursements').select('*').eq('confirmed_by', u.id).eq('status', 'rejected');
   const rejRows = (rd || []).map(d => ({ id: d.id, type: 'rejected_disb', amount: d.amount, created_at: d.requested_at || d.created_at, ref: d.ref, customer_id: d.customer_id, customer_name: d.customer_name }));
   _repTxAll = [...(allTx || []), ...rejRows].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   _repCustMapHist = cMap;

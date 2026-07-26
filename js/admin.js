@@ -393,7 +393,8 @@ let currentPage = 'overview';
 async function renderOverview() {
   if (!db) return;
   const [
-    { count: cc }, { count: rc }, { data: allTx }, { count: planCnt }, { data: pendDisb }
+    { count: cc }, { count: rc }, { data: allTx }, { count: planCnt }, { data: pendDisb },
+    { count: pdc }, { count: flagCount }, { data: auditRows }
   ] = await Promise.all([
     db.from('customers').select('*', { count: 'exact', head: true }),
     db.from('representatives').select('*', { count: 'exact', head: true }),
@@ -401,7 +402,10 @@ async function renderOverview() {
     db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     // Show both pending AND reviewed here — admin can review or approve
     // directly from the Overview without navigating to the full Disbursements tab.
-    db.from('disbursements').select('*,customers(first_name,last_name,phone)').in('status', ['pending', 'reviewed']).order('requested_at', { ascending: false }).limit(5)
+    db.from('disbursements').select('*,customers(first_name,last_name,phone)').in('status', ['pending', 'reviewed']).order('requested_at', { ascending: false }).limit(5),
+    db.from('disbursements').select('*', { count: 'exact', head: true }).in('status', ['pending', 'reviewed']),
+    db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
+    db.from('audit_log').select('*').order('created_at', { ascending: false }).limit(10),
   ]);
 
   const deps = (allTx || []).filter(t => t.type === 'deposit' || t.type === 'opening');
@@ -415,7 +419,6 @@ async function renderOverview() {
   document.getElementById('ovPayouts').textContent = fmt(totalPay);
   document.getElementById('ovPlans').textContent = planCnt || 0;
 
-  const { count: pdc } = await db.from('disbursements').select('*', { count: 'exact', head: true }).in('status', ['pending', 'reviewed']);
   document.getElementById('ovPendingDisb').textContent = pdc || 0;
   const badge = document.getElementById('disbBadge');
   if (badge) { if (pdc > 0) { badge.style.display = ''; badge.textContent = pdc; } else badge.style.display = 'none'; }
@@ -426,11 +429,9 @@ async function renderOverview() {
     document.getElementById('ovDisbList').innerHTML = pendDisb.map(d => renderDisbCard(d, true)).join('');
   }
 
-  const { count: flagCount } = await db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false);
   const flagBadgeEl = document.getElementById('flagBadge');
   if (flagBadgeEl) { flagBadgeEl.style.display = flagCount > 0 ? '' : 'none'; flagBadgeEl.textContent = flagCount || 0; }
 
-  const { data: auditRows } = await db.from('audit_log').select('*').order('created_at', { ascending: false }).limit(10);
   renderAuditRows('ovAuditList', auditRows || []);
 }
 
@@ -798,15 +799,17 @@ async function adminDoSearch() {
 // ═══════════════════════════════════════════════
 async function renderAnalytics() {
   if (!db) return;
-  const { data: allTx } = await db.from('transactions').select('amount,type,created_at');
+  const [{ data: allTx }, { count: custCnt }, { count: repCnt }, { count: activePlanCnt }, { count: flagCnt }] = await Promise.all([
+    db.from('transactions').select('amount,type,created_at'),
+    db.from('customers').select('*', { count: 'exact', head: true }),
+    db.from('representatives').select('*', { count: 'exact', head: true }),
+    db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
+  ]);
   const deps = (allTx || []).filter(t => t.type === 'deposit' || t.type === 'opening');
   const pays = (allTx || []).filter(t => t.type === 'payout');
   const totalVol = deps.reduce((s, t) => s + Number(t.amount), 0);
   const totalPay = pays.reduce((s, t) => s + Number(t.amount), 0);
-  const { count: custCnt } = await db.from('customers').select('*', { count: 'exact', head: true });
-  const { count: repCnt } = await db.from('representatives').select('*', { count: 'exact', head: true });
-  const { count: activePlanCnt } = await db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active');
-  const { count: flagCnt } = await db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false);
 
   document.getElementById('analyticsGrid').innerHTML = `
     <div class="ov-card green"><div class="ov-lbl">Total Volume</div><div class="ov-val">${fmt(totalVol)}</div><div class="ov-sub">all deposits</div></div>
