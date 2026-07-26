@@ -52,12 +52,11 @@
 <script>
 const _a = requireAdmin();
 if (_a) (async () => {
-if (!(await verifyAdminFromDB())) return;
   initAdminTheme();
   const initial = (location.hash === '#search') ? 'search' : 'customers';
   renderAdminShell(initial, initial === 'search' ? 'Search' : 'Customers');
 
-  function showAdminTab(page) {
+  async function showAdminTab(page) {
     currentPage = page;
     document.getElementById('page-customers').classList.toggle('active', page === 'customers');
     document.getElementById('page-search').classList.toggle('active', page === 'search');
@@ -66,7 +65,7 @@ if (!(await verifyAdminFromDB())) return;
       n.classList.toggle('active', n.getAttribute('href') === (page === 'search' ? 'users.html#search' : 'users.html'));
     });
     history.replaceState(null, '', page === 'search' ? '#search' : location.pathname);
-    if (page === 'customers') renderCustomersPage();
+    if (page === 'customers') return renderCustomersPage();
   }
 
   document.querySelectorAll('.nav-item').forEach(n => {
@@ -77,7 +76,11 @@ if (!(await verifyAdminFromDB())) return;
   });
 
   setSearchSub('customer');
-  showAdminTab(initial);
+  const [valid] = await Promise.all([
+    verifyAdminFromDB(),
+    showAdminTab(initial).catch(e => console.error('Admin users render error:', e)),
+  ]);
+  if (!valid) { window.location.replace(rootPath() + 'admin/login.html'); return; }
   closeSidebar();
 })();
 </script>

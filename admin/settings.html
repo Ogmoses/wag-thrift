@@ -176,12 +176,11 @@ document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e =
 <script>
 const _a = requireAdmin();
 if (_a) (async () => {
-if (!(await verifyAdminFromDB())) return;
   initAdminTheme();
   const initial = (location.hash === '#auditlog') ? 'auditlog' : 'settings';
   renderAdminShell(initial, initial === 'auditlog' ? 'Audit Log' : 'Settings');
 
-  function showAdminTab(page) {
+  async function showAdminTab(page) {
     currentPage = page;
     document.getElementById('page-auditlog').classList.toggle('active', page === 'auditlog');
     document.getElementById('page-settings').classList.toggle('active', page === 'settings');
@@ -190,7 +189,8 @@ if (!(await verifyAdminFromDB())) return;
       n.classList.toggle('active', n.getAttribute('href') === (page === 'auditlog' ? 'settings.html#auditlog' : 'settings.html'));
     });
     history.replaceState(null, '', page === 'auditlog' ? '#auditlog' : location.pathname);
-    if (page === 'auditlog') renderAuditLog(); else { renderSecurityLog(); renderAdminSessionInfo(); renderAdminsList(); renderReportRecipients(); render2FASection(); }
+    if (page === 'auditlog') return renderAuditLog();
+    return Promise.all([renderSecurityLog(), renderAdminSessionInfo(), renderAdminsList(), renderReportRecipients(), render2FASection()]);
   }
 
   document.querySelectorAll('.nav-item').forEach(n => {
@@ -200,7 +200,11 @@ if (!(await verifyAdminFromDB())) return;
     }
   });
 
-  showAdminTab(initial);
+  const [valid] = await Promise.all([
+    verifyAdminFromDB(),
+    showAdminTab(initial).catch(e => console.error('Admin settings render error:', e)),
+  ]);
+  if (!valid) { window.location.replace(rootPath() + 'admin/login.html'); return; }
   closeSidebar();
 })();
 </script>

@@ -76,12 +76,11 @@
 <script>
 const _a = requireAdmin();
 if (_a) (async () => {
-if (!(await verifyAdminFromDB())) return;
   initAdminTheme();
   const initial = (location.hash === '#disbursements') ? 'disbursements' : 'overview';
   renderAdminShell(initial, initial === 'disbursements' ? 'Disbursements' : 'Overview');
 
-  function showAdminTab(page) {
+  async function showAdminTab(page) {
     currentPage = page;
     document.getElementById('page-overview').classList.toggle('active', page === 'overview');
     document.getElementById('page-disbursements').classList.toggle('active', page === 'disbursements');
@@ -90,7 +89,7 @@ if (!(await verifyAdminFromDB())) return;
       n.classList.toggle('active', n.getAttribute('href') === (page === 'disbursements' ? 'dashboard.html#disbursements' : 'dashboard.html'));
     });
     history.replaceState(null, '', page === 'disbursements' ? '#disbursements' : location.pathname);
-    if (page === 'disbursements') renderDisbPage(); else renderOverview();
+    return page === 'disbursements' ? renderDisbPage() : renderOverview();
   }
 
   // Intercept the Overview / Disbursements nav links so they switch tabs in-page
@@ -102,7 +101,13 @@ if (!(await verifyAdminFromDB())) return;
   });
   document.getElementById('ovViewAllDisb').addEventListener('click', e => { e.preventDefault(); showAdminTab('disbursements'); });
 
-  showAdminTab(initial);
+  // The security re-check and the initial tab's data don't depend on each
+  // other, so they run concurrently instead of the check gating the render.
+  const [valid] = await Promise.all([
+    verifyAdminFromDB(),
+    showAdminTab(initial).catch(e => console.error('Admin dashboard render error:', e)),
+  ]);
+  if (!valid) { window.location.replace(rootPath() + 'admin/login.html'); return; }
   closeSidebar();
 })();
 </script>

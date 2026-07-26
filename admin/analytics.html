@@ -45,12 +45,11 @@
 <script>
 const _a = requireAdmin();
 if (_a) (async () => {
-if (!(await verifyAdminFromDB())) return;
   initAdminTheme();
   const initial = (location.hash === '#flags') ? 'flags' : 'analytics';
   renderAdminShell(initial, initial === 'flags' ? 'Fraud Flags' : 'Analytics');
 
-  function showAdminTab(page) {
+  async function showAdminTab(page) {
     currentPage = page;
     document.getElementById('page-analytics').classList.toggle('active', page === 'analytics');
     document.getElementById('page-flags').classList.toggle('active', page === 'flags');
@@ -59,7 +58,7 @@ if (!(await verifyAdminFromDB())) return;
       n.classList.toggle('active', n.getAttribute('href') === (page === 'flags' ? 'analytics.html#flags' : 'analytics.html'));
     });
     history.replaceState(null, '', page === 'flags' ? '#flags' : location.pathname);
-    if (page === 'analytics') renderAnalytics(); else renderFraudFlags();
+    return page === 'analytics' ? renderAnalytics() : renderFraudFlags();
   }
 
   document.querySelectorAll('.nav-item').forEach(n => {
@@ -69,7 +68,11 @@ if (!(await verifyAdminFromDB())) return;
     }
   });
 
-  showAdminTab(initial);
+  const [valid] = await Promise.all([
+    verifyAdminFromDB(),
+    showAdminTab(initial).catch(e => console.error('Admin analytics render error:', e)),
+  ]);
+  if (!valid) { window.location.replace(rootPath() + 'admin/login.html'); return; }
   closeSidebar();
 })();
 </script>
