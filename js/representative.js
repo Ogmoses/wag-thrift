@@ -23,9 +23,32 @@ async function confirmPayPin() {
   if (!pin || pin.length < 4) { setMsg('payPinMsg', '<div class="msg-err">Enter your 4–6 digit payment PIN</div>'); return; }
   const user = getUser(); const pinHash = await hashPin(pin);
   const tbl = user.role === 'representative' ? 'representatives' : 'customers';
-  const { data: row } = await db.from(tbl).select('payment_pin_hash').eq('id', user.id).single();
-  if (!row?.payment_pin_hash) { closeModal('payPinModal'); if (_payPinCallback) { _payPinCallback(); _payPinCallback = null; } return; }
+  const cacheKey = `wag_pinhash_${user.role}_${user.id}`;
+
+  const { data: row, error } = await db.from(tbl).select('payment_pin_hash').eq('id', user.id).single();
+
+  if (error || !row) {
+    // Couldn't reach the server — fall back to the locally cached hash
+    // from the last successful online check, rather than silently
+    // letting them through unverified (which is what happens if this
+    // falls through treating "no data" the same as "no PIN ever set").
+    const cached = localStorage.getItem(cacheKey);
+    if (!cached) {
+      setMsg('payPinMsg', '<div class="msg-err">Can\'t verify your PIN offline yet — please connect once first, then try again.</div>');
+      return;
+    }
+    if (cached !== pinHash) { setMsg('payPinMsg', '<div class="msg-err">Incorrect PIN. Try again.</div>'); return; }
+    closeModal('payPinModal');
+    document.getElementById('payPinInp').value = '';
+    if (_payPinCallback) { _payPinCallback(); _payPinCallback = null; }
+    return;
+  }
+
+  if (!row.payment_pin_hash) { closeModal('payPinModal'); if (_payPinCallback) { _payPinCallback(); _payPinCallback = null; } return; }
   if (row.payment_pin_hash !== pinHash) { setMsg('payPinMsg', '<div class="msg-err">Incorrect PIN. Try again.</div>'); return; }
+
+  // Verified live — cache it for the next offline attempt.
+  localStorage.setItem(cacheKey, row.payment_pin_hash);
   closeModal('payPinModal');
   document.getElementById('payPinInp').value = '';
   if (_payPinCallback) { _payPinCallback(); _payPinCallback = null; }
@@ -141,11 +164,25 @@ async function repDoSearch() {
   const normPh = normPhone(raw); showLoading('Searching…');
   const { data: result, error } = await db.rpc('rep_search_customer', { p_phone: normPh });
   hideLoading();
+
   if (error || result?.ok === false) {
+    const isNetworkIssue = !navigator.onLine || /fetch|network/i.test(error?.message || '');
+    if (isNetworkIssue) {
+      const cached = await getCachedCustomerLookup(normPh);
+      if (cached) { renderRepCustomerCard(cached.payload, true, cached.cachedAt); return; }
+      setMsg('repSearchMsg', '<div class="msg-err">No connection, and this customer hasn\'t been searched on this device before. Search for them once while online first.</div>');
+      return;
+    }
     setMsg('repSearchMsg', `<div class="msg-err">${result?.error || error?.message || 'Customer not found. Check the phone number.'}</div>`);
     document.getElementById('repCustCard').style.display = 'none';
     return;
   }
+
+  await cacheCustomerLookup(normPh, result);
+  renderRepCustomerCard(result, false, null);
+}
+
+function renderRepCustomerCard(result, isOffline, cachedAt) {
   const cust = result.customer;
   const plans = result.plans || [];
   const disbs = result.disbursements || [];
@@ -158,6 +195,21 @@ async function repDoSearch() {
   plans.forEach(p => dd.innerHTML += `<option value="${p.plan_id}" data-bal="${p.balance}" data-tgt="${p.target_amount}" data-contrib="${p.regular_contribution || 0}" data-createdat="${p.plan_created_at || ''}" data-deposited="${p.total_deposited || 0}">${p.name} — ${fmt(p.balance)}</option>`);
   if (plans.length === 1) { dd.value = plans[0].plan_id; repOnPlanChange(); } else document.getElementById('repPlanDetails').style.display = 'none';
   renderRepDisbList(cust.id, disbs);
+
+  let banner = document.getElementById('repOfflineBanner');
+  if (isOffline) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'repOfflineBanner';
+      banner.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:9px 12px;font-size:11px;color:#92400e;margin-bottom:10px;';
+      document.getElementById('repCustCard').prepend(banner);
+    }
+    banner.style.display = 'block';
+    banner.textContent = `Offline — showing cached data from ${new Date(cachedAt).toLocaleString()}. Balances may be out of date.`;
+  } else if (banner) {
+    banner.style.display = 'none';
+  }
+
   document.getElementById('repCustCard').style.display = 'block';
 }
 
@@ -255,21 +307,127 @@ async function _doCollection() {
     setMsg('colMsg', `<div class="msg-err">Amount must be a multiple of the regular contribution (${fmt(regContrib)}).<br>e.g. ${multiples}…</div>`);
     return;
   }
+
+  const custName = `${repFoundCust.first_name} ${repFoundCust.last_name}`;
+  const details = { ref, amt, method, notes, planId: repSelectedPlan.id, customerId: repFoundCust.id, agentId: rep.id, custName };
+
+  // Already known to be offline — skip straight to queuing, no point
+  // waiting on a request that can't possibly succeed.
+  if (!navigator.onLine) { await queueOfflineCollection(details); return; }
+
   showLoading('Saving deposit…');
-  const { count: txCount } = await db.from('transactions').select('*', { count: 'exact', head: true }).eq('plan_id', repSelectedPlan.id);
-  const txType = (txCount === 0) ? 'opening' : 'deposit';
-  await db.from('transactions').insert({ ref, type: txType, amount: amt, plan_id: repSelectedPlan.id, customer_id: repFoundCust.id, agent_id: rep.id, method, notes });
-  await db.from('representatives').update({ confirmed_count: (rep.confirmed_count || 0) + 1 }).eq('id', rep.id);
-  await checkLargeCollection(amt, rep.id, repSelectedPlan.id);
-  await audit('deposit', rep.id, 'representative', `Collected ${fmt(amt)} for ${repFoundCust.first_name} ${repFoundCust.last_name} — Ref: ${ref}`, amt, repSelectedPlan.id);
-  hideLoading(); closeModal('collectModal');
-  setUser({ ...rep, confirmed_count: (rep.confirmed_count || 0) + 1 });
+  try {
+    const { count: txCount } = await db.from('transactions').select('*', { count: 'exact', head: true }).eq('plan_id', repSelectedPlan.id);
+    const txType = (txCount === 0) ? 'opening' : 'deposit';
+    const { error: insertErr } = await db.from('transactions').insert({ ref, type: txType, amount: amt, plan_id: repSelectedPlan.id, customer_id: repFoundCust.id, agent_id: rep.id, method, notes });
+    if (insertErr) throw insertErr;
+
+    await db.from('representatives').update({ confirmed_count: (rep.confirmed_count || 0) + 1 }).eq('id', rep.id);
+    await checkLargeCollection(amt, rep.id, repSelectedPlan.id);
+    await audit('deposit', rep.id, 'representative', `Collected ${fmt(amt)} for ${custName} — Ref: ${ref}`, amt, repSelectedPlan.id);
+    hideLoading(); closeModal('collectModal');
+    setUser({ ...rep, confirmed_count: (rep.confirmed_count || 0) + 1 });
+    document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = '';
+    await repDoSearch(); // refreshes balance from RPC before showing receipt
+    const dd2 = document.getElementById('repPlanDd');
+    const opt2 = dd2.options[dd2.selectedIndex];
+    const newBal = +(opt2?.dataset?.bal || 0);
+    showReceipt(amt, repSelectedPlan, rep, repFoundCust, ref, method, newBal);
+  } catch (e) {
+    hideLoading();
+    const isNetworkIssue = !navigator.onLine || /fetch|network|failed/i.test(e?.message || '');
+    if (isNetworkIssue) {
+      await queueOfflineCollection(details);
+    } else {
+      setMsg('colMsg', `<div class="msg-err">${e?.message || 'Could not save this deposit. Please try again.'}</div>`);
+    }
+  }
+}
+
+// Saves a collection locally when there's no connection, instead of
+// losing it outright. Syncs automatically once back online.
+async function queueOfflineCollection(d) {
+  await queueCollection({
+    ref: d.ref, amount: d.amt, method: d.method, notes: d.notes,
+    planId: d.planId, customerId: d.customerId, agentId: d.agentId, custName: d.custName,
+  });
+  closeModal('collectModal');
   document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = '';
-  await repDoSearch(); // refreshes balance from RPC before showing receipt
-  const dd2 = document.getElementById('repPlanDd');
-  const opt2 = dd2.options[dd2.selectedIndex];
-  const newBal = +(opt2?.dataset?.bal || 0);
-  showReceipt(amt, repSelectedPlan, rep, repFoundCust, ref, method, newBal);
+  await updatePendingSyncBadge();
+  alert(`No connection right now — this ${fmt(d.amt)} deposit for ${d.custName} has been saved on this device and will sync automatically once you're back online.\n\nRef: ${d.ref}`);
+}
+
+// ═══════════════════════════════════════════════
+// OFFLINE SYNC ENGINE
+// Replays anything queued in js/offline-queue.js the moment a connection
+// is available — on page load, whenever the browser fires its 'online'
+// event, or via the "Sync Now" button. The 'online' event and background
+// timing aren't guaranteed on every device (iOS Safari in particular
+// doesn't support true background sync for web apps), so the manual
+// button is the reliable path regardless of device/OS — the automatic
+// triggers are a convenience on top of that, not the only way it works.
+// ═══════════════════════════════════════════════
+
+let _syncInProgress = false;
+
+async function syncPendingCollections() {
+  if (_syncInProgress || !navigator.onLine) return;
+  _syncInProgress = true;
+  try {
+    const pending = await getPendingCollections();
+    for (const item of pending) {
+      try {
+        const { count: txCount } = await db.from('transactions').select('*', { count: 'exact', head: true }).eq('plan_id', item.planId);
+        const txType = (txCount === 0) ? 'opening' : 'deposit';
+        const { error: insertErr } = await db.from('transactions').insert({
+          ref: item.ref, type: txType, amount: item.amount, plan_id: item.planId,
+          customer_id: item.customerId, agent_id: item.agentId, method: item.method, notes: item.notes,
+        });
+        if (insertErr) throw insertErr;
+
+        const rep = getUser();
+        if (rep && rep.id === item.agentId) {
+          await db.from('representatives').update({ confirmed_count: (rep.confirmed_count || 0) + 1 }).eq('id', rep.id);
+          setUser({ ...rep, confirmed_count: (rep.confirmed_count || 0) + 1 });
+        }
+        await checkLargeCollection(item.amount, item.agentId, item.planId);
+        await audit('deposit', item.agentId, 'representative', `Collected ${fmt(item.amount)} for ${item.custName} — Ref: ${item.ref} (synced from offline)`, item.amount, item.planId);
+
+        await removePendingCollection(item.localId);
+      } catch (e) {
+        await markPendingCollectionFailed(item.localId, e?.message || 'Unknown error');
+        if (!navigator.onLine) break; // connection dropped again mid-sync
+      }
+    }
+  } finally {
+    _syncInProgress = false;
+    await updatePendingSyncBadge();
+  }
+}
+
+async function updatePendingSyncBadge() {
+  const count = await getPendingCount();
+  document.querySelectorAll('.pending-sync-badge').forEach(el => {
+    if (count > 0) {
+      el.style.display = 'flex';
+      const c = el.querySelector('.pending-sync-count');
+      if (c) c.textContent = count;
+    } else {
+      el.style.display = 'none';
+    }
+  });
+}
+
+window.addEventListener('online', () => { syncPendingCollections(); });
+document.addEventListener('DOMContentLoaded', () => {
+  updatePendingSyncBadge();
+  if (navigator.onLine) syncPendingCollections();
+});
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(rootPath() + 'sw.js', { scope: rootPath() || '/' }).catch(e => console.error('SW registration failed:', e));
+  });
 }
 
 function showReceipt(amount, plan, rep, cust, ref, method, newBal) {
