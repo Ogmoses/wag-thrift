@@ -93,14 +93,26 @@ async function renderRepDash() {
   // dropping deposits made in that window from "today"'s total.
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const { data: todayTx } = await db.from('transactions').select('amount').eq('agent_id', rep.id).in('type', ['deposit', 'opening']).gte('created_at', startOfToday);
+
+  // These four don't depend on each other's results, so they run
+  // concurrently instead of one after another — including the deposit
+  // preview list, which used to run silently in the background after
+  // this function had already "finished", causing it to visibly pop in
+  // a moment after everything else.
+  const [todayTxResult, allTxResult, score] = await Promise.all([
+    db.from('transactions').select('amount').eq('agent_id', rep.id).in('type', ['deposit', 'opening']).gte('created_at', startOfToday),
+    db.from('transactions').select('amount').eq('agent_id', rep.id).in('type', ['deposit', 'opening']),
+    getAgentScore(rep.id),
+    loadRepTxPreview(),
+  ]);
+
+  const todayTx = todayTxResult.data;
+  const allTx = allTxResult.data;
   const todayAmt = (todayTx || []).reduce((s, t) => s + Number(t.amount), 0);
   document.getElementById('repTodayAmt').textContent = fmt(todayAmt);
   document.getElementById('repTodayCnt').textContent = (todayTx || []).length + ' transaction' + ((todayTx || []).length !== 1 ? 's' : '');
-  const { data: allTx } = await db.from('transactions').select('amount').eq('agent_id', rep.id).in('type', ['deposit', 'opening']);
   document.getElementById('repAllAmt').textContent = fmt((allTx || []).reduce((s, t) => s + Number(t.amount), 0));
   document.getElementById('repConfirmed').textContent = rep.confirmed_count || 0;
-  const score = await getAgentScore(rep.id);
   const scoreEl = document.getElementById('repScoreVal');
   const lblEl = document.getElementById('repScoreLbl');
   if (score === null) {
@@ -112,7 +124,6 @@ async function renderRepDash() {
     scoreEl.style.color = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--yellow)' : 'var(--red)';
     lblEl.textContent = score >= 80 ? 'excellent' : score >= 60 ? 'good' : 'needs review';
   }
-  loadRepTxPreview();
 }
 
 // ── Recent deposits preview (used on dashboard.html)

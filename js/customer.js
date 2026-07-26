@@ -67,10 +67,12 @@ async function switchPlan(id) {
 
 async function renderPlanDetail(planId) {
   loadBalPref(); // restore hidden/shown preference before rendering balance
-  const [{ data: plan }, { data: planExtra }, { data: allDeposits }] = await Promise.all([
+  const [{ data: plan }, { data: planExtra }, { data: allDeposits }, { data: txs }, { data: rejDisbs }] = await Promise.all([
     db.from('plan_balances').select('*').eq('plan_id', planId).single(),
     db.from('plans').select('regular_contribution,maturity_date').eq('id', planId).single(),
-    db.from('transactions').select('amount').eq('plan_id', planId).in('type', ['opening', 'deposit'])
+    db.from('transactions').select('amount').eq('plan_id', planId).in('type', ['opening', 'deposit']),
+    db.from('transactions').select('*').eq('plan_id', planId).order('created_at', { ascending: false }),
+    db.from('disbursements').select('*').eq('plan_id', planId).eq('status', 'rejected')
   ]);
   if (!plan) return;
   plan.regular_contribution = planExtra?.regular_contribution || 0;
@@ -103,16 +105,11 @@ async function renderPlanDetail(planId) {
   document.getElementById('scheduleBlock').innerHTML = `
    <div class="sched-row"><span class="sched-label">Regular contribution</span><span class="sched-val">${regularAmt > 0 ? fmt(regularAmt) + ' / ' + schedLabel : 'Not set'}</span></div>
    <div class="sched-row" style="border-bottom:none;"><span class="sched-label">Missed contributions</span><span class="sched-val ${sched.missed === 0 ? 'ok' : sched.missed < 3 ? 'warn' : 'bad'}">${sched.missed === 0 ? 'None' : sched.missed}</span></div>`;
-  let txs = [], rejDisbs = [];
+  let rejRows = [];
   try {
-    const [r1, r2] = await Promise.all([
-      db.from('transactions').select('*').eq('plan_id', planId).order('created_at', { ascending: false }),
-      db.from('disbursements').select('*').eq('plan_id', planId).eq('status', 'rejected')
-    ]);
-    txs = r1.data || []; rejDisbs = r2.data || [];
-  } catch (e) { console.warn('tx fetch error:', e); }
-  const rejRows = (rejDisbs || []).map(d => ({ id: d.id, type: 'rejected', amount: d.amount, created_at: d.requested_at, ref: d.ref }));
-  const allTxs = [...txs, ...rejRows].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    rejRows = (rejDisbs || []).map(d => ({ id: d.id, type: 'rejected', amount: d.amount, created_at: d.requested_at, ref: d.ref }));
+  } catch (e) { console.warn('tx processing error:', e); }
+  const allTxs = [...(txs || []), ...rejRows].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const txList = document.getElementById('txList');
   if (!allTxs || !allTxs.length) { txList.innerHTML = '<div class="tx-empty">No transactions yet</div>'; }
   else {
