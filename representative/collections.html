@@ -61,11 +61,14 @@
 requireRole(['representative']);
 initTheme();
 document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
-verifyRoleFromDB('representative').then(valid => {
-  if (!valid) return window.location.replace(rootPath() + 'login.html');
-  loadRepTxPage();
+(async () => {
+  const [valid] = await Promise.all([
+    verifyRoleFromDB('representative'),
+    loadRepTxPage().catch(e => console.error('Collections render error:', e)),
+  ]);
+  if (!valid) { window.location.replace(rootPath() + 'login.html'); return; }
   startSuspendCheck();
-});
+})();
 </script>
 </body>
 </html>

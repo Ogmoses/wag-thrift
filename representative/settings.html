@@ -47,9 +47,9 @@
 <script>
 requireRole(['representative']);
 initTheme();
+buildRepProfilePage();
 verifyRoleFromDB('representative').then(valid => {
-  if (!valid) return window.location.replace(rootPath() + 'login.html');
-  buildRepProfilePage();
+  if (!valid) { window.location.replace(rootPath() + 'login.html'); return; }
   startSuspendCheck();
 });
 </script>
