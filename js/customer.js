@@ -700,3 +700,16 @@ function renderStreakStats() {
     ringFg.style.strokeDashoffset = (c * (1 - pct)).toFixed(2);
   }
 }
+
+// ═══════════════════════════════════════════════
+// OFFLINE APP-SHELL SUPPORT
+// Lets the app itself open with no signal, so a customer at least sees
+// their last-known dashboard instead of a blank browser error. Live data
+// (balances, transactions) still needs a real connection either way —
+// this only covers the app shell loading in the first place.
+// ═══════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(rootPath() + 'sw.js', { scope: rootPath() || '/' }).catch(e => console.error('SW registration failed:', e));
+  });
+}

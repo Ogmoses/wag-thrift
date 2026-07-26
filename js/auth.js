@@ -55,7 +55,20 @@ async function refreshUserProfile(expectedRole) {
   const authId = session.user.id;
   const table = expectedRole === 'representative' ? 'representatives' : 'customers';
   const { data, error } = await db.from(table).select('*').eq('auth_user_id', authId).single();
-  if (error || !data) return null;
+
+  if (error || !data) {
+    // Couldn't reach the server to check — don't treat that the same as
+    // "this session is invalid". A remembered session should survive
+    // being temporarily offline; only a genuine, confirmed rejection
+    // (wrong/suspended/deleted account) should log someone out.
+    const isNetworkIssue = !navigator.onLine || /fetch|network/i.test(error?.message || '');
+    if (isNetworkIssue) {
+      const cached = getUser();
+      if (cached && cached.role === expectedRole) return cached;
+    }
+    return null;
+  }
+
   if (data.status === 'suspended' || data.status === 'deleted') return null;
   const profile = { ...data, role: expectedRole };
   setUser(profile);
