@@ -61,7 +61,7 @@ async function refreshUserProfile(expectedRole) {
     // "this session is invalid". A remembered session should survive
     // being temporarily offline; only a genuine, confirmed rejection
     // (wrong/suspended/deleted account) should log someone out.
-    const isNetworkIssue = !navigator.onLine || /fetch|network/i.test(error?.message || '');
+    const isNetworkIssue = isConnectivityError(error);
     if (isNetworkIssue) {
       const cached = getUser();
       if (cached && cached.role === expectedRole) return cached;
@@ -155,6 +155,13 @@ async function checkFailedPin(phone) {
 // LOGIN — now via supabase.auth.signInWithPassword()
 // currentRole is set by the login page UI ('customer' | 'representative')
 // ═══════════════════════════════════════════════
+// Distinguishes "couldn't reach the server" from a genuine rejection, so
+// login (and other network calls) can show an accurate message instead of
+// a misleading "invalid credentials" when the real problem is signal.
+function isConnectivityError(error) {
+  return !navigator.onLine || /fetch|network/i.test(error?.message || '');
+}
+
 async function doLogin() {
   if (!dbReady()) return;
   if (currentRole === 'customer') {
@@ -168,11 +175,19 @@ async function doLogin() {
     // Translate phone -> internal email via the SQL helper, then sign in
     // through real Supabase Auth (password verified server-side by Supabase,
     // never compared in our own code).
-    const { data: emailResult } = await db.rpc('get_login_email_for_phone', { p_phone: normPh });
-    if (!emailResult) { hideLoading(); const locked = await checkFailedPin(normPh); setMsg('loginMsg', `<div class="msg-err">Invalid phone or password.${locked ? ' Account locked.' : ''}</div>`); return; }
+    const { data: emailResult, error: emailErr } = await db.rpc('get_login_email_for_phone', { p_phone: normPh });
+    if (!emailResult) {
+      hideLoading();
+      if (isConnectivityError(emailErr)) { setMsg('loginMsg', '<div class="msg-err">No connection right now. Please check your signal and try again.</div>'); return; }
+      const locked = await checkFailedPin(normPh); setMsg('loginMsg', `<div class="msg-err">Invalid phone or password.${locked ? ' Account locked.' : ''}</div>`); return;
+    }
 
     const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email: emailResult, password: pin });
-    if (authErr || !authData?.session) { hideLoading(); const locked = await checkFailedPin(normPh); setMsg('loginMsg', `<div class="msg-err">Invalid phone or password.${locked ? ' Account locked.' : ''}</div>`); return; }
+    if (authErr || !authData?.session) {
+      hideLoading();
+      if (isConnectivityError(authErr)) { setMsg('loginMsg', '<div class="msg-err">No connection right now. Please check your signal and try again.</div>'); return; }
+      const locked = await checkFailedPin(normPh); setMsg('loginMsg', `<div class="msg-err">Invalid phone or password.${locked ? ' Account locked.' : ''}</div>`); return;
+    }
 
     const profile = await refreshUserProfile('customer');
     if (!profile) {
@@ -194,11 +209,19 @@ async function doLogin() {
     const rid = document.getElementById('loginRepId').value.trim(), pin = document.getElementById('loginRepPin').value.trim();
     showLoading('Signing in…');
 
-    const { data: emailResult } = await db.rpc('get_login_email_for_rep_id', { p_rep_id: rid });
-    if (!emailResult) { hideLoading(); setMsg('loginRepMsg', '<div class="msg-err">Invalid Agent ID or password</div>'); return; }
+    const { data: emailResult, error: emailErr } = await db.rpc('get_login_email_for_rep_id', { p_rep_id: rid });
+    if (!emailResult) {
+      hideLoading();
+      if (isConnectivityError(emailErr)) { setMsg('loginRepMsg', '<div class="msg-err">No connection right now. Please check your signal and try again.</div>'); return; }
+      setMsg('loginRepMsg', '<div class="msg-err">Invalid Agent ID or password</div>'); return;
+    }
 
     const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email: emailResult, password: pin });
-    if (authErr || !authData?.session) { hideLoading(); setMsg('loginRepMsg', '<div class="msg-err">Invalid Agent ID or password</div>'); return; }
+    if (authErr || !authData?.session) {
+      hideLoading();
+      if (isConnectivityError(authErr)) { setMsg('loginRepMsg', '<div class="msg-err">No connection right now. Please check your signal and try again.</div>'); return; }
+      setMsg('loginRepMsg', '<div class="msg-err">Invalid Agent ID or password</div>'); return;
+    }
 
     // Save remember-me preference BEFORE refreshUserProfile (which calls
     // setUser internally) so the storage target — localStorage vs.

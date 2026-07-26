@@ -165,7 +165,12 @@ async function doAdminLogin() {
   const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email, password: pw });
 
   if (authErr || !authData?.session) {
-    await handleAdminLoginFailure('Invalid email or password');
+    const isConnectivityIssue = !navigator.onLine || /fetch|network/i.test(authErr?.message || '');
+    if (isConnectivityIssue) {
+      setMsg('loginMsg', '<div class="msg-err">No connection right now. Please check your signal and try again.</div>');
+    } else {
+      await handleAdminLoginFailure('Invalid email or password');
+    }
     btn.disabled = false;
     btn.textContent = 'Access Super Admin Portal';
     return;
