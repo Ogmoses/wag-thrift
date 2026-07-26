@@ -21,6 +21,9 @@
 const CACHE_NAME = 'wag-shell-v1';
 
 const APP_SHELL = [
+  'index.html',
+  'login.html',
+  'register.html',
   'representative/dashboard.html',
   'representative/collections.html',
   'representative/customer-search.html',
@@ -79,13 +82,26 @@ self.addEventListener('fetch', (event) => {
   const isHTML = req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html');
 
   if (isHTML) {
-    // Network-first for pages: try live, fall back to the last cached copy.
+    // Network-first for pages: try live, fall back to the last cached copy,
+    // and if we truly have nothing for this page, hand back an actual
+    // offline page rather than nothing — returning "nothing" from a fetch
+    // handler crashes the browser with a "response is null" error instead
+    // of just failing gracefully.
     event.respondWith(
       fetch(req).then(res => {
         const copy = res.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
         return res;
-      }).catch(() => caches.match(req))
+      }).catch(async () => {
+        const cached = await caches.match(req);
+        if (cached) return cached;
+        return new Response(
+          '<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:60px 20px;color:#666;">' +
+          '<h2>No connection</h2><p>This page hasn\'t been opened on this device before, so it needs an internet ' +
+          'connection to load the first time. Please reconnect and try again.</p></body></html>',
+          { status: 200, headers: { 'Content-Type': 'text/html' } }
+        );
+      })
     );
     return;
   }
@@ -96,6 +112,6 @@ self.addEventListener('fetch', (event) => {
       const copy = res.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
       return res;
-    }))
+    }).catch(() => new Response('', { status: 408, statusText: 'Offline and not cached' })))
   );
 });
