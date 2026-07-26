@@ -110,11 +110,14 @@ body.dark .cal-nav-btn{background:#2a2a2a!important;color:#f0f0f0!important;}
 <script>
 requireRole(['customer']);
 initTheme();
-verifyRoleFromDB('customer').then(valid => {
-  if (!valid) return window.location.replace(rootPath() + 'login.html');
-  loadCalendarPage();
+(async () => {
+  const [valid] = await Promise.all([
+    verifyRoleFromDB('customer'),
+    loadCalendarPage().catch(e => console.error('Calendar render error:', e)),
+  ]);
+  if (!valid) { window.location.replace(rootPath() + 'login.html'); return; }
   startSuspendCheck();
-});
+})();
 </script>
 </body>
 </html>

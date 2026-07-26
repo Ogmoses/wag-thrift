@@ -50,9 +50,12 @@
 <script>
 requireRole(['customer']);
 initTheme();
+// buildCustProfilePage() only reads the already-cached local profile — no
+// network wait needed — so it can render instantly while the fresh
+// security check happens in the background.
+buildCustProfilePage();
 verifyRoleFromDB('customer').then(valid => {
-  if (!valid) return window.location.replace(rootPath() + 'login.html');
-  buildCustProfilePage();
+  if (!valid) { window.location.replace(rootPath() + 'login.html'); return; }
   startSuspendCheck();
 });
 </script>
