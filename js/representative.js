@@ -301,6 +301,25 @@ function openCollectModal() {
   requirePayPin('Payment PIN', 'Enter your payment PIN to save this deposit.', () => showModal('collectModal'));
 }
 
+// ═══════════════════════════════════════════════
+// QUICK CASH PRESET BUTTONS (hybrid amount entry)
+// Adds to whatever is already typed in the Amount field instead of
+// replacing it, so an agent can tap +₦1,000 twice then +₦2,000 to build
+// up ₦4,000 — or just type the full amount manually as before. The manual
+// text input (#colAmt) stays fully editable; this is purely additive.
+// ═══════════════════════════════════════════════
+function addPresetAmount(amount) {
+  const inp = document.getElementById('colAmt');
+  if (!inp) return;
+  const current = parseFloat(inp.value) || 0;
+  inp.value = current + amount;
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function clearCollectAmount() {
+  const inp = document.getElementById('colAmt');
+  if (inp) inp.value = '';
+}
+
 async function doCollection() { guardedSubmit('collection', () => _doCollection()); }
 async function _doCollection() {
   const amtVal = document.getElementById('colAmt').value.trim(), method = document.getElementById('colMethod').value, notes = document.getElementById('colNotes').value.trim();
@@ -366,6 +385,114 @@ async function queueOfflineCollection(d) {
   document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = '';
   await updatePendingSyncBadge();
   alert(`No connection right now — this ${fmt(d.amt)} deposit for ${d.custName} has been saved on this device and will sync automatically once you're back online.\n\nRef: ${d.ref}`);
+}
+
+// ═══════════════════════════════════════════════
+// AGENT-DRIVEN CUSTOMER CREATION (Agent Workspace → "+ Add New Customer")
+// Lets a field agent onboard a market trader on the spot with just three
+// fields — phone, name/stall label, and a 4-digit PIN — with NO email and
+// NO OTP step. This intentionally reuses the exact same signUp()-then-
+// restore-session pattern already used by js/admin.js's inviteNewAdmin()
+// (see comment there): db.auth.signUp() briefly switches the active
+// browser session to the newly created customer, so we snapshot the
+// agent's session first and put it straight back afterwards. It also
+// reuses the existing customer_internal_email() and
+// complete_customer_registration() RPCs unchanged — no new backend
+// functions, tables, or RLS policies are introduced.
+//
+// NOTE: complete_customer_registration() normally receives a real email
+// and home address, collected during standard self-registration. Neither
+// is available here, so this passes clearly-marked placeholders:
+//   - email:   a synthetic, unique, valid-format address (agent+<phone>@
+//              wagthrift.local) — separate from the hidden Auth login
+//              email, and safe to overwrite later from Settings.
+//   - address: a fixed "registered by agent" placeholder.
+// If your Supabase schema instead requires these fields to be genuinely
+// unique/validated in a way a synthetic value can't satisfy, adjust the
+// two constants below to match.
+//
+// IMPORTANT — Supabase project setting: Auth's default minimum password
+// length is 6 characters. For a real 4-digit PIN to be accepted here (and
+// at customer login), set Authentication → Providers → Email → "Minimum
+// password length" to 4 in the Supabase dashboard.
+// ═══════════════════════════════════════════════
+function agentSyntheticEmail(normPh) {
+  return `agent+${normPh.replace(/\D/g, '')}@wagthrift.local`;
+}
+
+async function doAgentCreateCustomer() { guardedSubmit('agentCreateCustomer', () => _doAgentCreateCustomer()); }
+async function _doAgentCreateCustomer() {
+  if (!dbReady()) return;
+  const rawPhone = document.getElementById('acPhone')?.value?.trim() || '';
+  const rawName = document.getElementById('acName')?.value?.trim() || '';
+  const pin = document.getElementById('acPin')?.value?.trim() || '';
+  setMsg('acMsg', '');
+
+  if (!rawPhone || !rawName || !pin) { setMsg('acMsg', '<div class="msg-err">Please fill in phone number, name, and PIN</div>'); return; }
+  if (!/^\d{4}$/.test(pin)) { setMsg('acMsg', '<div class="msg-err">PIN must be exactly 4 digits</div>'); return; }
+
+  const normPh = normPhone(rawPhone);
+  showLoading('Checking phone number…');
+
+  // Same duplicate checks doRegister() runs client-side — the DB trigger
+  // (sql/002's PHONE_ALREADY_AGENT/PHONE_ALREADY_CUSTOMER guard) enforces
+  // this server-side too, so this is just for a friendlier message.
+  const { data: existingCust } = await db.from('customers').select('id').eq('phone', normPh).maybeSingle();
+  if (existingCust) { hideLoading(); setMsg('acMsg', '<div class="msg-err">A customer with this phone number is already registered.</div>'); return; }
+  const { data: existingRep } = await db.from('representatives').select('id').eq('phone', normPh).neq('status', 'deleted').maybeSingle();
+  if (existingRep) { hideLoading(); setMsg('acMsg', '<div class="msg-err">This phone number is already registered to a Field Agent account.</div>'); return; }
+
+  // "Mama Ngozi / Stall 14" → first_name "Mama Ngozi", last_name "Stall 14".
+  // A plain name with no "/" just becomes the first name.
+  const [namePart, stallPart] = rawName.split('/').map(s => s.trim()).filter(Boolean);
+  const firstName = namePart || rawName;
+  const lastName = stallPart || 'Market Customer';
+
+  showLoading('Creating customer account…');
+
+  // Snapshot the agent's own session — signUp() below will briefly switch
+  // the active session to the new customer, exactly like inviteNewAdmin()
+  // in js/admin.js. We restore it in every exit path, success or failure.
+  const { data: { session: originalSession } } = await db.auth.getSession();
+
+  const { data: internalEmail, error: emailErr } = await db.rpc('customer_internal_email', { p_phone: normPh });
+  if (emailErr || !internalEmail) {
+    hideLoading();
+    setMsg('acMsg', `<div class="msg-err">${emailErr?.message || 'Could not prepare this account. Please try again.'}</div>`);
+    return;
+  }
+
+  const { data: signUpData, error: signUpErr } = await db.auth.signUp({ email: internalEmail, password: pin });
+  if (signUpErr || !signUpData?.user) {
+    if (originalSession) await db.auth.setSession({ access_token: originalSession.access_token, refresh_token: originalSession.refresh_token });
+    hideLoading();
+    setMsg('acMsg', `<div class="msg-err">${signUpErr?.message || 'Could not create this account. Please try again.'}</div>`);
+    return;
+  }
+
+  const { data: regResult, error: regErr } = await db.rpc('complete_customer_registration', {
+    p_auth_user_id: signUpData.user.id,
+    p_first_name: firstName, p_last_name: lastName,
+    p_email: agentSyntheticEmail(normPh), p_phone: normPh,
+    p_address: 'Registered by field agent (no address on file)'
+  });
+
+  // Always restore the agent's own session before doing anything else.
+  if (originalSession) await db.auth.setSession({ access_token: originalSession.access_token, refresh_token: originalSession.refresh_token });
+  hideLoading();
+
+  if (regErr || regResult?.ok === false) {
+    setMsg('acMsg', `<div class="msg-err">${friendlyRegError(regResult?.error || regErr?.message) || 'Registration failed'}</div>`);
+    return;
+  }
+
+  const rep = getUser();
+  await audit('login', rep?.id || 'unknown', 'representative', `Agent ${rep?.first_name || ''} ${rep?.last_name || ''} registered new customer on the spot: ${firstName} ${lastName} (${normPh})`);
+
+  closeModal('agentCreateCustomerModal');
+  ['acPhone', 'acName', 'acPin'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  setMsg('acMsg', '');
+  alert(`Customer account created!\n\nName: ${firstName}${stallPart ? ' / ' + stallPart : ''}\nPhone: ${normPh}\nPIN: ${pin}\n\nThey can sign in now using their phone number and this PIN. Give them a Savings Plan next from Customer Search.`);
 }
 
 // ═══════════════════════════════════════════════
