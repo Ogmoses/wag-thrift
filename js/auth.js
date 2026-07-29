@@ -182,7 +182,7 @@ async function doLogin() {
       const locked = await checkFailedPin(normPh); setMsg('loginMsg', `<div class="msg-err">Invalid phone or password.${locked ? ' Account locked.' : ''}</div>`); return;
     }
 
-    const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email: emailResult, password: pin });
+    const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email: emailResult, password: deriveAuthPassword(pin) });
     if (authErr || !authData?.session) {
       hideLoading();
       if (isConnectivityError(authErr)) { setMsg('loginMsg', '<div class="msg-err">No connection right now. Please check your signal and try again.</div>'); return; }

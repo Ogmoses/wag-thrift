@@ -411,10 +411,22 @@ async function queueOfflineCollection(d) {
 // unique/validated in a way a synthetic value can't satisfy, adjust the
 // two constants below to match.
 //
-// IMPORTANT — Supabase project setting: Auth's default minimum password
-// length is 6 characters. For a real 4-digit PIN to be accepted here (and
-// at customer login), set Authentication → Providers → Email → "Minimum
-// password length" to 4 in the Supabase dashboard.
+// IMPORTANT — Supabase project setting: Auth's minimum password length is
+// enforced server-side project-wide and CANNOT be lowered below 6 (confirmed:
+// setting it to 4 in the dashboard is rejected with "Must be greater or equal
+// to 6"). So a raw 4-digit PIN can never be sent to signUp()/signInWithPassword()
+// directly — Supabase would reject it. Instead, js/utils.js's
+// deriveAuthPassword() deterministically pads any PIN shorter than 6
+// characters with a fixed, non-secret suffix before it's used as the actual
+// Supabase Auth password — here at creation, and in auth.js's doLogin() at
+// sign-in. The customer only ever sees/types their real 4-digit PIN; the
+// padded string is purely an internal detail. Since the padding suffix is
+// constant and not secret, the effective brute-force strength of this
+// account is exactly that of a 4-digit numeric PIN (10,000 combinations) —
+// no weaker, no stronger. The existing pin_attempts lockout (5 failed
+// attempts locks the account, enforced in js/auth.js) is what actually
+// protects against guessing, exactly as it already does for every other
+// customer login on this app.
 // ═══════════════════════════════════════════════
 function agentSyntheticEmail(normPh) {
   return `agent+${normPh.replace(/\D/g, '')}@wagthrift.local`;
@@ -462,7 +474,7 @@ async function _doAgentCreateCustomer() {
     return;
   }
 
-  const { data: signUpData, error: signUpErr } = await db.auth.signUp({ email: internalEmail, password: pin });
+  const { data: signUpData, error: signUpErr } = await db.auth.signUp({ email: internalEmail, password: deriveAuthPassword(pin) });
   if (signUpErr || !signUpData?.user) {
     if (originalSession) await db.auth.setSession({ access_token: originalSession.access_token, refresh_token: originalSession.refresh_token });
     hideLoading();
