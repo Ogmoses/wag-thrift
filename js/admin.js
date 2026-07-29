@@ -393,12 +393,12 @@ let currentPage = 'overview';
 async function renderOverview() {
   if (!db) return;
   const [
-    { count: cc }, { count: rc }, { data: allTx }, { count: planCnt }, { data: pendDisb },
+    { count: cc }, { count: rc }, { data: totals }, { count: planCnt }, { data: pendDisb },
     { count: pdc }, { count: flagCount }, { data: auditRows }
   ] = await Promise.all([
     db.from('customers').select('*', { count: 'exact', head: true }),
     db.from('representatives').select('*', { count: 'exact', head: true }),
-    db.from('transactions').select('amount,type'),
+    db.rpc('admin_transaction_totals'),
     db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     // Show both pending AND reviewed here — admin can review or approve
     // directly from the Overview without navigating to the full Disbursements tab.
@@ -408,10 +408,8 @@ async function renderOverview() {
     db.from('audit_log').select('*').order('created_at', { ascending: false }).limit(10),
   ]);
 
-  const deps = (allTx || []).filter(t => t.type === 'deposit' || t.type === 'opening');
-  const pays = (allTx || []).filter(t => t.type === 'payout');
-  const totalDep = deps.reduce((s, t) => s + Number(t.amount), 0);
-  const totalPay = pays.reduce((s, t) => s + Number(t.amount), 0);
+  const totalDep = totals?.[0]?.total_deposits || 0;
+  const totalPay = totals?.[0]?.total_payouts || 0;
 
   document.getElementById('ovCust').textContent = cc || 0;
   document.getElementById('ovReps').textContent = rc || 0;
@@ -551,7 +549,12 @@ async function rejectDisb(disbId) {
 let allCustomers = [];
 
 async function renderCustomersPage() {
-  const { data: custs } = await db.from('customers').select('*').order('created_at', { ascending: false });
+  // A generous cap, not full pagination — at real-world scale (low
+  // thousands) a single list is still fine to load and keeps the
+  // existing instant client-side search working. This exists purely so
+  // the query is never truly unbounded if the customer base grows a lot
+  // further down the line.
+  const { data: custs } = await db.from('customers').select('*').order('created_at', { ascending: false }).limit(2000);
   allCustomers = custs || [];
   renderCustomersList(allCustomers);
 }
@@ -799,17 +802,23 @@ async function adminDoSearch() {
 // ═══════════════════════════════════════════════
 async function renderAnalytics() {
   if (!db) return;
-  const [{ data: allTx }, { count: custCnt }, { count: repCnt }, { count: activePlanCnt }, { count: flagCnt }] = await Promise.all([
-    db.from('transactions').select('amount,type,created_at'),
+  const days = []; const today = new Date();
+  for (let i = 6; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); days.push(d); }
+  const weekStart = new Date(days[0]); weekStart.setHours(0, 0, 0, 0);
+
+  const [{ data: totals }, { count: custCnt }, { count: repCnt }, { count: activePlanCnt }, { count: flagCnt }, { data: weekDeps }, { data: leaderboard }] = await Promise.all([
+    db.rpc('admin_transaction_totals'),
     db.from('customers').select('*', { count: 'exact', head: true }),
     db.from('representatives').select('*', { count: 'exact', head: true }),
     db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
+    // Only the last 7 days are needed for the chart below — no reason to
+    // pull the entire transaction history just to plot one week of bars.
+    db.from('transactions').select('amount,created_at').in('type', ['deposit', 'opening']).gte('created_at', weekStart.toISOString()),
+    db.rpc('admin_agent_leaderboard', { p_limit: 5 }),
   ]);
-  const deps = (allTx || []).filter(t => t.type === 'deposit' || t.type === 'opening');
-  const pays = (allTx || []).filter(t => t.type === 'payout');
-  const totalVol = deps.reduce((s, t) => s + Number(t.amount), 0);
-  const totalPay = pays.reduce((s, t) => s + Number(t.amount), 0);
+  const totalVol = totals?.[0]?.total_deposits || 0;
+  const totalPay = totals?.[0]?.total_payouts || 0;
 
   document.getElementById('analyticsGrid').innerHTML = `
     <div class="ov-card green"><div class="ov-lbl">Total Volume</div><div class="ov-val">${fmt(totalVol)}</div><div class="ov-sub">all deposits</div></div>
@@ -819,17 +828,12 @@ async function renderAnalytics() {
     <div class="ov-card"><div class="ov-lbl">Customers</div><div class="ov-val">${custCnt || 0}</div><div class="ov-sub">registered</div></div>
     <div class="ov-card"><div class="ov-lbl">Field Agents</div><div class="ov-val">${repCnt || 0}</div><div class="ov-sub">active</div></div>`;
 
-  const days = []; const today = new Date();
-  for (let i = 6; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); days.push(d); }
-  const dayTotals = days.map(d => { const ds = d.toDateString(); return deps.filter(t => new Date(t.created_at).toDateString() === ds).reduce((s, t) => s + Number(t.amount), 0); });
+  const dayTotals = days.map(d => { const ds = d.toDateString(); return (weekDeps || []).filter(t => new Date(t.created_at).toDateString() === ds).reduce((s, t) => s + Number(t.amount), 0); });
   const maxAmt = Math.max(...dayTotals, 1);
   document.getElementById('barChart').innerHTML = dayTotals.map((amt, i) => `<div class="bar-item"><div class="bar" style="height:${Math.max(4, Math.round((amt / maxAmt) * 70))}px;" title="${fmt(amt)}"></div><div class="bar-label">${days[i].toLocaleDateString('en', { weekday: 'short' })}</div></div>`).join('');
 
-  const { data: reps } = await db.from('representatives').select('*');
-  const agentPerf = await Promise.all((reps || []).map(async r => { const { data: t } = await db.from('transactions').select('amount').eq('agent_id', r.id).in('type', ['deposit', 'opening']); const total = (t || []).reduce((s, x) => s + Number(x.amount), 0); return { ...r, total }; }));
-  agentPerf.sort((a, b) => b.total - a.total);
-  document.getElementById('topAgentsList').innerHTML = agentPerf.slice(0, 5).length
-    ? agentPerf.slice(0, 5).map((r, i) => `<div class="agent-row"><div><span style="color:var(--yellow);font-weight:800;margin-right:7px;">#${i + 1}</span><span style="font-size:13px;">${r.first_name} ${r.last_name}</span><div style="color:var(--sub);font-size:10px;margin-top:2px;">ID: ${r.rep_id}</div></div><div style="color:var(--green);font-weight:700;font-size:13px;">${fmt(r.total)}</div></div>`).join('')
+  document.getElementById('topAgentsList').innerHTML = (leaderboard || []).length
+    ? leaderboard.map((r, i) => `<div class="agent-row"><div><span style="color:var(--yellow);font-weight:800;margin-right:7px;">#${i + 1}</span><span style="font-size:13px;">${r.first_name} ${r.last_name}</span><div style="color:var(--sub);font-size:10px;margin-top:2px;">ID: ${r.rep_id}</div></div><div style="color:var(--green);font-weight:700;font-size:13px;">${fmt(r.total)}</div></div>`).join('')
     : '<div class="empty-state">No agents yet</div>';
 }
 
@@ -952,9 +956,27 @@ async function renderTokensList() {
 // ═══════════════════════════════════════════════
 let allAuditLogs = [];
 
+const AUDIT_PAGE_SIZE = 100;
+let _auditPageOffset = 0;
+let _auditHasMore = true;
+
 async function renderAuditLog() {
-  const { data: logs } = await db.from('audit_log').select('*').order('created_at', { ascending: false });
+  _auditPageOffset = 0;
+  allAuditLogs = [];
+  const { data: logs } = await db.from('audit_log').select('*').order('created_at', { ascending: false }).range(0, AUDIT_PAGE_SIZE - 1);
   allAuditLogs = logs || [];
+  _auditHasMore = (logs || []).length === AUDIT_PAGE_SIZE;
+  _auditPageOffset = allAuditLogs.length;
+  renderAuditEntries(allAuditLogs);
+}
+
+async function loadMoreAuditLog() {
+  const btn = document.getElementById('auditLoadMoreBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+  const { data: logs } = await db.from('audit_log').select('*').order('created_at', { ascending: false }).range(_auditPageOffset, _auditPageOffset + AUDIT_PAGE_SIZE - 1);
+  _auditHasMore = (logs || []).length === AUDIT_PAGE_SIZE;
+  _auditPageOffset += (logs || []).length;
+  allAuditLogs = [...allAuditLogs, ...(logs || [])];
   renderAuditEntries(allAuditLogs);
 }
 
@@ -973,6 +995,10 @@ function renderAuditRows(containerId, logs) {
 
 function renderAuditEntries(logs) {
   renderAuditRows('auditLogList', logs);
+  const el = document.getElementById('auditLogList');
+  if (el && _auditHasMore && logs.length) {
+    el.insertAdjacentHTML('beforeend', '<button id="auditLoadMoreBtn" class="btn btn-outline" onclick="loadMoreAuditLog()" style="margin-top:10px;">Load more</button>');
+  }
 }
 
 // ═══════════════════════════════════════════════
