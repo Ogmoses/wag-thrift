@@ -8,23 +8,28 @@
 // first place.
 //
 // Strategy:
-//   - App shell files: cache-first, so opening the app is instant and
-//     works offline, falling back to the network only if something's
-//     missing from the cache (e.g. right after a fresh install).
-//   - HTML pages specifically: network-first with a cache fallback, so
-//     you still get the latest version when online, but the last-seen
-//     version still opens when you don't have signal.
+//   - HTML pages: network-first with a cache fallback, so you get the
+//     latest version when online, but the last-seen version still opens
+//     when you don't have signal.
+//   - Our OWN JS/CSS (same origin): also network-first with a cache
+//     fallback, for the same reason — these change on every deploy, and
+//     cache-first here previously meant deployed fixes could silently
+//     never reach devices that had already opened the app.
+//   - Third-party CDN scripts (different origin, version-pinned in their
+//     URLs already): cache-first, since a pinned URL never changes and
+//     this is what makes the app open instantly / work offline.
 //   - Supabase API calls are NEVER cached here — those either succeed
 //     live or fail and get handled by the offline queue; caching stale
 //     financial data would be actively dangerous.
 
-const CACHE_NAME = 'wag-shell-v2'; // bumped: v1 had cached JS from before the
-// Agent Workspace features below existed — a static cache name never gets
-// invalidated on its own, so devices that had already opened the app kept
-// serving the old js/representative.js and js/auth.js forever (cache-first
-// strategy below never re-checks the network for JS/CSS). Bump this string
-// on every deploy that touches cached files, or returning users silently
-// keep running old code with no visible error.
+const CACHE_NAME = 'wag-shell-v3'; // bumped again: v2 already had JS cached
+// before THIS deploy's changes (Add Email/Address, mandatory payment PIN,
+// the customer/agent delete fix) existed. See the fetch handler below —
+// this version has also been changed so this stops being a recurring
+// problem: same-origin JS/CSS is now network-first (was cache-first),
+// so future deploys of OUR OWN files take effect immediately without
+// needing another version bump. Only third-party CDN scripts (which
+// rarely change) still use cache-first.
 
 const APP_SHELL = [
   'index.html',
@@ -112,12 +117,33 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for everything else (CSS/JS/CDN libraries).
+  // Third-party CDN libraries (supabase-js, emailjs, html2canvas): cache-first.
+  // These are pinned to specific versions in the <script> tags themselves,
+  // so they never change under a given URL — safe to cache aggressively,
+  // and doing so is what makes the app load instantly / work offline.
+  if (url.origin !== self.location.origin) {
+    event.respondWith(
+      caches.match(req).then(cached => cached || fetch(req).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
+        return res;
+      }).catch(() => new Response('', { status: 408, statusText: 'Offline and not cached' })))
+    );
+    return;
+  }
+
+  // Our OWN JS/CSS: network-first with a cache fallback — same strategy as
+  // HTML above, and for the same reason. These files change on every
+  // deploy; cache-first here is what caused several rounds of "I shipped a
+  // fix but the phone is still running the old code" bugs, because a
+  // static CACHE_NAME never invalidates itself. Network-first means a new
+  // deploy is visible immediately for anyone online, while still falling
+  // back to the last-cached copy when truly offline.
   event.respondWith(
-    caches.match(req).then(cached => cached || fetch(req).then(res => {
+    fetch(req).then(res => {
       const copy = res.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
       return res;
-    }).catch(() => new Response('', { status: 408, statusText: 'Offline and not cached' })))
+    }).catch(() => caches.match(req).then(cached => cached || new Response('', { status: 408, statusText: 'Offline and not cached' })))
   );
 });
