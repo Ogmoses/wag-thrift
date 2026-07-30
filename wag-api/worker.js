@@ -45,8 +45,8 @@ export default {
           return await handleSendResetEmail(request, env);
         case '/api/send-digest-now':
           return await handleSendDigestNow(request, env);
-        case '/api/retire-auth-account':
-          return await handleRetireAuthAccount(request, env);
+        case '/api/delete-auth-account':
+          return await handleDeleteAuthAccount(request, env);
         default:
           return json({ error: 'Not found' }, 404);
       }
@@ -689,7 +689,7 @@ async function handleSendDigestNow(request, env) {
   return json({ ok: true, sentTo: to });
 }
 
-// ─── RETIRE AUTH ACCOUNT (after a permanent delete) ───────────────────────────
+// ─── DELETE AUTH ACCOUNT (after a permanent delete) ───────────────────────────
 // Admin's deleteCustomer()/deleteAgent() (js/admin.js) only ever anonymized
 // the customers/representatives PROFILE ROW — it never touched the
 // underlying Supabase Auth account, which can't be done from the browser at
@@ -700,34 +700,28 @@ async function handleSendDigestNow(request, env) {
 // Supabase's own "User already registered" error on signUp(), with no
 // visible connection to the account that was supposedly deleted.
 //
-// This renames (never deletes) that orphaned Auth user's email to a unique,
-// permanently-unreachable placeholder and randomizes its password, freeing
-// the phone number for reuse while leaving the Auth row itself intact —
-// safer than a hard delete, since transactions/audit_log rows likely
-// foreign-key against it.
-async function handleRetireAuthAccount(request, env) {
+// Straight DELETE /admin/users/:id — no rename fallback. Confirmed via an
+// information_schema query against this project that nothing (customers,
+// representatives, transactions, audit_log) holds a foreign key against
+// auth.users, so this always succeeds cleanly.
+async function handleDeleteAuthAccount(request, env) {
   const authCheck = await verifyRequestIsAdmin(request, env);
   if (!authCheck.ok) return json({ error: authCheck.error }, 403);
 
   const { authUserId } = await request.json();
   if (!authUserId) return json({ error: 'Missing authUserId' }, 400);
 
-  const retiredEmail = `retired-${authUserId}@wagthrift.retired`;
-  const randomPassword = crypto.randomUUID();
-
   const res = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${authUserId}`, {
-    method: 'PUT',
+    method: 'DELETE',
     headers: {
-      'Content-Type': 'application/json',
       apikey: env.SUPABASE_SERVICE_KEY,
       Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
     },
-    body: JSON.stringify({ email: retiredEmail, password: randomPassword, email_confirm: true }),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    return json({ error: err.message || 'Failed to retire the Auth account' }, 500);
+    return json({ error: err.message || 'Failed to delete the Auth account' }, 500);
   }
 
   return json({ ok: true });
