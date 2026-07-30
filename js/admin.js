@@ -396,8 +396,8 @@ async function renderOverview() {
     { count: cc }, { count: rc }, { data: totals }, { count: planCnt }, { data: pendDisb },
     { count: pdc }, { count: flagCount }, { data: auditRows }
   ] = await Promise.all([
-    db.from('customers').select('*', { count: 'exact', head: true }),
-    db.from('representatives').select('*', { count: 'exact', head: true }),
+    db.from('customers').select('*', { count: 'exact', head: true }).neq('status', 'deleted'),
+    db.from('representatives').select('*', { count: 'exact', head: true }).neq('status', 'deleted'),
     db.rpc('admin_transaction_totals'),
     db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     // Show both pending AND reviewed here — admin can review or approve
@@ -855,8 +855,8 @@ async function renderAnalytics() {
 
   const [{ data: totals }, { count: custCnt }, { count: repCnt }, { count: activePlanCnt }, { count: flagCnt }, { data: weekDeps }, { data: leaderboard }] = await Promise.all([
     db.rpc('admin_transaction_totals'),
-    db.from('customers').select('*', { count: 'exact', head: true }),
-    db.from('representatives').select('*', { count: 'exact', head: true }),
+    db.from('customers').select('*', { count: 'exact', head: true }).neq('status', 'deleted'),
+    db.from('representatives').select('*', { count: 'exact', head: true }).neq('status', 'deleted'),
     db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
     // Only the last 7 days are needed for the chart below — no reason to

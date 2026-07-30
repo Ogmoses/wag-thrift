@@ -788,7 +788,7 @@ function renderRepTxList() {
     const badge = `<span style="background:${isIn ? '#d1fae5' : isConfirmedPaid ? '#d1fae5' : '#fee2e2'};color:${isIn ? '#065f46' : isConfirmedPaid ? '#065f46' : '#991b1b'};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;">${badgeText}</span>`;
     return `<div class="tx-row" onclick="showTxReceipt('${tx.id}')" style="cursor:pointer;">
      <div class="tx-ico ${isIn || isConfirmedPaid ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
-     <div class="tx-body"><div class="tx-name">${_repCustMapHist[tx.customer_id] || 'Customer'}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${lbl}</div><div class="tx-ref">${refDisplay}</div><div style="margin-top:3px;">${badge}</div></div>
+     <div class="tx-body"><div class="tx-name">${tx.customer_name || _repCustMapHist[tx.customer_id] || 'Customer'}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${lbl}</div><div class="tx-ref">${refDisplay}</div><div style="margin-top:3px;">${badge}</div></div>
      <div class="${isIn ? 'tx-amt-g' : 'tx-amt-r'}">${isIn ? '+' : '-'}${fmt(tx.amount)}</div>
     </div>`;
   }).join('');
