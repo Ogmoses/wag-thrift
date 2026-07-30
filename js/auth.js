@@ -268,87 +268,13 @@ function friendlyRegError(msg) {
 }
 
 // ═══════════════════════════════════════════════
-// REGISTRATION (customer) — email verification flow unchanged in UX;
-// the actual account creation now goes through supabase.auth.signUp()
-// followed by complete_customer_registration() to create the profile row.
+// CUSTOMER SELF-REGISTRATION — REMOVED.
+// Customers are no longer able to sign themselves up. The only way a
+// customer account gets created now is a field agent using "Add New
+// Customer" (doAgentCreateCustomer() below), which skips email/OTP
+// entirely and uses just phone + name + a 4-digit PIN. register.html no
+// longer has a customer registration form at all.
 // ═══════════════════════════════════════════════
-async function doRegister() {
-  if (!dbReady()) return;
-  const fn = document.getElementById('regFn').value.trim(), ln = document.getElementById('regLn').value.trim(),
-    em = document.getElementById('regEm').value.trim(), ph = document.getElementById('regPh').value.trim(),
-    addr = document.getElementById('regAddr').value.trim(), pin = document.getElementById('regPin').value.trim();
-  if (!fn || !ln || !em || !ph || !addr || !pin) { setMsg('regMsg', '<div class="msg-err">Please fill in all fields</div>'); return; }
-  if (pin.length < 6) { setMsg('regMsg', '<div class="msg-err">Password must be at least 6 characters</div>'); return; }
-  const normPh = normPhone(ph);
-  showLoading('Checking details…');
-  const { data: existing } = await db.from('customers').select('id').eq('phone', normPh).single();
-  if (existing) { hideLoading(); setMsg('regMsg', '<div class="msg-err">Phone number already registered</div>'); return; }
-  // Fix: block registering a customer account with a phone number that's
-  // already in use by a Field Agent (strict, cross-role uniqueness).
-  // The DB also enforces this server-side (see sql/002), so it's blocked
-  // even if this client-side check is bypassed.
-  const { data: existingRep } = await db.from('representatives').select('id').eq('phone', normPh).neq('status', 'deleted').maybeSingle();
-  hideLoading();
-  if (existingRep) { setMsg('regMsg', '<div class="msg-err">This phone number is already registered to a Field Agent account. Please use a different phone number.</div>'); return; }
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  sessionStorage.setItem('wagVerify', JSON.stringify({ code, fn, ln, em, ph: normPh, addr, pin, expires: Date.now() + 600000 }));
-  showLoading('Sending verification code…');
-  const result = await sendVerificationEmail(em, fn, code);
-  hideLoading();
-  document.getElementById('custCreateFormBtns').style.display = 'none';
-  document.getElementById('verifySection').style.display = 'block';
-  if (result.error) {
-    document.getElementById('verifyInfo').innerHTML = `Could not send email automatically. <br><small style="color:var(--sub);">Your code is: <strong style="font-family:monospace;color:var(--blue);font-size:16px;">${code}</strong></small>`;
-  } else if (result.demo) {
-    document.getElementById('verifyInfo').innerHTML = `EmailJS not configured yet.<br><small style="color:var(--sub);">For now your code is: <strong style="font-family:monospace;color:var(--blue);font-size:16px;">${code}</strong></small>`;
-  } else {
-    document.getElementById('verifyInfo').innerHTML = `A 6-digit verification code has been sent to <strong>${em}</strong>. Please check your inbox and enter the code below.`;
-  }
-  setMsg('regMsg', '');
-}
-
-function cancelVerification() {
-  document.getElementById('custCreateFormBtns').style.display = 'block';
-  document.getElementById('verifySection').style.display = 'none';
-  setMsg('verifyMsg', '');
-}
-
-async function doVerifyCode() {
-  if (!dbReady()) return;
-  const entered = document.getElementById('verifyCodeInp').value.trim();
-  const stored = JSON.parse(sessionStorage.getItem('wagVerify') || '{}');
-  if (!stored.code) { setMsg('verifyMsg', '<div class="msg-err">Session expired. Please start again.</div>'); return; }
-  if (Date.now() > stored.expires) { setMsg('verifyMsg', '<div class="msg-err">Code expired. Please start again.</div>'); cancelVerification(); return; }
-  if (entered !== stored.code) { setMsg('verifyMsg', '<div class="msg-err">Incorrect code. Please try again.</div>'); return; }
-  showLoading('Creating your account…');
-
-  // 1. Build the hidden internal email and create the real Supabase Auth account
-  const { data: internalEmail } = await db.rpc('customer_internal_email', { p_phone: stored.ph });
-  const { data: signUpData, error: signUpErr } = await db.auth.signUp({ email: internalEmail, password: stored.pin });
-  if (signUpErr || !signUpData?.user) {
-    hideLoading();
-    setMsg('verifyMsg', `<div class="msg-err">${signUpErr?.message || 'Could not create account. Please try again.'}</div>`);
-    return;
-  }
-
-  // 2. Create the customer profile row linked to that Auth user
-  const { data: regResult, error: regErr } = await db.rpc('complete_customer_registration', {
-    p_auth_user_id: signUpData.user.id,
-    p_first_name: stored.fn, p_last_name: stored.ln,
-    p_email: stored.em, p_phone: stored.ph, p_address: stored.addr
-  });
-  hideLoading();
-  if (regErr || regResult?.ok === false) {
-    setMsg('verifyMsg', `<div class="msg-err">${friendlyRegError(regResult?.error || regErr?.message) || 'Registration failed'}</div>`);
-    return;
-  }
-
-  sessionStorage.removeItem('wagVerify');
-  cancelVerification();
-  setMsg('regMsg', '<div class="msg-ok">Account verified and created! You can now sign in.</div>');
-  document.getElementById('verifyCodeInp').value = '';
-  setTimeout(() => { setMsg('regMsg', ''); setAuthTab('signin'); }, 2500);
-}
 
 // ═══════════════════════════════════════════════
 // REPRESENTATIVE REGISTRATION (token-gated) — now via supabase.auth.signUp()

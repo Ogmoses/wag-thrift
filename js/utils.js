@@ -58,7 +58,8 @@ const genToken = () => { const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let t
 // on both signUp (customer creation) and signInWithPassword (login), or a
 // customer's password and their login attempt will silently mismatch.
 // Existing accounts are unaffected: self-registered customers already set a
-// 6+ character password (enforced in doRegister), so this is a no-op for them.
+// 6+ character password (customer self-registration required it, before it
+// was removed in favor of agent-driven creation), so this is a no-op for them.
 function deriveAuthPassword(rawPin) {
   const s = String(rawPin || '');
   return s.length >= 6 ? s : s + '-wagpin';

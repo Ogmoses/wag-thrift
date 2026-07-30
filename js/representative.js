@@ -298,21 +298,46 @@ async function repOnPlanChange() {
 function openCollectModal() {
   if (!repFoundCust) { alert('Search for a customer first'); return; }
   if (!repSelectedPlan) { alert('Please select a plan first'); return; }
+  renderCollectPresets();
   requirePayPin('Payment PIN', 'Enter your payment PIN to save this deposit.', () => showModal('collectModal'));
 }
 
 // ═══════════════════════════════════════════════
-// QUICK CASH PRESET BUTTONS (hybrid amount entry)
-// Adds to whatever is already typed in the Amount field instead of
-// replacing it, so an agent can tap +₦1,000 twice then +₦2,000 to build
-// up ₦4,000 — or just type the full amount manually as before. The manual
-// text input (#colAmt) stays fully editable; this is purely additive.
+// QUICK AMOUNT PRESETS (hybrid amount entry)
+// Reads the currently selected plan's regular_contribution straight from
+// the dropdown's cached data-contrib attribute (same source doCollection()
+// already trusts — no extra query). Since doCollection() requires the
+// deposit amount to be an exact multiple of that contribution, presets are
+// built as multiples of it (×1, ×2, ×3, ×5) and TAPPING SETS the field to
+// that exact value — not additive, so it can never accidentally produce a
+// non-multiple amount. Plans with no fixed contribution fall back to
+// generic round amounts instead. The manual #colAmt input stays fully
+// editable either way.
 // ═══════════════════════════════════════════════
-function addPresetAmount(amount) {
+function renderCollectPresets() {
+  const row = document.getElementById('colPresetRow');
+  if (!row) return;
+  const dd = document.getElementById('repPlanDd');
+  const opt = dd?.options[dd.selectedIndex];
+  const regContrib = +(opt?.dataset?.contrib || 0);
+
+  if (regContrib > 0) {
+    row.innerHTML = [1, 2, 3, 5].map(n => {
+      const amt = regContrib * n;
+      return `<button type="button" onclick="setCollectAmount(${amt})" class="btn-sm btn-sm-blue" style="flex:1;min-width:70px;padding:9px 4px;font-size:12.5px;">${n === 1 ? fmt(amt) : n + '× ' + fmt(regContrib)}</button>`;
+    }).join('');
+  } else {
+    // No fixed daily/regular contribution set on this plan — offer generic
+    // round cash amounts instead so the feature still helps.
+    row.innerHTML = [1000, 2000, 5000, 10000].map(amt =>
+      `<button type="button" onclick="setCollectAmount(${amt})" class="btn-sm btn-sm-blue" style="flex:1;min-width:70px;padding:9px 4px;font-size:12.5px;">${fmt(amt)}</button>`
+    ).join('');
+  }
+}
+function setCollectAmount(amount) {
   const inp = document.getElementById('colAmt');
   if (!inp) return;
-  const current = parseFloat(inp.value) || 0;
-  inp.value = current + amount;
+  inp.value = amount;
   inp.dispatchEvent(new Event('input', { bubbles: true }));
 }
 function clearCollectAmount() {
@@ -436,29 +461,25 @@ async function doAgentCreateCustomer() { guardedSubmit('agentCreateCustomer', ()
 async function _doAgentCreateCustomer() {
   if (!dbReady()) return;
   const rawPhone = document.getElementById('acPhone')?.value?.trim() || '';
-  const rawName = document.getElementById('acName')?.value?.trim() || '';
+  const firstName = document.getElementById('acFirstName')?.value?.trim() || '';
+  const lastName = document.getElementById('acLastName')?.value?.trim() || '';
   const pin = document.getElementById('acPin')?.value?.trim() || '';
   setMsg('acMsg', '');
 
-  if (!rawPhone || !rawName || !pin) { setMsg('acMsg', '<div class="msg-err">Please fill in phone number, name, and PIN</div>'); return; }
+  if (!rawPhone || !firstName || !lastName || !pin) { setMsg('acMsg', '<div class="msg-err">Please fill in phone number, first name, surname, and PIN</div>'); return; }
   if (!/^\d{4}$/.test(pin)) { setMsg('acMsg', '<div class="msg-err">PIN must be exactly 4 digits</div>'); return; }
 
   const normPh = normPhone(rawPhone);
   showLoading('Checking phone number…');
 
-  // Same duplicate checks doRegister() runs client-side — the DB trigger
-  // (sql/002's PHONE_ALREADY_AGENT/PHONE_ALREADY_CUSTOMER guard) enforces
-  // this server-side too, so this is just for a friendlier message.
+  // Same duplicate checks customer self-registration used to run client-side
+  // (before it was removed) — the DB trigger (sql/002's
+  // PHONE_ALREADY_AGENT/PHONE_ALREADY_CUSTOMER guard) enforces this
+  // server-side too, so this is just for a friendlier message.
   const { data: existingCust } = await db.from('customers').select('id').eq('phone', normPh).maybeSingle();
   if (existingCust) { hideLoading(); setMsg('acMsg', '<div class="msg-err">A customer with this phone number is already registered.</div>'); return; }
   const { data: existingRep } = await db.from('representatives').select('id').eq('phone', normPh).neq('status', 'deleted').maybeSingle();
   if (existingRep) { hideLoading(); setMsg('acMsg', '<div class="msg-err">This phone number is already registered to a Field Agent account.</div>'); return; }
-
-  // "Mama Ngozi / Stall 14" → first_name "Mama Ngozi", last_name "Stall 14".
-  // A plain name with no "/" just becomes the first name.
-  const [namePart, stallPart] = rawName.split('/').map(s => s.trim()).filter(Boolean);
-  const firstName = namePart || rawName;
-  const lastName = stallPart || 'Market Customer';
 
   showLoading('Creating customer account…');
 
@@ -502,9 +523,9 @@ async function _doAgentCreateCustomer() {
   await audit('login', rep?.id || 'unknown', 'representative', `Agent ${rep?.first_name || ''} ${rep?.last_name || ''} registered new customer on the spot: ${firstName} ${lastName} (${normPh})`);
 
   closeModal('agentCreateCustomerModal');
-  ['acPhone', 'acName', 'acPin'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  ['acPhone', 'acFirstName', 'acLastName', 'acPin'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   setMsg('acMsg', '');
-  alert(`Customer account created!\n\nName: ${firstName}${stallPart ? ' / ' + stallPart : ''}\nPhone: ${normPh}\nPIN: ${pin}\n\nThey can sign in now using their phone number and this PIN. Give them a Savings Plan next from Customer Search.`);
+  alert(`Customer account created!\n\nName: ${firstName} ${lastName}\nPhone: ${normPh}\nPIN: ${pin}\n\nThey can sign in now using their phone number and this PIN. Give them a Savings Plan next from Customer Search.`);
 }
 
 // ═══════════════════════════════════════════════
