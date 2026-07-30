@@ -554,7 +554,11 @@ async function renderCustomersPage() {
   // existing instant client-side search working. This exists purely so
   // the query is never truly unbounded if the customer base grows a lot
   // further down the line.
-  const { data: custs } = await db.from('customers').select('*').order('created_at', { ascending: false }).limit(2000);
+  // Fix: deleted customers used to still show up here (with a misleading
+  // "Suspend" button, since the list only ever checked for 'suspended')
+  // and counted toward the total — permanently deleted accounts should
+  // disappear from this list entirely.
+  const { data: custs } = await db.from('customers').select('*').neq('status', 'deleted').order('created_at', { ascending: false }).limit(2000);
   allCustomers = custs || [];
   renderCustomersList(allCustomers);
 }
@@ -666,7 +670,11 @@ async function deleteCustomer(id, name) {
   // at the moment they were created (see sql/002) — so overwriting the
   // name here no longer erases it from historical/transactional records,
   // receipts, or the audit log. Only this LIVE profile becomes [DELETED].
-  await db.from('customers').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id }).eq('id', id);
+  // Fix: also anonymize email — it was left untouched before, so its
+  // UNIQUE constraint permanently blocked ever re-registering this same
+  // phone number again (a new signup generates the same deterministic
+  // synthetic email for that phone, colliding with this old row's).
+  await db.from('customers').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id, email: 'del_' + id + '@wagthrift.retired' }).eq('id', id);
   // Fix: also retire the orphaned Auth account (never removed before),
   // which used to permanently block this phone number from ever being
   // reused — signUp() would fail with Supabase's own "User already
@@ -689,7 +697,9 @@ async function getAgentReliability(repId) {
 }
 
 async function renderAgentsPage() {
-  const { data: reps } = await db.from('representatives').select('*').order('created_at', { ascending: false });
+  // Fix: same issue as renderCustomersPage() — deleted agents used to
+  // still show up here with a misleading "Suspend" button.
+  const { data: reps } = await db.from('representatives').select('*').neq('status', 'deleted').order('created_at', { ascending: false });
   const el = document.getElementById('agentsPageList');
   if (!el) return;
   if (!reps?.length) { el.innerHTML = '<div class="empty-state">No agents registered</div>'; return; }
@@ -759,7 +769,8 @@ async function deleteAgent(id, name) {
   // Fix: transactions already snapshot the agent's name at the moment
   // they were created (see sql/002), so this no longer erases the agent's
   // name from historical/transactional records or the audit log.
-  await db.from('representatives').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id }).eq('id', id);
+  // Fix: also anonymize email — same reasoning as deleteCustomer() above.
+  await db.from('representatives').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id, email: 'del_' + id + '@wagthrift.retired' }).eq('id', id);
   // Fix: also retire the orphaned Auth account — see retireAuthAccount()
   // above and handleRetireAuthAccount in wag-api/worker.js for why this
   // couldn't be done client-side and why it used to block phone reuse.

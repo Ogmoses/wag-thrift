@@ -154,7 +154,7 @@ async function loadRepTxPreview() {
     return `<div class="tx-row" onclick="showTxReceipt('${tx.id}')" style="cursor:pointer;">
  <div class="tx-ico ${isIn || isConfirmedPaid ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div>
  <div class="tx-body">
- <div class="tx-name">${_repCustMap[tx.customer_id] || 'Customer'}</div>
+ <div class="tx-name">${tx.customer_name || _repCustMap[tx.customer_id] || 'Customer'}</div>
  <div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)} · ${label}</div>
  <div class="tx-ref">${refDisplay}</div>
  </div>
