@@ -89,6 +89,7 @@ showLoading('Loading your dashboard…');
   hideLoading();
   if (!valid) { window.location.replace(rootPath() + 'login.html'); return; }
   requestAnimationFrame(() => startSuspendCheck());
+  enforceRepPaymentPinSetup();
 })();
 </script>
 </body>

@@ -44,13 +44,17 @@
  </nav>
 </div>
 
+<div id="addRepEmailModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('addRepEmailModal')">×</button><div class="m-handle"></div><div class="m-title">Email Address</div><p style="color:var(--sub);font-size:13px;margin-bottom:14px;">Optional — add this to enable email-based password reset and notifications.</p><div class="mform-group"><label class="form-lbl">Email Address</label><input type="email" id="addRepEmailInp" class="form-inp" placeholder="you@example.com"></div><div id="addRepEmailMsg"></div><button class="btn btn-blue" style="margin-top:8px;" onclick="saveAddRepEmail()">Save Email</button></div></div>
+
 <script>
 requireRole(['representative']);
 initTheme();
 buildRepProfilePage();
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
 verifyRoleFromDB('representative').then(valid => {
   if (!valid) { window.location.replace(rootPath() + 'login.html'); return; }
   startSuspendCheck();
+  enforceRepPaymentPinSetup();
 });
 </script>
 </body>

@@ -68,6 +68,7 @@ document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e =
   ]);
   if (!valid) { window.location.replace(rootPath() + 'login.html'); return; }
   startSuspendCheck();
+  enforceRepPaymentPinSetup();
 })();
 </script>
 </body>
