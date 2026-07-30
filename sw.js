@@ -18,7 +18,13 @@
 //     live or fail and get handled by the offline queue; caching stale
 //     financial data would be actively dangerous.
 
-const CACHE_NAME = 'wag-shell-v1';
+const CACHE_NAME = 'wag-shell-v2'; // bumped: v1 had cached JS from before the
+// Agent Workspace features below existed — a static cache name never gets
+// invalidated on its own, so devices that had already opened the app kept
+// serving the old js/representative.js and js/auth.js forever (cache-first
+// strategy below never re-checks the network for JS/CSS). Bump this string
+// on every deploy that touches cached files, or returning users silently
+// keep running old code with no visible error.
 
 const APP_SHELL = [
   'index.html',

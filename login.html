@@ -108,7 +108,7 @@ body.dark .forgot-link{color:var(--yellow);}
 <div class="login-card">
  <div class="auth-tab-row">
   <button class="auth-tab-btn active" id="tabSignIn">Sign In</button>
-  <button class="auth-tab-btn" onclick="window.location.href='register.html'">Create Account</button>
+  <button class="auth-tab-btn" id="authCreateTab" onclick="window.location.href='register.html'">Create Account</button>
  </div>
 
  <!-- Customer form -->
@@ -190,6 +190,21 @@ function setRole(r) {
   document.getElementById('repForm').style.display = r === 'customer' ? 'none' : 'block';
   document.getElementById('loginBtn') && (document.getElementById('loginBtn').textContent = 'Sign In as Customer');
   document.getElementById('loginRepBtn') && (document.getElementById('loginRepBtn').textContent = 'Sign In as Representative');
+
+  // Customer self-registration has been removed — new customers are only
+  // ever set up by a field agent. The Create Account tab therefore only
+  // ever leads to register.html (representative-only now) when the
+  // Representative role is selected; for Customer it just explains that.
+  const createTab = document.getElementById('authCreateTab');
+  if (createTab) {
+    if (r === 'representative') {
+      createTab.textContent = 'Create Account';
+      createTab.onclick = () => { window.location.href = 'register.html'; };
+    } else {
+      createTab.textContent = 'New Customer?';
+      createTab.onclick = () => { alert('Customer accounts are set up in person by a WAG field agent — please contact yours to get started.'); };
+    }
+  }
 }
 
 (function redirectIfLoggedIn(){
