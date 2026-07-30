@@ -618,6 +618,29 @@ async function restoreCustomer(id, name) {
   renderCustomersList(allCustomers);
 }
 
+// Frees up a permanently-deleted customer's/agent's phone number for reuse
+// by retiring the orphaned Supabase Auth account behind the scenes (see
+// handleRetireAuthAccount in wag-api/worker.js for why this can't be done
+// client-side, and why it renames rather than hard-deletes). Best-effort:
+// if it fails, the profile row is already anonymized either way, so we
+// just warn rather than blocking the delete the admin already confirmed.
+async function retireAuthAccount(authUserId) {
+  if (!authUserId || !WORKER_URL) return { ok: false, error: 'not configured' };
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) return { ok: false, error: 'no session' };
+    const res = await fetch(`${WORKER_URL}/api/retire-auth-account`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ authUserId }),
+    });
+    const result = await res.json();
+    return res.ok && !result.error ? { ok: true } : { ok: false, error: result.error };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
 async function deleteCustomer(id, name) {
   showLoading('Checking…');
   // Fix: a customer account can only be permanently deleted once it has
@@ -638,13 +661,20 @@ async function deleteCustomer(id, name) {
   }
   if (!confirm(`Permanently delete ${name}? This cannot be undone.`)) return;
   showLoading('Deleting…');
+  const { data: custAuthRow } = await db.from('customers').select('auth_user_id').eq('id', id).single();
   // Fix: transactions/disbursements already snapshot the customer's name
   // at the moment they were created (see sql/002) — so overwriting the
   // name here no longer erases it from historical/transactional records,
   // receipts, or the audit log. Only this LIVE profile becomes [DELETED].
   await db.from('customers').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id }).eq('id', id);
+  // Fix: also retire the orphaned Auth account (never removed before),
+  // which used to permanently block this phone number from ever being
+  // reused — signUp() would fail with Supabase's own "User already
+  // registered" error with no visible link back to this deletion.
+  const retireResult = await retireAuthAccount(custAuthRow?.auth_user_id);
   await audit('delete', `Admin permanently deleted customer ${name} (${id})`);
   hideLoading();
+  if (!retireResult.ok) alert(`${name} was deleted, but their phone number may not be reusable yet (${retireResult.error || 'could not reach the server'}). Contact your developer if re-registering this phone number fails.`);
   await renderCustomersPage();
 }
 
@@ -725,12 +755,18 @@ async function deleteAgent(id, name) {
   }
   if (!confirm(`Permanently delete agent ${name}? This cannot be undone.`)) return;
   showLoading('Deleting…');
+  const { data: repAuthRow } = await db.from('representatives').select('auth_user_id').eq('id', id).single();
   // Fix: transactions already snapshot the agent's name at the moment
   // they were created (see sql/002), so this no longer erases the agent's
   // name from historical/transactional records or the audit log.
   await db.from('representatives').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id }).eq('id', id);
+  // Fix: also retire the orphaned Auth account — see retireAuthAccount()
+  // above and handleRetireAuthAccount in wag-api/worker.js for why this
+  // couldn't be done client-side and why it used to block phone reuse.
+  const retireResult = await retireAuthAccount(repAuthRow?.auth_user_id);
   await audit('delete', `Admin permanently deleted agent ${name} (${id})`);
   hideLoading();
+  if (!retireResult.ok) alert(`${name} was deleted, but their phone number may not be reusable yet (${retireResult.error || 'could not reach the server'}). Contact your developer if re-registering this phone number fails.`);
   await renderAgentsPage();
 }
 
