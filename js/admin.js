@@ -623,17 +623,16 @@ async function restoreCustomer(id, name) {
 }
 
 // Frees up a permanently-deleted customer's/agent's phone number for reuse
-// by retiring the orphaned Supabase Auth account behind the scenes (see
-// handleRetireAuthAccount in wag-api/worker.js for why this can't be done
-// client-side, and why it renames rather than hard-deletes). Best-effort:
-// if it fails, the profile row is already anonymized either way, so we
-// just warn rather than blocking the delete the admin already confirmed.
-async function retireAuthAccount(authUserId) {
+// by hard-deleting the orphaned Supabase Auth account behind the scenes
+// (see handleDeleteAuthAccount in wag-api/worker.js). Best-effort: if it
+// fails, the profile row is already anonymized either way, so we just
+// warn rather than blocking the delete the admin already confirmed.
+async function deleteAuthAccount(authUserId) {
   if (!authUserId || !WORKER_URL) return { ok: false, error: 'not configured' };
   try {
     const { data: { session } } = await db.auth.getSession();
     if (!session) return { ok: false, error: 'no session' };
-    const res = await fetch(`${WORKER_URL}/api/retire-auth-account`, {
+    const res = await fetch(`${WORKER_URL}/api/delete-auth-account`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ authUserId }),
@@ -675,14 +674,14 @@ async function deleteCustomer(id, name) {
   // phone number again (a new signup generates the same deterministic
   // synthetic email for that phone, colliding with this old row's).
   await db.from('customers').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id, email: 'del_' + id + '@wagthrift.retired' }).eq('id', id);
-  // Fix: also retire the orphaned Auth account (never removed before),
+  // Fix: also delete the orphaned Auth account (never removed before),
   // which used to permanently block this phone number from ever being
   // reused — signUp() would fail with Supabase's own "User already
   // registered" error with no visible link back to this deletion.
-  const retireResult = await retireAuthAccount(custAuthRow?.auth_user_id);
+  const deleteAuthResult = await deleteAuthAccount(custAuthRow?.auth_user_id);
   await audit('delete', `Admin permanently deleted customer ${name} (${id})`);
   hideLoading();
-  if (!retireResult.ok) alert(`${name} was deleted, but their phone number may not be reusable yet (${retireResult.error || 'could not reach the server'}). Contact your developer if re-registering this phone number fails.`);
+  if (!deleteAuthResult.ok) alert(`${name} was deleted, but their phone number may not be reusable yet (${deleteAuthResult.error || 'could not reach the server'}). Contact your developer if re-registering this phone number fails.`);
   await renderCustomersPage();
 }
 
@@ -771,13 +770,13 @@ async function deleteAgent(id, name) {
   // name from historical/transactional records or the audit log.
   // Fix: also anonymize email — same reasoning as deleteCustomer() above.
   await db.from('representatives').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id, email: 'del_' + id + '@wagthrift.retired' }).eq('id', id);
-  // Fix: also retire the orphaned Auth account — see retireAuthAccount()
-  // above and handleRetireAuthAccount in wag-api/worker.js for why this
+  // Fix: also delete the orphaned Auth account — see deleteAuthAccount()
+  // above and handleDeleteAuthAccount in wag-api/worker.js for why this
   // couldn't be done client-side and why it used to block phone reuse.
-  const retireResult = await retireAuthAccount(repAuthRow?.auth_user_id);
+  const deleteAuthResult = await deleteAuthAccount(repAuthRow?.auth_user_id);
   await audit('delete', `Admin permanently deleted agent ${name} (${id})`);
   hideLoading();
-  if (!retireResult.ok) alert(`${name} was deleted, but their phone number may not be reusable yet (${retireResult.error || 'could not reach the server'}). Contact your developer if re-registering this phone number fails.`);
+  if (!deleteAuthResult.ok) alert(`${name} was deleted, but their phone number may not be reusable yet (${deleteAuthResult.error || 'could not reach the server'}). Contact your developer if re-registering this phone number fails.`);
   await renderAgentsPage();
 }
 
