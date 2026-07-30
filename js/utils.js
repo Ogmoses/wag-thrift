@@ -65,6 +65,25 @@ function deriveAuthPassword(rawPin) {
   return s.length >= 6 ? s : s + '-wagpin';
 }
 
+// ── PLACEHOLDER CONTACT EMAIL
+// Used when a customer or representative doesn't have a real contact email
+// on file (agent-created customers by design; representatives who left the
+// optional Email field blank at registration). This is distinct from the
+// hidden internal email Supabase Auth uses for login — this is what's
+// stored in the customers/representatives.email COLUMN, shown (or not) on
+// their profile page. isPlaceholderEmail() is how profile pages decide
+// whether to show the real address or an "+ Add Email" prompt instead.
+function syntheticPlaceholderEmail(rawPhone) {
+  return `agent+${String(rawPhone || '').replace(/\D/g, '')}@wagthrift.local`;
+}
+function isPlaceholderEmail(email) {
+  return !email || /^agent\+\d+@wagthrift\.local$/i.test(email);
+}
+const PLACEHOLDER_ADDRESS = 'Registered by field agent (no address on file)';
+function isPlaceholderAddress(addr) {
+  return !addr || addr === PLACEHOLDER_ADDRESS;
+}
+
 // ── PASSWORD VISIBILITY ICONS
 const EYE_OPEN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 const EYE_CLOSED = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;

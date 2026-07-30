@@ -285,13 +285,19 @@ async function doRepRegister() {
   const fn = document.getElementById('repRegFn').value.trim(), ln = document.getElementById('repRegLn').value.trim(),
     em = document.getElementById('repRegEm').value.trim(), ph = document.getElementById('repRegPh').value.trim(),
     pin = document.getElementById('repRegPin').value.trim(), tok = document.getElementById('repRegToken').value.trim();
-  if (!fn || !ln || !em || !ph || !pin || !tok) { setMsg('repRegMsg', '<div class="msg-err">Please fill in all fields</div>'); return; }
+  const repPayPinRaw = document.getElementById('repRegPayPin')?.value?.trim() || '';
+  // Email is optional — falls back to a synthetic placeholder (same scheme
+  // customer accounts use, see syntheticPlaceholderEmail() in js/utils.js)
+  // so the profile page can show a clean "+ Add Email" prompt instead of
+  // that placeholder. Payment PIN is now REQUIRED — every representative
+  // must be able to authorize deposits/withdrawals from day one.
+  if (!fn || !ln || !ph || !pin || !tok) { setMsg('repRegMsg', '<div class="msg-err">Please fill in all required fields</div>'); return; }
   if (pin.length < 6) { setMsg('repRegMsg', '<div class="msg-err">Password must be at least 6 characters</div>'); return; }
+  if (!/^\d{4,6}$/.test(repPayPinRaw)) { setMsg('repRegMsg', '<div class="msg-err">Payment PIN is required and must be 4–6 digits</div>'); return; }
   showLoading('Verifying token…');
 
   const normPh = normPhone(ph);
-  const repPayPinRaw = document.getElementById('repRegPayPin')?.value?.trim() || '';
-  const repPayPinHash = repPayPinRaw ? await hashPin(repPayPinRaw) : null;
+  const repPayPinHash = await hashPin(repPayPinRaw);
 
   // Fix: block registering a Field Agent account with a phone number
   // that's already in use by a Customer (strict, cross-role uniqueness).
@@ -323,7 +329,7 @@ async function doRepRegister() {
   // Step 3: create the profile row with the already-reserved Agent ID
   const { data: regResult, error: regErr } = await db.rpc('complete_rep_registration', {
     p_auth_user_id: signUpData.user.id,
-    p_first_name: fn, p_last_name: ln, p_email: em, p_phone: normPh,
+    p_first_name: fn, p_last_name: ln, p_email: em || syntheticPlaceholderEmail(normPh), p_phone: normPh,
     p_token: tok, p_rep_id: repId, p_payment_pin_hash: repPayPinHash
   });
   hideLoading();

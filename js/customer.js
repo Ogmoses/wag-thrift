@@ -512,13 +512,19 @@ function renderCustTxList() {
 function buildCustProfilePage() {
   const u = getUser(); if (!u) return;
   const el = document.getElementById('custProfileContent'); if (!el) return;
+  const emailCell = isPlaceholderEmail(u.email)
+    ? `<button type="button" onclick="openAddEmailModal()" style="background:none;border:none;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;padding:0;">+ Add Email</button>`
+    : `<span onclick="openAddEmailModal()" style="cursor:pointer;">${u.email}</span>`;
+  const addressCell = isPlaceholderAddress(u.address)
+    ? `<button type="button" onclick="openAddAddressModal()" style="background:none;border:none;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;padding:0;">+ Add Address</button>`
+    : `<span onclick="openAddAddressModal()" style="cursor:pointer;">${u.address}</span>`;
   el.innerHTML = `
    <div class="profile-card">
     <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> My Profile</div>
     <div class="profile-row"><span class="profile-lbl">Full Name</span><span class="profile-val">${u.first_name || ''} ${u.last_name || ''}</span></div>
     <div class="profile-row"><span class="profile-lbl">Phone</span><span class="profile-val">${(u.phone || '').replace('+234', '0')}</span></div>
-    <div class="profile-row"><span class="profile-lbl">Email</span><span class="profile-val">${u.email || '—'}</span></div>
-    <div class="profile-row"><span class="profile-lbl">Address</span><span class="profile-val">${u.address || '—'}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Email</span><span class="profile-val">${emailCell}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Address</span><span class="profile-val">${addressCell}</span></div>
     <div class="profile-row"><span class="profile-lbl">Member Since</span><span class="profile-val">${fmtDate(u.created_at)}</span></div>
    </div>
    <div class="profile-card">
@@ -594,6 +600,79 @@ async function changeCustPayPin() {
   await audit('login', u.id, 'customer', `Customer ${u.first_name} ${u.last_name} changed their withdrawal PIN`);
   hideLoading(); setMsg('cpPinMsg', '<div class="msg-ok">Withdrawal PIN updated</div>');
   document.getElementById('cpCurPin').value = ''; document.getElementById('cpNewPin').value = '';
+}
+
+// ═══════════════════════════════════════════════
+// ADD / EDIT EMAIL & ADDRESS (customer profile)
+// Agent-created customers start with a synthetic placeholder email and a
+// fixed "no address on file" placeholder — see doAgentCreateCustomer() in
+// js/representative.js. buildCustProfilePage() shows a plain "+ Add Email"
+// / "+ Add Address" prompt for anyone still on those placeholders (via
+// isPlaceholderEmail()/isPlaceholderAddress() in js/utils.js), and the
+// real value — still tappable to update — for anyone who's set one. Either
+// way this only ever touches customers.email/address, never the hidden
+// internal Auth email used for login.
+// ═══════════════════════════════════════════════
+function openAddEmailModal() {
+  const u = getUser();
+  document.getElementById('addEmailInp').value = isPlaceholderEmail(u.email) ? '' : u.email;
+  setMsg('addEmailMsg', '');
+  showModal('addEmailModal');
+}
+async function saveAddEmail() {
+  const u = getUser();
+  const val = document.getElementById('addEmailInp').value.trim();
+  if (!val || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { setMsg('addEmailMsg', '<div class="msg-err">Enter a valid email address</div>'); return; }
+  showLoading('Saving…');
+  const { error } = await db.from('customers').update({ email: val }).eq('id', u.id);
+  hideLoading();
+  if (error) { setMsg('addEmailMsg', `<div class="msg-err">${error.message}</div>`); return; }
+  setUser({ ...u, email: val });
+  await audit('login', u.id, 'customer', `Customer ${u.first_name} ${u.last_name} added/updated their email address`);
+  closeModal('addEmailModal');
+  buildCustProfilePage();
+}
+function openAddAddressModal() {
+  const u = getUser();
+  document.getElementById('addAddressInp').value = isPlaceholderAddress(u.address) ? '' : u.address;
+  setMsg('addAddressMsg', '');
+  showModal('addAddressModal');
+}
+async function saveAddAddress() {
+  const u = getUser();
+  const val = document.getElementById('addAddressInp').value.trim();
+  if (!val) { setMsg('addAddressMsg', '<div class="msg-err">Enter your address</div>'); return; }
+  showLoading('Saving…');
+  const { error } = await db.from('customers').update({ address: val }).eq('id', u.id);
+  hideLoading();
+  if (error) { setMsg('addAddressMsg', `<div class="msg-err">${error.message}</div>`); return; }
+  setUser({ ...u, address: val });
+  await audit('login', u.id, 'customer', `Customer ${u.first_name} ${u.last_name} added/updated their address`);
+  closeModal('addAddressModal');
+  buildCustProfilePage();
+}
+
+// ═══════════════════════════════════════════════
+// MANDATORY PAYMENT/WITHDRAWAL PIN — enforced on every customer page
+// Agent-created customers never set one during account creation (only a
+// login PIN), and it used to only be prompted for lazily after creating a
+// first plan. Call this after role verification on EVERY customer page —
+// if the modal markup isn't on the current page (only dashboard.html has
+// it), it sends them to dashboard.html where it is, and where there's no
+// way to dismiss it without saving a PIN (see customer/dashboard.html —
+// the old "Skip for now" button has been removed).
+// ═══════════════════════════════════════════════
+async function enforcePaymentPinSetup() {
+  const u = getUser();
+  if (!u) return;
+  const { data } = await db.from('customers').select('payment_pin_hash').eq('id', u.id).single();
+  if (data && !data.payment_pin_hash) {
+    if (document.getElementById('payPinSetupModal')) {
+      openPayPinSetupModal();
+    } else {
+      window.location.replace('dashboard.html');
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════

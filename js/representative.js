@@ -453,9 +453,7 @@ async function queueOfflineCollection(d) {
 // protects against guessing, exactly as it already does for every other
 // customer login on this app.
 // ═══════════════════════════════════════════════
-function agentSyntheticEmail(normPh) {
-  return `agent+${normPh.replace(/\D/g, '')}@wagthrift.local`;
-}
+function agentSyntheticEmail(normPh) { return syntheticPlaceholderEmail(normPh); } // kept as an alias — see js/utils.js
 
 async function doAgentCreateCustomer() { guardedSubmit('agentCreateCustomer', () => _doAgentCreateCustomer()); }
 async function _doAgentCreateCustomer() {
@@ -802,13 +800,17 @@ function renderRepTxList() {
 function buildRepProfilePage() {
   const u = getUser(); if (!u) return;
   const el = document.getElementById('repProfileContent'); if (!el) return;
+  const emailCell = isPlaceholderEmail(u.email)
+    ? `<button type="button" onclick="openAddRepEmailModal()" style="background:none;border:none;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;padding:0;">+ Add Email</button>`
+    : `<span onclick="openAddRepEmailModal()" style="cursor:pointer;">${u.email}</span>`;
+  const hasPin = !!u.payment_pin_hash;
   el.innerHTML = `
    <div class="profile-card">
     <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg> Agent Profile</div>
     <div class="profile-row"><span class="profile-lbl">Full Name</span><span class="profile-val">${u.first_name || ''} ${u.last_name || ''}</span></div>
     <div class="profile-row"><span class="profile-lbl">Agent ID</span><span class="profile-val">${u.rep_id || '—'}</span></div>
     <div class="profile-row"><span class="profile-lbl">Phone</span><span class="profile-val">${(u.phone || '').replace('+234', '0')}</span></div>
-    <div class="profile-row"><span class="profile-lbl">Email</span><span class="profile-val">${u.email || '—'}</span></div>
+    <div class="profile-row"><span class="profile-lbl">Email</span><span class="profile-val">${emailCell}</span></div>
     <div class="profile-row"><span class="profile-lbl">Member Since</span><span class="profile-val">${fmtDate(u.created_at)}</span></div>
    </div>
    <div class="profile-card">
@@ -829,14 +831,14 @@ function buildRepProfilePage() {
     <div id="rpPwMsg"></div>
     <button class="btn btn-blue" style="margin-bottom:10px;" onclick="changeRepPassword()">Update Password</button>
    </div>
-   <div class="profile-card">
-    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg> Change Payment PIN</div>
-    <div class="mform-group"><label class="form-lbl">Current Payment PIN</label>
-     <div class="pin-wrap"><input type="password" id="rpCurPin" class="form-inp" placeholder="Current PIN" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('rpCurPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
-    <div class="mform-group"><label class="form-lbl">New Payment PIN</label>
+   <div class="profile-card" id="rpPayPinCard">
+    <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg> ${hasPin ? 'Change Payment PIN' : 'Set Payment PIN (Required)'}</div>
+    ${hasPin ? `<div class="mform-group"><label class="form-lbl">Current Payment PIN</label>
+     <div class="pin-wrap"><input type="password" id="rpCurPin" class="form-inp" placeholder="Current PIN" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('rpCurPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>` : `<p style="color:var(--sub);font-size:13px;margin-bottom:14px;">No payment PIN on file yet — every agent needs one to confirm deposits and withdrawals.</p>`}
+    <div class="mform-group"><label class="form-lbl">${hasPin ? 'New ' : ''}Payment PIN</label>
      <div class="pin-wrap"><input type="password" id="rpNewPin" class="form-inp" placeholder="4–6 digits" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('rpNewPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
     <div id="rpPinMsg"></div>
-    <button class="btn btn-blue" style="margin-bottom:10px;" onclick="changeRepPayPin()">Update Payment PIN</button>
+    <button class="btn btn-blue" style="margin-bottom:10px;" onclick="changeRepPayPin()">${hasPin ? 'Update' : 'Save'} Payment PIN</button>
    </div>
    <div class="profile-card">
     <div class="profile-card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Account</div>
@@ -867,15 +869,65 @@ async function changeRepPassword() {
 
 async function changeRepPayPin() {
   const u = getUser();
-  const cur = document.getElementById('rpCurPin').value;
+  const curEl = document.getElementById('rpCurPin');
   const nw = document.getElementById('rpNewPin').value;
-  if (!cur || !nw) { setMsg('rpPinMsg', '<div class="msg-err">Fill in both fields</div>'); return; }
   if (!/^\d{4,6}$/.test(nw)) { setMsg('rpPinMsg', '<div class="msg-err">PIN must be 4–6 digits</div>'); return; }
-  showLoading('Verifying…');
-  const curHash = await hashPin(cur);
-  const { data: chk } = await db.from('representatives').select('id').eq('id', u.id).eq('payment_pin_hash', curHash).single();
-  if (!chk) { hideLoading(); setMsg('rpPinMsg', '<div class="msg-err">Current PIN is incorrect</div>'); return; }
-  await db.from('representatives').update({ payment_pin_hash: await hashPin(nw) }).eq('id', u.id);
-  hideLoading(); setMsg('rpPinMsg', '<div class="msg-ok">Payment PIN updated</div>');
-  document.getElementById('rpCurPin').value = ''; document.getElementById('rpNewPin').value = '';
+  showLoading('Saving…');
+  if (curEl) {
+    const cur = curEl.value;
+    if (!cur) { hideLoading(); setMsg('rpPinMsg', '<div class="msg-err">Enter your current PIN</div>'); return; }
+    const curHash = await hashPin(cur);
+    const { data: chk } = await db.from('representatives').select('id').eq('id', u.id).eq('payment_pin_hash', curHash).single();
+    if (!chk) { hideLoading(); setMsg('rpPinMsg', '<div class="msg-err">Current PIN is incorrect</div>'); return; }
+  }
+  const newHash = await hashPin(nw);
+  await db.from('representatives').update({ payment_pin_hash: newHash }).eq('id', u.id);
+  setUser({ ...u, payment_pin_hash: newHash });
+  await audit('login', u.id, 'representative', `Agent ${u.first_name} ${u.last_name} ${curEl ? 'changed' : 'set'} their payment PIN`);
+  hideLoading(); setMsg('rpPinMsg', '<div class="msg-ok">Payment PIN saved</div>');
+  setTimeout(() => buildRepProfilePage(), 900);
+}
+
+// ═══════════════════════════════════════════════
+// ADD / EDIT EMAIL (representative profile)
+// Email is now optional at registration — reps who left it blank start
+// with a synthetic placeholder (syntheticPlaceholderEmail() in
+// js/utils.js). This lets them add a real one later; only ever touches
+// representatives.email, never the hidden internal Auth login email.
+// ═══════════════════════════════════════════════
+function openAddRepEmailModal() {
+  const u = getUser();
+  document.getElementById('addRepEmailInp').value = isPlaceholderEmail(u.email) ? '' : u.email;
+  setMsg('addRepEmailMsg', '');
+  showModal('addRepEmailModal');
+}
+async function saveAddRepEmail() {
+  const u = getUser();
+  const val = document.getElementById('addRepEmailInp').value.trim();
+  if (!val || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { setMsg('addRepEmailMsg', '<div class="msg-err">Enter a valid email address</div>'); return; }
+  showLoading('Saving…');
+  const { error } = await db.from('representatives').update({ email: val }).eq('id', u.id);
+  hideLoading();
+  if (error) { setMsg('addRepEmailMsg', `<div class="msg-err">${error.message}</div>`); return; }
+  setUser({ ...u, email: val });
+  await audit('login', u.id, 'representative', `Agent ${u.first_name} ${u.last_name} added/updated their email address`);
+  closeModal('addRepEmailModal');
+  buildRepProfilePage();
+}
+
+// ═══════════════════════════════════════════════
+// MANDATORY PAYMENT PIN — enforced on every representative page.
+// Payment PIN is now required at registration (doRepRegister in
+// js/auth.js), but existing reps who registered before this change (or
+// whose registration somehow left it blank) won't have one — this sends
+// them to settings.html, where the card above forces a "Set Payment PIN"
+// flow with no way to skip it.
+// ═══════════════════════════════════════════════
+async function enforceRepPaymentPinSetup() {
+  const u = getUser();
+  if (!u) return;
+  const { data } = await db.from('representatives').select('payment_pin_hash').eq('id', u.id).single();
+  if (data && !data.payment_pin_hash && !window.location.pathname.endsWith('settings.html')) {
+    window.location.replace('settings.html');
+  }
 }
