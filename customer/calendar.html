@@ -117,6 +117,7 @@ initTheme();
   ]);
   if (!valid) { window.location.replace(rootPath() + 'login.html'); return; }
   startSuspendCheck();
+  enforcePaymentPinSetup();
 })();
 </script>
 </body>

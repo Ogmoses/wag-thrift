@@ -68,6 +68,7 @@ verifyRoleFromDB('customer').then(valid => {
   if (!valid) return window.location.replace(rootPath() + 'login.html');
   loadCustTxPage();
   startSuspendCheck();
+  enforcePaymentPinSetup();
 });
 </script>
 </body>

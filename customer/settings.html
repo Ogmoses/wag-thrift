@@ -47,6 +47,10 @@
  </nav>
 </div>
 
+<div id="addEmailModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('addEmailModal')">×</button><div class="m-handle"></div><div class="m-title">Email Address</div><p style="color:var(--sub);font-size:13px;margin-bottom:14px;">Optional — add this if you'd like to receive account notifications by email.</p><div class="mform-group"><label class="form-lbl">Email Address</label><input type="email" id="addEmailInp" class="form-inp" placeholder="you@example.com"></div><div id="addEmailMsg"></div><button class="btn btn-blue" style="margin-top:8px;" onclick="saveAddEmail()">Save Email</button></div></div>
+
+<div id="addAddressModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('addAddressModal')">×</button><div class="m-handle"></div><div class="m-title">Home Address</div><p style="color:var(--sub);font-size:13px;margin-bottom:14px;">Optional — add this if you'd like it on file.</p><div class="mform-group"><label class="form-lbl">Address</label><input type="text" id="addAddressInp" class="form-inp" placeholder="Your residential address"></div><div id="addAddressMsg"></div><button class="btn btn-blue" style="margin-top:8px;" onclick="saveAddAddress()">Save Address</button></div></div>
+
 <script>
 requireRole(['customer']);
 initTheme();
@@ -57,7 +61,9 @@ buildCustProfilePage();
 verifyRoleFromDB('customer').then(valid => {
   if (!valid) { window.location.replace(rootPath() + 'login.html'); return; }
   startSuspendCheck();
+  enforcePaymentPinSetup();
 });
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m && m.id !== 'payPinSetupModal') m.classList.remove('active'); }));
 </script>
 </body>
 </html>
