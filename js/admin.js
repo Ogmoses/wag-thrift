@@ -519,10 +519,10 @@ function renderActionNeeded(disbs, flags, disbCount, flagCount) {
     const approveBtn = canReview
       ? `<button class="exec-btn-approve" onclick="reviewDisb('${d.id}', ${d.amount}, '${esc}')">Mark Reviewed</button>`
       : canApprove
-      ? `<button class="exec-btn-approve" onclick="approveDisb('${d.id}', ${d.amount}, '${esc}')">✅ Approve</button>`
+      ? `<button class="exec-btn-approve" onclick="approveDisb('${d.id}', ${d.amount}, '${esc}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Approve</button>`
       : '';
     const declineBtn = (canReview || canApprove)
-      ? `<button class="exec-btn-decline" onclick="rejectDisb('${d.id}', ${d.amount}, '${esc}')">❌ Decline</button>`
+      ? `<button class="exec-btn-decline" onclick="rejectDisb('${d.id}', ${d.amount}, '${esc}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Decline</button>`
       : '';
     return `<div class="exec-priority-card">
       <div class="exec-priority-info">
@@ -537,7 +537,7 @@ function renderActionNeeded(disbs, flags, disbCount, flagCount) {
     const type = (f.type || '').replace(/emergency/gi, 'withdrawal').replace(/EXCESS_EMERGENCY/g, 'EXCESS_WITHDRAWAL');
     return `<div class="exec-priority-card">
       <div class="exec-priority-info">
-        <div class="exec-priority-title">🚩 ${type.replace(/_/g, ' ')} <span class="exec-sev exec-sev-${(f.severity || '').toLowerCase()}">${(f.severity || '').toUpperCase()}</span></div>
+        <div class="exec-priority-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>${type.replace(/_/g, ' ')} <span class="exec-sev exec-sev-${(f.severity || '').toLowerCase()}">${(f.severity || '').toUpperCase()}</span></div>
         <div class="exec-priority-sub">${f.description || 'Flagged for review'}</div>
       </div>
       <div class="exec-priority-actions"><button class="exec-btn-approve" onclick="resolveFlagExec('${f.id}')">Mark Resolved</button></div>
