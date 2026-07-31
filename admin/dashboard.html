@@ -22,31 +22,97 @@
     <!-- OVERVIEW -->
     <div class="page active" id="page-overview">
       <div class="page-inner">
-        <div class="overview-grid">
-          <div class="ov-card"><div class="ov-lbl">Customers</div><div class="ov-val" id="ovCust">—</div><div class="ov-sub">registered</div></div>
-          <div class="ov-card"><div class="ov-lbl">Field Agents</div><div class="ov-val" id="ovReps">—</div><div class="ov-sub">active</div></div>
-          <div class="ov-card green"><div class="ov-lbl">Total Deposits</div><div class="ov-val" id="ovDeposits">—</div><div class="ov-sub">all time</div></div>
-          <div class="ov-card red"><div class="ov-lbl">Total Payouts</div><div class="ov-val" id="ovPayouts">—</div><div class="ov-sub">disbursed</div></div>
-          <div class="ov-card orange"><div class="ov-lbl">Pending Withdrawals</div><div class="ov-val" id="ovPendingDisb">—</div><div class="ov-sub">awaiting review</div></div>
-          <div class="ov-card"><div class="ov-lbl">Active Plans</div><div class="ov-val" id="ovPlans">—</div><div class="ov-sub">in progress</div></div>
+
+        <div class="view-toggle-row">
+          <div class="view-toggle" role="tablist">
+            <button class="view-toggle-btn active" id="viewToggleExec" onclick="setAdminViewMode('executive')" role="tab">👑 Executive View</button>
+            <button class="view-toggle-btn" id="viewToggleDetailed" onclick="setAdminViewMode('detailed')" role="tab">📊 Detailed View</button>
+          </div>
         </div>
 
-        <div class="section-card">
-          <div class="section-card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-            Pending Disbursements
-            <a href="#disbursements" id="ovViewAllDisb" style="float:right;font-size:11px;color:var(--yellow);text-decoration:none;">View all →</a>
+        <!-- EXECUTIVE VIEW -->
+        <div id="execView">
+          <div class="section-card exec-action-card">
+            <div class="section-card-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              Attention Required
+            </div>
+            <div id="execActionNeeded"><div class="empty-state">Loading…</div></div>
           </div>
-          <div id="ovDisbList"><div class="empty-state">Loading…</div></div>
+
+          <div class="exec-tier-lbl">Financial Flow</div>
+          <div class="exec-grid">
+            <div class="exec-card exec-card-hero">
+              <div class="exec-card-lbl">Total Vault Balance</div>
+              <div class="exec-card-val" id="execVault">—</div>
+              <div class="exec-card-sub">across all active plans</div>
+            </div>
+            <div class="exec-card">
+              <div class="exec-card-lbl">Today's Collections</div>
+              <div class="exec-card-val exec-green" id="execCollections">—</div>
+              <div class="exec-card-sub">cash deposited today</div>
+            </div>
+            <div class="exec-card">
+              <div class="exec-card-lbl">Today's Payouts</div>
+              <div class="exec-card-val exec-red" id="execPayouts">—</div>
+              <div class="exec-card-sub">disbursed today</div>
+            </div>
+            <div class="exec-card">
+              <div class="exec-card-lbl">Net Daily Cashflow</div>
+              <div class="exec-card-val exec-net" id="execNet">—</div>
+              <div class="exec-card-sub">collections − payouts</div>
+            </div>
+          </div>
+
+          <div class="exec-tier-lbl">Operational Health Pulse</div>
+          <div class="exec-grid exec-grid-3">
+            <div class="exec-card">
+              <div class="exec-card-lbl">Active Agents Today</div>
+              <div class="exec-card-val" id="execAgentsToday">—</div>
+              <div class="exec-card-sub">logged a deposit / total active</div>
+            </div>
+            <div class="exec-card">
+              <div class="exec-card-lbl">Transactions Today</div>
+              <div class="exec-card-val" id="execTxToday">—</div>
+              <div class="exec-card-sub">collections logged</div>
+            </div>
+            <div class="exec-card">
+              <div class="exec-card-lbl">Active Customer Plans</div>
+              <div class="exec-card-val" id="execPlans">—</div>
+              <div class="exec-card-sub">in progress</div>
+            </div>
+          </div>
         </div>
 
-        <div class="section-card">
-          <div class="section-card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
-            Recent Activity
+        <!-- DETAILED VIEW — the full existing admin suite, unchanged -->
+        <div id="detailedView" style="display:none;">
+          <div class="overview-grid">
+            <div class="ov-card"><div class="ov-lbl">Customers</div><div class="ov-val" id="ovCust">—</div><div class="ov-sub">registered</div></div>
+            <div class="ov-card"><div class="ov-lbl">Field Agents</div><div class="ov-val" id="ovReps">—</div><div class="ov-sub">active</div></div>
+            <div class="ov-card green"><div class="ov-lbl">Total Deposits</div><div class="ov-val" id="ovDeposits">—</div><div class="ov-sub">all time</div></div>
+            <div class="ov-card red"><div class="ov-lbl">Total Payouts</div><div class="ov-val" id="ovPayouts">—</div><div class="ov-sub">disbursed</div></div>
+            <div class="ov-card orange"><div class="ov-lbl">Pending Withdrawals</div><div class="ov-val" id="ovPendingDisb">—</div><div class="ov-sub">awaiting review</div></div>
+            <div class="ov-card"><div class="ov-lbl">Active Plans</div><div class="ov-val" id="ovPlans">—</div><div class="ov-sub">in progress</div></div>
           </div>
-          <div id="ovAuditList"><div class="empty-state">Loading…</div></div>
+
+          <div class="section-card">
+            <div class="section-card-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+              Pending Disbursements
+              <a href="#disbursements" id="ovViewAllDisb" style="float:right;font-size:11px;color:var(--yellow);text-decoration:none;">View all →</a>
+            </div>
+            <div id="ovDisbList"><div class="empty-state">Loading…</div></div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-card-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+              Recent Activity
+            </div>
+            <div id="ovAuditList"><div class="empty-state">Loading…</div></div>
+          </div>
         </div>
+
       </div>
     </div>
 
@@ -79,6 +145,7 @@ if (_a) (async () => {
   initAdminTheme();
   const initial = (location.hash === '#disbursements') ? 'disbursements' : 'overview';
   renderAdminShell(initial, initial === 'disbursements' ? 'Disbursements' : 'Overview');
+  setAdminViewMode(localStorage.getItem('wagAdminViewMode') || 'executive');
 
   async function showAdminTab(page) {
     currentPage = page;
@@ -89,7 +156,10 @@ if (_a) (async () => {
       n.classList.toggle('active', n.getAttribute('href') === (page === 'disbursements' ? 'dashboard.html#disbursements' : 'dashboard.html'));
     });
     history.replaceState(null, '', page === 'disbursements' ? '#disbursements' : location.pathname);
-    return page === 'disbursements' ? renderDisbPage() : renderOverview();
+    // Both the Executive and Detailed views' data are fetched together —
+    // each is a handful of cheap queries, and pre-loading both means
+    // toggling between them is instant with no loading flicker.
+    return page === 'disbursements' ? renderDisbPage() : Promise.all([renderOverview(), renderExecutiveOverview()]);
   }
 
   // Intercept the Overview / Disbursements nav links so they switch tabs in-page
