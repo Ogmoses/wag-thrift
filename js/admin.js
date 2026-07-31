@@ -555,8 +555,9 @@ function renderActionNeeded(disbs, flags, disbCount, flagCount) {
 async function resolveFlagExec(id) {
   showConfirm('Resolve Flag', 'Mark this fraud flag as resolved?', async () => {
     showLoading('Updating…');
-    await db.from('fraud_flags').update({ resolved: true }).eq('id', id);
+    const { error } = await db.from('fraud_flags').update({ resolved: true }).eq('id', id);
     hideLoading();
+    if (error) { alert('Could not mark this flag as resolved: ' + error.message); return; }
     await renderExecutiveOverview();
   });
 }
@@ -1076,8 +1077,11 @@ async function buildCustomerFlagContext(custId, withEvidence) {
   const { data: c } = await db.from('customers').select('*').eq('id', custId).maybeSingle();
   if (!c) return '<div class="ff-not-found">Customer account not found — may have been deleted.</div>';
   const isSuspended = c.status === 'suspended';
-  const statusTag = isSuspended ? '<span class="ff-status-tag">SUSPENDED</span>' : '';
-  const actionBtn = isSuspended
+  const isDeleted = c.status === 'deleted';
+  const statusTag = isSuspended ? '<span class="ff-status-tag">SUSPENDED</span>' : isDeleted ? '<span class="ff-status-tag">DELETED</span>' : '';
+  const actionBtn = isDeleted
+    ? '' // account is gone — nothing to suspend or restore
+    : isSuspended
     ? `<button class="btn btn-green" onclick="suspendFlagAccount('customer','restore','${c.id}','${(c.first_name||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:5px 11px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.51"/></svg>Restore</button>`
     : `<button class="btn btn-red" onclick="suspendFlagAccount('customer','suspend','${c.id}','${(c.first_name||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:5px 11px;">Suspend Account</button>`;
 
@@ -1100,8 +1104,11 @@ async function buildAgentFlagContext(agentId) {
   const reliability = await getAgentReliability(r.id);
   const reliabilityColor = reliability >= 80 ? 'var(--green)' : reliability >= 60 ? 'var(--yellow)' : 'var(--red)';
   const isSuspended = r.status === 'suspended';
-  const statusTag = isSuspended ? '<span class="ff-status-tag">SUSPENDED</span>' : '';
-  const actionBtn = isSuspended
+  const isDeleted = r.status === 'deleted';
+  const statusTag = isSuspended ? '<span class="ff-status-tag">SUSPENDED</span>' : isDeleted ? '<span class="ff-status-tag">DELETED</span>' : '';
+  const actionBtn = isDeleted
+    ? ''
+    : isSuspended
     ? `<button class="btn btn-green" onclick="suspendFlagAccount('agent','restore','${r.id}','${(r.first_name||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:5px 11px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5.51"/></svg>Restore</button>`
     : `<button class="btn btn-red" onclick="suspendFlagAccount('agent','suspend','${r.id}','${(r.first_name||'').replace(/'/g,"\\'")}')" style="font-size:10px;padding:5px 11px;">Suspend Account</button>`;
 
@@ -1115,7 +1122,10 @@ async function suspendFlagAccount(role, action, id, name) {
 }
 
 async function resolveFlag(id) {
-  await db.from('fraud_flags').update({ resolved: true }).eq('id', id);
+  showLoading('Updating…');
+  const { error } = await db.from('fraud_flags').update({ resolved: true }).eq('id', id);
+  hideLoading();
+  if (error) { alert('Could not mark this flag as resolved: ' + error.message); return; }
   await renderFraudFlags();
   await renderAnalytics();
 }
