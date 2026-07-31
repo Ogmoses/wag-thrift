@@ -642,7 +642,7 @@ async function handleSendDigestNow(request, env) {
   return json({ ok: true, sentTo: to });
 }
 
-// ─── DELETE AUTH ACCOUNT (after a permanent delete) ───────────────────────────
+// ─── RETIRE AUTH ACCOUNT (after a permanent delete) ───────────────────────────
 // Admin's deleteCustomer()/deleteAgent() (js/admin.js) only ever anonymized
 // the customers/representatives PROFILE ROW — it never touched the
 // underlying Supabase Auth account, which can't be done from the browser at
@@ -653,10 +653,19 @@ async function handleSendDigestNow(request, env) {
 // Supabase's own "User already registered" error on signUp(), with no
 // visible connection to the account that was supposedly deleted.
 //
-// Straight DELETE /admin/users/:id — no rename fallback. Confirmed via an
-// information_schema query against this project that nothing (customers,
-// representatives, transactions, audit_log) holds a foreign key against
-// auth.users, so this always succeeds cleanly.
+// This renames the account rather than hard-deleting it. An earlier version
+// tried a real DELETE — an information_schema query had confirmed nothing
+// holds a foreign key directly against auth.users, so that looked safe. In
+// practice it wasn't: deleting the Auth user surfaced a live error
+// ("...violates foreign key constraint transactions_customer_id_fkey..."),
+// which means something in this Supabase project — almost certainly a
+// TRIGGER on auth.users, not a constraint — cascades an Auth-user delete
+// into also hard-deleting the linked customers/representatives row. That
+// row deliberately needs to survive (anonymized) so transaction history
+// keeps working, so a real delete here is fundamentally incompatible with
+// this schema. Renaming sidesteps the trigger entirely: nothing gets
+// deleted, so nothing cascades, while still freeing the phone number for
+// reuse by moving the login email out of the way.
 async function handleDeleteAuthAccount(request, env) {
   const authCheck = await verifyRequestIsAdmin(request, env);
   if (!authCheck.ok) return json({ error: authCheck.error }, 403);
@@ -664,17 +673,22 @@ async function handleDeleteAuthAccount(request, env) {
   const { authUserId } = await request.json();
   if (!authUserId) return json({ error: 'Missing authUserId' }, 400);
 
+  const retiredEmail = `retired-${authUserId}@wagthrift.retired`;
+  const randomPassword = crypto.randomUUID();
+
   const res = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${authUserId}`, {
-    method: 'DELETE',
+    method: 'PUT',
     headers: {
+      'Content-Type': 'application/json',
       apikey: env.SUPABASE_SERVICE_KEY,
       Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
     },
+    body: JSON.stringify({ email: retiredEmail, password: randomPassword, email_confirm: true }),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    return json({ error: err.message || 'Failed to delete the Auth account' }, 500);
+    return json({ error: err.message || 'Failed to retire the Auth account' }, 500);
   }
 
   return json({ ok: true });
