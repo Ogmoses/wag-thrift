@@ -32,7 +32,8 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !RESEND_API_KEY) {
 const NOW = new Date();
 const PERIOD_HOURS = REPORT_TYPE === 'weekly' ? 24 * 7 : 24;
 const PERIOD_START = new Date(NOW.getTime() - PERIOD_HOURS * 60 * 60 * 1000);
-const PERIOD_LABEL = REPORT_TYPE === 'weekly' ? 'Weekly Rollup' : 'Daily Summary';
+const PERIOD_LABEL = REPORT_TYPE === 'weekly' ? 'Weekly Cash Report' : 'Daily Cash Report';
+const REPORT_REF = `WAG-${REPORT_TYPE.toUpperCase()}-${NOW.toISOString().slice(0, 10)}`;
 
 const headers = {
   apikey: SUPABASE_SERVICE_KEY,
@@ -113,7 +114,6 @@ async function gatherReport() {
     totalActiveAgents,
     txRows,
     disbRows,
-    auditRows,
     balanceRows,
     agentRows,
   ] = await Promise.all([
@@ -123,7 +123,6 @@ async function gatherReport() {
     fetchCount('representatives', `status=eq.active`),
     fetchRows('transactions', `created_at=gte.${since}&select=ref,type,amount,customer_name,agent_name,agent_id,created_at&order=created_at.asc`),
     fetchRows('disbursements', `requested_at=gte.${since}&select=status,amount,customer_name,requested_at`),
-    fetchRows('audit_log', `created_at=gte.${since}&select=action,description,amount,user_id,user_role,created_at&order=created_at.asc`),
     fetchRows('plan_balances', `select=balance`),
     fetchRows('representatives', `select=id,first_name,last_name,rep_id`),
   ]);
@@ -143,32 +142,31 @@ async function gatherReport() {
   // Total funds currently held across all plans (point-in-time, not period-based)
   const totalHeld = balanceRows.reduce((s, r) => s + Number(r.balance), 0);
 
-  const agentGroups = groupByAgent(txRows, auditRows, agentRows);
-  // Only true admin-authored actions (suspend/delete/restore/review/etc.)
-  // — agent logins, searches, and collections now live inside each
-  // agent's own section instead, so nothing is shown twice.
-  const adminOnlyAuditRows = auditRows.filter(a => a.user_role !== 'representative');
+  const agentGroups = groupByAgent(txRows, agentRows);
 
   return {
     newCustomers, newAgents, totalActiveCustomers, totalActiveAgents,
     deposits, payouts, depositTotal, payoutTotal,
     disbByStatus, disbCount: disbRows.length,
-    auditRows, adminOnlyAuditRows, agentGroups, totalHeld,
+    agentGroups, totalHeld,
   };
 }
 
-// Groups this period's transactions and audit activity by the agent who
-// did them — the whole point being: an admin can look at ONE agent's
-// block and see everything that agent did, instead of scrolling through
-// a single giant mixed list to piece it together themselves. Admin-only
-// actions (suspend, delete, approve, etc.) are deliberately excluded —
-// those aren't any agent's actions, so forcing them into an agent's
-// section would misattribute them.
-function groupByAgent(txRows, auditRows, agentRows) {
+// Groups this period's deposit/payout transactions by the agent who
+// handled them — the whole point being: an admin can look at ONE agent's
+// block and see everything that agent collected/paid out, instead of
+// scrolling through a single giant mixed list to piece it together
+// themselves. This report is a Cash Report — deposits and payouts only,
+// for agents and customers alike. It used to also carry a full admin
+// audit trail (suspends, deletes, flags, etc.) plus a per-agent "other
+// activity" line; both are gone now. That audit trail still exists in
+// full, in-app, under Admin → Settings → Audit Log — it just doesn't
+// belong in a report that gets emailed out.
+function groupByAgent(txRows, agentRows) {
   const agentMap = {};
   (agentRows || []).forEach(a => { agentMap[a.id] = a; });
 
-  const groups = {}; // agentId -> { agentName, repId, transactions, auditEntries, totalCollected }
+  const groups = {}; // agentId -> { agentName, repId, transactions, totalCollected }
   const getGroup = (agentId, fallbackName) => {
     if (!groups[agentId]) {
       const a = agentMap[agentId];
@@ -177,7 +175,6 @@ function groupByAgent(txRows, auditRows, agentRows) {
         agentName: a ? `${a.first_name} ${a.last_name}` : (fallbackName || 'Unknown Agent'),
         repId: a?.rep_id || null,
         transactions: [],
-        auditEntries: [],
         totalCollected: 0,
       };
     }
@@ -189,12 +186,6 @@ function groupByAgent(txRows, auditRows, agentRows) {
     const g = getGroup(t.agent_id, t.agent_name);
     g.transactions.push(t);
     if (t.type === 'deposit' || t.type === 'opening') g.totalCollected += Number(t.amount);
-  });
-
-  auditRows.forEach(a => {
-    if (a.user_role !== 'representative' || !a.user_id) return;
-    const g = getGroup(a.user_id, null);
-    g.auditEntries.push(a);
   });
 
   // Busiest agent first — the most relevant activity floats to the top
@@ -236,11 +227,15 @@ async function buildPDF(d) {
 
   // Header
   text('WONDERFUL & ABLE GOD ENTERPRISES', MARGIN, 10, bold, rgb(0.7, 0.5, 0));
+  const confLabel = 'CONFIDENTIAL';
+  text(confLabel, PAGE_W - MARGIN - bold.widthOfTextAtSize(confLabel, 8), 8, bold, GREY);
   line(18);
   text(PERIOD_LABEL, MARGIN, 20, bold, NAVY);
   line(16);
   text(`${fmtDateTime(PERIOD_START.toISOString())}  -  ${fmtDateTime(NOW.toISOString())}`, MARGIN, 10, font, GREY);
-  line(30);
+  line(13);
+  text(`Ref: ${REPORT_REF}`, MARGIN, 9, font, GREY);
+  line(28);
 
   // Stat summary
   const stats = [
@@ -248,11 +243,12 @@ async function buildPDF(d) {
     ['New agents', String(d.newAgents)],
     ['Deposits collected', `${fmtNairaPDF(d.depositTotal)} (${d.deposits.length} txn)`],
     ['Withdrawals paid', `${fmtNairaPDF(d.payoutTotal)} (${d.payouts.length} txn)`],
+    ['Net cash movement', fmtNairaPDF(d.depositTotal - d.payoutTotal)],
     ['Total funds held across all plans', fmtNairaPDF(d.totalHeld)],
     ['Active customers', String(d.totalActiveCustomers)],
     ['Active agents', String(d.totalActiveAgents)],
   ];
-  text('SUMMARY', MARGIN, 11, bold, NAVY);
+  text('CASH POSITION SUMMARY', MARGIN, 11, bold, NAVY);
   line(18);
   stats.forEach(([label, value]) => {
     newPageIfNeeded(16);
@@ -279,7 +275,7 @@ async function buildPDF(d) {
   // Agent activity — grouped so each agent's block is self-contained and
   // scannable, instead of one long mixed list to scroll through.
   newPageIfNeeded(60);
-  text(`AGENT ACTIVITY (${d.agentGroups.length} agent${d.agentGroups.length === 1 ? '' : 's'})`, MARGIN, 11, bold, NAVY);
+  text(`AGENT COLLECTIONS & DISBURSEMENTS (${d.agentGroups.length} agent${d.agentGroups.length === 1 ? '' : 's'})`, MARGIN, 11, bold, NAVY);
   line(20);
 
   if (!d.agentGroups.length) {
@@ -318,44 +314,16 @@ async function buildPDF(d) {
           line(13);
         });
       }
-      if (g.auditEntries.length) {
-        newPageIfNeeded(13);
-        text(pdfSafe(`${g.auditEntries.length} other activity: ${g.auditEntries.map(a => a.action).join(', ')}`), gColTime, 7.5, font, GREY);
-        line(13);
-      }
       line(10); // gap before the next agent's block
     });
   }
   line(10);
 
-  // Admin actions — suspend/delete/restore/review/etc. Agent logins,
-  // searches, and collections live inside each agent's own section
-  // above instead, so nothing appears twice.
-  newPageIfNeeded(60);
-  text('ADMIN ACTIONS', MARGIN, 11, bold, NAVY);
-  line(18);
-  const colTime = MARGIN, colAction = MARGIN + 110, colDetails = MARGIN + 190;
-  text('TIME', colTime, 9, bold, GREY);
-  text('ACTION', colAction, 9, bold, GREY);
-  text('DETAILS', colDetails, 9, bold, GREY);
-  line(20);
-  page.drawLine({ start: { x: MARGIN, y: y + 6 }, end: { x: PAGE_W - MARGIN, y: y + 6 }, thickness: 0.5, color: GREY });
-  line(8);
-
-  if (!d.adminOnlyAuditRows.length) {
-    line(16);
-    text('No admin actions logged this period.', MARGIN, 10, font, GREY);
-  } else {
-    d.adminOnlyAuditRows.forEach(a => {
-      newPageIfNeeded(30);
-      const details = pdfSafe(a.description || '-');
-      const wrapped = details.length > 60 ? details.slice(0, 57) + '...' : details;
-      text(fmtDateTime(a.created_at), colTime, 8.5, font, GREY);
-      text(pdfSafe((a.action || '').toUpperCase()), colAction, 8.5, bold, NAVY);
-      text(wrapped, colDetails, 8.5, font, BLACK);
-      line(16);
-    });
-  }
+  newPageIfNeeded(30);
+  text('This report covers deposits and withdrawals only. The full admin', MARGIN, 8.5, font, GREY);
+  line(11);
+  text('audit trail is available in-app under Admin -> Settings -> Audit Log.', MARGIN, 8.5, font, GREY);
+  line(11);
 
   const pdfBytes = await pdfDoc.save();
   return Buffer.from(pdfBytes).toString('base64');
@@ -375,25 +343,9 @@ function icon(name, color) {
 }
 
 function buildHTML(d) {
-  const adminAuditRowsHTML = d.adminOnlyAuditRows.length
-    ? d.adminOnlyAuditRows.map(a => `
-        <tr>
-          <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#6b7280;white-space:nowrap;">${fmtDateTime(a.created_at)}</td>
-          <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">
-            <span style="display:inline-block;padding:2px 8px;border-radius:6px;font-weight:700;font-size:10px;text-transform:uppercase;
-              background:${a.action === 'delete' ? '#fee2e2' : a.action === 'flag' ? '#fef3c7' : '#e0e7ff'};
-              color:${a.action === 'delete' ? '#b91c1c' : a.action === 'flag' ? '#92400e' : '#3730a3'};">
-              ${a.action}
-            </span>
-          </td>
-          <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#111827;">${a.description || '—'}</td>
-        </tr>`).join('')
-    : `<tr><td colspan="3" style="padding:14px;text-align:center;color:#9ca3af;font-size:13px;">No admin actions logged this period.</td></tr>`;
-
-  // One compact block per agent — their deposits/withdrawals table, plus
-  // a short activity line (logins, searches) underneath. Sorted busiest
-  // agent first, so scanning top-to-bottom is itself useful, not just
-  // alphabetical.
+  // One compact block per agent — their deposits/withdrawals table. Sorted
+  // busiest agent first, so scanning top-to-bottom is itself useful, not
+  // just alphabetical.
   const agentSectionsHTML = d.agentGroups.length
     ? d.agentGroups.map(g => {
         const txHTML = g.transactions.length
@@ -428,7 +380,6 @@ function buildHTML(d) {
             </thead>
             <tbody>${txHTML}</tbody>
           </table>
-          ${g.auditEntries.length ? `<div style="padding:8px 14px;background:#fafafa;font-size:11px;color:#6b7280;border-top:1px solid #f0f2f5;">${g.auditEntries.length} other activity: ${g.auditEntries.map(a => a.action).join(', ')}</div>` : ''}
         </div>`;
       }).join('')
     : `<div style="padding:14px;text-align:center;color:#9ca3af;font-size:13px;border:1px solid #e5e7eb;border-radius:10px;">No agent activity this period.</div>`;
@@ -436,9 +387,13 @@ function buildHTML(d) {
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;background:#f4f6fb;padding:24px 16px;">
     <div style="background:#011f7b;border-radius:14px 14px 0 0;padding:24px 28px;">
-      <div style="color:#FFBA09;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Wonderful &amp; Able God Enterprises</div>
-      <div style="color:#fff;font-size:22px;font-weight:800;">${PERIOD_LABEL}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div style="color:#FFBA09;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Wonderful &amp; Able God Enterprises</div>
+        <div style="color:#8a97c2;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border:1px solid #2a3a7a;border-radius:4px;padding:2px 7px;">Confidential</div>
+      </div>
+      <div style="color:#fff;font-size:22px;font-weight:800;margin-top:4px;">${PERIOD_LABEL}</div>
       <div style="color:#c7d2ea;font-size:13px;margin-top:4px;">${fmtDateTime(PERIOD_START.toISOString())} — ${fmtDateTime(NOW.toISOString())}</div>
+      <div style="color:#8a97c2;font-size:11px;margin-top:2px;">Ref: ${REPORT_REF}</div>
     </div>
 
     <div style="background:#fff;padding:24px 28px;">
@@ -472,6 +427,7 @@ function buildHTML(d) {
       <div style="margin-top:20px;padding:16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
         <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Platform Snapshot (as of now)</div>
         <table style="width:100%;font-size:13px;">
+          <tr><td style="padding:3px 0;color:#374151;">Net cash movement</td><td style="text-align:right;font-weight:700;">${fmtNaira(d.depositTotal - d.payoutTotal)}</td></tr>
           <tr><td style="padding:3px 0;color:#374151;">Total funds held across all plans</td><td style="text-align:right;font-weight:700;color:#011f7b;">${fmtNaira(d.totalHeld)}</td></tr>
           <tr><td style="padding:3px 0;color:#374151;">Active customers</td><td style="text-align:right;font-weight:700;">${d.totalActiveCustomers}</td></tr>
           <tr><td style="padding:3px 0;color:#374151;">Active agents</td><td style="text-align:right;font-weight:700;">${d.totalActiveAgents}</td></tr>
@@ -497,26 +453,9 @@ function buildHTML(d) {
         ${agentSectionsHTML}
       </div>
 
-      <!-- Admin actions — suspend/delete/restore/review/etc. Agent logins,
-           searches, and collections live inside each agent's own section
-           above instead, so nothing appears twice. -->
-      <div style="margin-top:24px;">
-        <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Admin Actions</div>
-        <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-          <thead>
-            <tr style="background:#f9fafb;">
-              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;">Time</th>
-              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;">Action</th>
-              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;">Details</th>
-            </tr>
-          </thead>
-          <tbody>${adminAuditRowsHTML}</tbody>
-        </table>
-      </div>
-
       <p style="color:#9ca3af;font-size:11px;margin-top:24px;text-align:center;">
-        This is an automated ${REPORT_TYPE} digest generated from live platform data.<br>
-        A downloadable PDF copy of this report, including the full admin action logbook, is attached — save it for your records.<br>
+        This is an automated ${REPORT_TYPE} Cash Report generated from live platform data.<br>
+        A downloadable PDF copy is attached for your records. This report covers deposits and withdrawals only — the full admin audit trail stays in-app under Admin → Settings → Audit Log.<br>
         Full raw database backups are stored separately and privately in Cloudflare R2.
       </p>
     </div>
