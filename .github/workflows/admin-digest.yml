@@ -1,12 +1,23 @@
 name: Admin Activity Digest
 
-# Daily summary every day at 7 AM UTC, plus a weekly rollup every Monday
-# at 7:30 AM UTC. Both can also be triggered manually from the Actions tab
-# for testing — pick "daily" or "weekly" from the dropdown.
+# Daily summary every day at 7 AM WAT (Nigeria), plus a weekly rollup every
+# Monday at 7:30 AM WAT. Both can also be triggered manually from the
+# Actions tab for testing — pick "daily" or "weekly" from the dropdown.
+#
+# NOTE on timing: these are deliberately NOT scheduled on the exact hour
+# (e.g. "0 6" or "30 6"). GitHub's own docs warn that scheduled workflows
+# "may be delayed during periods of high load," and load spikes hardest
+# at the top and half of every hour, since that's when most other repos'
+# cron jobs also fire. Off-the-hour minutes reduce how often a run gets
+# queued behind that pile-up. This is a mitigation, not a guarantee —
+# GitHub Actions cron has no exact-time SLA. If delivery time needs to be
+# reliable to the minute, this needs to move to a real scheduler (e.g. a
+# Cloudflare Cron Trigger calling the existing /api/send-digest-now
+# endpoint) instead of GitHub Actions.
 on:
   schedule:
-    - cron: '0 6 * * *'      # every day, 6:00 AM UTC = 7:00 AM WAT (Nigeria)
-    - cron: '30 6 * * 1'     # Mondays, 6:30 AM UTC = 7:30 AM WAT (weekly rollup)
+    - cron: '47 5 * * *'     # every day, 5:47 AM UTC = 6:47 AM WAT
+    - cron: '17 6 * * 1'     # Mondays, 6:17 AM UTC = 7:17 AM WAT (weekly rollup)
   workflow_dispatch:
     inputs:
       report_type:
@@ -29,7 +40,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "type=${{ github.event.inputs.report_type }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "30 6 * * 1" ]; then
+          elif [ "${{ github.event.schedule }}" = "17 6 * * 1" ]; then
             echo "type=weekly" >> "$GITHUB_OUTPUT"
           else
             echo "type=daily" >> "$GITHUB_OUTPUT"
