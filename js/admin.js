@@ -405,7 +405,7 @@ async function renderOverview() {
     db.from('disbursements').select('*,customers(first_name,last_name,phone)').in('status', ['pending', 'reviewed']).order('requested_at', { ascending: false }).limit(5),
     db.from('disbursements').select('*', { count: 'exact', head: true }).in('status', ['pending', 'reviewed']),
     db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
-    db.from('audit_log').select('*').order('created_at', { ascending: false }).limit(10),
+    db.from('audit_log').select('*').not('description', 'ilike', 'New customer account created:%').order('created_at', { ascending: false }).limit(10),
   ]);
 
   const totalDep = totals?.[0]?.total_deposits || 0;
@@ -1009,7 +1009,14 @@ let _auditHasMore = true;
 async function renderAuditLog() {
   _auditPageOffset = 0;
   allAuditLogs = [];
-  const { data: logs } = await db.from('audit_log').select('*').order('created_at', { ascending: false }).range(0, AUDIT_PAGE_SIZE - 1);
+  // Fix: complete_customer_registration() writes its own "New customer
+  // account created: X" audit_log row server-side (customer role) — see
+  // the comment near line 523 — which duplicates the representative-side
+  // "Agent X registered new customer on the spot: Y (phone)" entry that
+  // already has everything useful (name + phone). Filtering the redundant
+  // one out here, since editing the RPC itself isn't possible from this
+  // codebase (its SQL source isn't in this repo).
+  const { data: logs } = await db.from('audit_log').select('*').not('description', 'ilike', 'New customer account created:%').order('created_at', { ascending: false }).range(0, AUDIT_PAGE_SIZE - 1);
   allAuditLogs = logs || [];
   _auditHasMore = (logs || []).length === AUDIT_PAGE_SIZE;
   _auditPageOffset = allAuditLogs.length;
@@ -1019,7 +1026,7 @@ async function renderAuditLog() {
 async function loadMoreAuditLog() {
   const btn = document.getElementById('auditLoadMoreBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
-  const { data: logs } = await db.from('audit_log').select('*').order('created_at', { ascending: false }).range(_auditPageOffset, _auditPageOffset + AUDIT_PAGE_SIZE - 1);
+  const { data: logs } = await db.from('audit_log').select('*').not('description', 'ilike', 'New customer account created:%').order('created_at', { ascending: false }).range(_auditPageOffset, _auditPageOffset + AUDIT_PAGE_SIZE - 1);
   _auditHasMore = (logs || []).length === AUDIT_PAGE_SIZE;
   _auditPageOffset += (logs || []).length;
   allAuditLogs = [...allAuditLogs, ...(logs || [])];
