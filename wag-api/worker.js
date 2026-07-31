@@ -275,7 +275,7 @@ function pdfSafe(str) {
     .replace(/[^\x00-\xFF]/g, '?');
 }
 
-async function buildDigestPDF(reportType, periodLabel, periodStart, now, d) {
+async function buildDigestPDF(reportType, periodLabel, reportRef, periodStart, now, d) {
   const fmtNairaPDF = (n) => 'NGN ' + Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
   const fmtDT = (iso) => new Date(iso).toLocaleString('en-NG', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -296,19 +296,24 @@ async function buildDigestPDF(reportType, periodLabel, periodStart, now, d) {
   const line = (h) => { y -= h; };
 
   text('WONDERFUL & ABLE GOD ENTERPRISES', MARGIN, 10, bold, rgb(0.7, 0.5, 0));
+  const confLabel = 'CONFIDENTIAL';
+  text(confLabel, PAGE_W - MARGIN - bold.widthOfTextAtSize(confLabel, 8), 8, bold, GREY);
   line(18);
-  text(`${periodLabel} (sent manually)`, MARGIN, 20, bold, NAVY);
+  text(periodLabel, MARGIN, 20, bold, NAVY);
   line(16);
   text(`${fmtDT(periodStart.toISOString())}  -  ${fmtDT(now.toISOString())}`, MARGIN, 10, font, GREY);
-  line(30);
+  line(13);
+  text(`Ref: ${reportRef}`, MARGIN, 9, font, GREY);
+  line(28);
 
-  text('SUMMARY', MARGIN, 11, bold, NAVY);
+  text('CASH POSITION SUMMARY', MARGIN, 11, bold, NAVY);
   line(18);
   [
     ['New customers', String(d.newCustomers)],
     ['New agents', String(d.newAgents)],
     ['Deposits collected', `${fmtNairaPDF(d.depositTotal)} (${d.deposits.length} txn)`],
     ['Withdrawals paid', `${fmtNairaPDF(d.payoutTotal)} (${d.payouts.length} txn)`],
+    ['Net cash movement', fmtNairaPDF(d.depositTotal - d.payoutTotal)],
     ['Total funds held across all plans', fmtNairaPDF(d.totalHeld)],
     ['Active customers', String(d.totalActiveCustomers)],
     ['Active agents', String(d.totalActiveAgents)],
@@ -334,7 +339,7 @@ async function buildDigestPDF(reportType, periodLabel, periodStart, now, d) {
   line(14);
 
   newPageIfNeeded(60);
-  text(`AGENT ACTIVITY (${d.agentGroups.length} agent${d.agentGroups.length === 1 ? '' : 's'})`, MARGIN, 11, bold, NAVY);
+  text(`AGENT COLLECTIONS & DISBURSEMENTS (${d.agentGroups.length} agent${d.agentGroups.length === 1 ? '' : 's'})`, MARGIN, 11, bold, NAVY);
   line(20);
 
   if (!d.agentGroups.length) {
@@ -372,41 +377,16 @@ async function buildDigestPDF(reportType, periodLabel, periodStart, now, d) {
           line(13);
         });
       }
-      if (g.auditEntries.length) {
-        newPageIfNeeded(13);
-        text(pdfSafe(`${g.auditEntries.length} other activity: ${g.auditEntries.map(a => a.action).join(', ')}`), gColTime, 7.5, font, GREY);
-        line(13);
-      }
       line(10);
     });
   }
   line(10);
 
-  newPageIfNeeded(60);
-  text('ADMIN ACTIONS', MARGIN, 11, bold, NAVY);
-  line(18);
-  const colTime = MARGIN, colAction = MARGIN + 110, colDetails = MARGIN + 190;
-  text('TIME', colTime, 9, bold, GREY);
-  text('ACTION', colAction, 9, bold, GREY);
-  text('DETAILS', colDetails, 9, bold, GREY);
-  line(20);
-  page.drawLine({ start: { x: MARGIN, y: y + 6 }, end: { x: PAGE_W - MARGIN, y: y + 6 }, thickness: 0.5, color: GREY });
-  line(8);
-
-  if (!d.adminOnlyAuditRows.length) {
-    line(16);
-    text('No admin actions logged this period.', MARGIN, 10, font, GREY);
-  } else {
-    d.adminOnlyAuditRows.forEach(a => {
-      newPageIfNeeded(30);
-      const details = pdfSafe(a.description || '-');
-      const wrapped = details.length > 60 ? details.slice(0, 57) + '...' : details;
-      text(fmtDT(a.created_at), colTime, 8.5, font, GREY);
-      text(pdfSafe((a.action || '').toUpperCase()), colAction, 8.5, bold, NAVY);
-      text(wrapped, colDetails, 8.5, font, BLACK);
-      line(16);
-    });
-  }
+  newPageIfNeeded(30);
+  text('This report covers deposits and withdrawals only. The full admin', MARGIN, 8.5, font, GREY);
+  line(11);
+  text('audit trail is available in-app under Admin -> Settings -> Audit Log.', MARGIN, 8.5, font, GREY);
+  line(11);
 
   const pdfBytes = await pdfDoc.save();
   return uint8ToBase64(pdfBytes);
@@ -465,10 +445,11 @@ async function handleSendDigestNow(request, env) {
   const now = new Date();
   const periodHours = reportType === 'weekly' ? 24 * 7 : 24;
   const periodStart = new Date(now.getTime() - periodHours * 60 * 60 * 1000);
-  const periodLabel = reportType === 'weekly' ? 'Weekly Rollup' : 'Daily Summary';
+  const periodLabel = reportType === 'weekly' ? 'Weekly Cash Report' : 'Daily Cash Report';
   const since = periodStart.toISOString();
+  const reportRef = `WAG-${reportType.toUpperCase()}-${now.toISOString().slice(0, 10)}`;
 
-  const [newCustomers, newAgents, totalActiveCustomers, totalActiveAgents, txRows, disbRows, auditRows, balanceRows, agentRows] =
+  const [newCustomers, newAgents, totalActiveCustomers, totalActiveAgents, txRows, disbRows, balanceRows, agentRows] =
     await Promise.all([
       fetchCount('customers', `created_at=gte.${since}`),
       fetchCount('representatives', `created_at=gte.${since}`),
@@ -476,7 +457,6 @@ async function handleSendDigestNow(request, env) {
       fetchCount('representatives', `status=eq.active`),
       fetchRows('transactions', `created_at=gte.${since}&select=ref,type,amount,customer_name,agent_name,agent_id,created_at&order=created_at.asc`),
       fetchRows('disbursements', `requested_at=gte.${since}&select=status,amount,customer_name,requested_at`),
-      fetchRows('audit_log', `created_at=gte.${since}&select=action,description,amount,user_id,user_role,created_at&order=created_at.asc`),
       fetchRows('plan_balances', `select=balance`),
       fetchRows('representatives', `select=id,first_name,last_name,rep_id`),
     ]);
@@ -488,18 +468,21 @@ async function handleSendDigestNow(request, env) {
   const disbByStatus = disbRows.reduce((acc, d) => { acc[d.status] = (acc[d.status] || 0) + 1; return acc; }, {});
   const totalHeld = balanceRows.reduce((s, r) => s + Number(r.balance), 0);
 
-  // Groups this period's transactions and audit activity by the agent who
-  // did them, so an admin can see one agent's whole day as one block
-  // instead of piecing it together from a giant mixed list. Admin-only
-  // actions (suspend/delete/etc.) are excluded — those aren't any agent's
-  // actions, so they stay in their own separate section below.
+  // Groups this period's deposit/payout transactions by the agent who
+  // handled them, so an admin can see one agent's whole day as one block.
+  // Fix: this report is a Cash Report — deposits and payouts only, for
+  // agents and customers. It used to also carry a full admin-actions
+  // audit trail (suspends, deletes, flags, etc.) alongside a per-agent
+  // "other activity" line pulled from audit_log; both are gone now. That
+  // internal audit trail still exists in full in Admin → Settings → Audit
+  // Log — it just doesn't belong in a report that gets emailed out.
   const agentMap = {};
   (agentRows || []).forEach(a => { agentMap[a.id] = a; });
   const agentGroupsObj = {};
   const getAgentGroup = (agentId, fallbackName) => {
     if (!agentGroupsObj[agentId]) {
       const a = agentMap[agentId];
-      agentGroupsObj[agentId] = { agentId, agentName: a ? `${a.first_name} ${a.last_name}` : (fallbackName || 'Unknown Agent'), repId: a?.rep_id || null, transactions: [], auditEntries: [], totalCollected: 0 };
+      agentGroupsObj[agentId] = { agentId, agentName: a ? `${a.first_name} ${a.last_name}` : (fallbackName || 'Unknown Agent'), repId: a?.rep_id || null, transactions: [], totalCollected: 0 };
     }
     return agentGroupsObj[agentId];
   };
@@ -509,27 +492,7 @@ async function handleSendDigestNow(request, env) {
     g.transactions.push(t);
     if (t.type === 'deposit' || t.type === 'opening') g.totalCollected += Number(t.amount);
   });
-  auditRows.forEach(a => {
-    if (a.user_role !== 'representative' || !a.user_id) return;
-    getAgentGroup(a.user_id, null).auditEntries.push(a);
-  });
   const agentGroups = Object.values(agentGroupsObj).sort((a, b) => b.totalCollected - a.totalCollected);
-  const adminOnlyAuditRows = auditRows.filter(a => a.user_role !== 'representative');
-
-  const adminAuditRowsHTML = adminOnlyAuditRows.length
-    ? adminOnlyAuditRows.map(a => `
-        <tr>
-          <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#6b7280;white-space:nowrap;">${fmtDateTime(a.created_at)}</td>
-          <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;">
-            <span style="display:inline-block;padding:2px 8px;border-radius:6px;font-weight:700;font-size:10px;text-transform:uppercase;
-              background:${a.action === 'delete' ? '#fee2e2' : a.action === 'flag' ? '#fef3c7' : '#e0e7ff'};
-              color:${a.action === 'delete' ? '#b91c1c' : a.action === 'flag' ? '#92400e' : '#3730a3'};">
-              ${a.action}
-            </span>
-          </td>
-          <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#111827;">${a.description || '—'}</td>
-        </tr>`).join('')
-    : `<tr><td colspan="3" style="padding:14px;text-align:center;color:#9ca3af;font-size:13px;">No admin actions logged this period.</td></tr>`;
 
   const icon = (name, color) => {
     const paths = {
@@ -545,9 +508,13 @@ async function handleSendDigestNow(request, env) {
   const html = `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;background:#f4f6fb;padding:24px 16px;">
     <div style="background:#011f7b;border-radius:14px 14px 0 0;padding:24px 28px;">
-      <div style="color:#FFBA09;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Wonderful &amp; Able God Enterprises</div>
-      <div style="color:#fff;font-size:22px;font-weight:800;">${periodLabel} <span style="font-size:12px;font-weight:600;color:#FFBA09;">(sent manually)</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div style="color:#FFBA09;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Wonderful &amp; Able God Enterprises</div>
+        <div style="color:#8a97c2;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border:1px solid #2a3a7a;border-radius:4px;padding:2px 7px;">Confidential</div>
+      </div>
+      <div style="color:#fff;font-size:22px;font-weight:800;margin-top:4px;">${periodLabel}</div>
       <div style="color:#c7d2ea;font-size:13px;margin-top:4px;">${fmtDateTime(periodStart.toISOString())} — ${fmtDateTime(now.toISOString())}</div>
+      <div style="color:#8a97c2;font-size:11px;margin-top:2px;">Ref: ${reportRef}</div>
     </div>
     <div style="background:#fff;padding:24px 28px;">
       <table style="width:100%;border-collapse:separate;border-spacing:8px 8px;margin:-8px;">
@@ -628,28 +595,14 @@ async function handleSendDigestNow(request, env) {
                     </thead>
                     <tbody>${txHTML}</tbody>
                   </table>
-                  ${g.auditEntries.length ? `<div style="padding:8px 14px;background:#fafafa;font-size:11px;color:#6b7280;border-top:1px solid #f0f2f5;">${g.auditEntries.length} other activity: ${g.auditEntries.map(a => a.action).join(', ')}</div>` : ''}
                 </div>`;
               }).join('')
             : `<div style="padding:14px;text-align:center;color:#9ca3af;font-size:13px;border:1px solid #e5e7eb;border-radius:10px;">No agent activity this period.</div>`
         }
       </div>
-      <div style="margin-top:24px;">
-        <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Admin Actions</div>
-        <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-          <thead>
-            <tr style="background:#f9fafb;">
-              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;">Time</th>
-              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;">Action</th>
-              <th style="padding:8px 10px;text-align:left;font-size:11px;color:#6b7280;text-transform:uppercase;">Details</th>
-            </tr>
-          </thead>
-          <tbody>${adminAuditRowsHTML}</tbody>
-        </table>
-      </div>
       <p style="color:#9ca3af;font-size:11px;margin-top:24px;text-align:center;">
-        This ${reportType} digest was sent manually from Admin Settings.<br>
-        A downloadable PDF copy, including the full admin action logbook, is attached — save it for your records.<br>
+        A downloadable PDF copy of this ${reportType} Cash Report is attached for your records.<br>
+        This report covers deposits and withdrawals only. The full admin audit trail stays in-app under Admin → Settings → Audit Log.<br>
         Full raw database backups are stored separately and privately in Cloudflare R2.
       </p>
     </div>
@@ -661,10 +614,10 @@ async function handleSendDigestNow(request, env) {
     return json({ error: 'No recipients configured. Add at least one email under Email Reports first.' }, 400);
   }
 
-  const pdfBase64 = await buildDigestPDF(reportType, periodLabel, periodStart, now, {
+  const pdfBase64 = await buildDigestPDF(reportType, periodLabel, reportRef, periodStart, now, {
     newCustomers, newAgents, totalActiveCustomers, totalActiveAgents,
     deposits, payouts, depositTotal, payoutTotal,
-    disbByStatus, disbCount: disbRows.length, agentGroups, adminOnlyAuditRows, totalHeld,
+    disbByStatus, disbCount: disbRows.length, agentGroups, totalHeld,
   });
 
   const from = env.RESEND_FROM_EMAIL || 'WAG Enterprises <onboarding@resend.dev>';
