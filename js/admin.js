@@ -130,7 +130,7 @@ function renderAdminShell(activePage, title) {
   <span class="topbar-badge">SUPER ADMIN</span>
   <button onclick="doAdminLogout()" title="Exit Portal" style="background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.3);color:#fca5a5;padding:6px 11px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Exit</button>
 </div>
-<div id="confirmModal" class="modal"><div class="msheet" style="position:relative;"><button class="m-close" onclick="closeModal('confirmModal')">×</button><div class="m-title" id="confirmTitle">Confirm Action</div><p style="color:var(--sub);font-size:13px;margin-bottom:18px;" id="confirmMsg">Are you sure?</p><div style="display:flex;gap:9px;"><button class="btn btn-ghost" onclick="closeModal('confirmModal')" style="flex:1;justify-content:center;">Cancel</button><button class="btn btn-yellow" style="flex:1;justify-content:center;" onclick="confirmOkHandler()">Confirm</button></div></div></div>`;
+<div id="confirmModal" class="modal"><div class="msheet" style="position:relative;"><button class="m-close" onclick="closeModal('confirmModal')">×</button><div class="m-title" id="confirmTitle">Confirm Action</div><p style="color:var(--sub);font-size:13px;margin-bottom:18px;" id="confirmMsg">Are you sure?</p><div style="display:flex;gap:9px;"><button class="btn btn-ghost" onclick="closeModal('confirmModal')" style="flex:1;justify-content:center;">Cancel</button><button class="btn btn-yellow" style="flex:1;justify-content:center;" onclick="confirmOkHandler()">Yes, Confirm</button></div></div></div>`;
 
   updateBadges();
   setupRealtimeListeners();
@@ -434,6 +434,144 @@ async function renderOverview() {
 }
 
 // ═══════════════════════════════════════════════
+// EXECUTIVE VIEW (admin/dashboard.html — Overview tab)
+// A streamlined, high-level daily-operations read on top of the same
+// Detailed View (the overview-grid/disbursements/audit sections above)
+// — nothing here replaces or duplicates that data model, it's a second,
+// friendlier lens on the same live tables plus a few "today" and
+// "needs attention" queries the Detailed View doesn't need.
+// ═══════════════════════════════════════════════
+function startOfTodayWAT() {
+  // WAT (West Africa Time / Nigeria) is a fixed UTC+1 offset with no DST,
+  // so "today" for the business is computed by shifting to WAT, zeroing
+  // the clock, then shifting back to get the correct UTC instant to
+  // filter created_at by.
+  const now = new Date();
+  const wat = new Date(now.getTime() + 60 * 60 * 1000);
+  wat.setUTCHours(0, 0, 0, 0);
+  return new Date(wat.getTime() - 60 * 60 * 1000).toISOString();
+}
+
+async function renderExecutiveOverview() {
+  if (!db) return;
+  const since = startOfTodayWAT();
+
+  const [
+    { data: pendDisb }, { count: pdc },
+    { data: flags }, { count: flagCount },
+    { count: activeReps },
+    { count: activePlans },
+    { data: balanceRows },
+    { data: todayTx },
+  ] = await Promise.all([
+    db.from('disbursements').select('*,customers(first_name,last_name,phone)').in('status', ['pending', 'reviewed']).order('requested_at', { ascending: false }).limit(5),
+    db.from('disbursements').select('*', { count: 'exact', head: true }).in('status', ['pending', 'reviewed']),
+    db.from('fraud_flags').select('*').eq('resolved', false).order('created_at', { ascending: false }).limit(5),
+    db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
+    db.from('representatives').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    db.from('plan_balances').select('balance'),
+    db.from('transactions').select('type,amount,agent_id').gte('created_at', since),
+  ]);
+
+  const vaultBalance = (balanceRows || []).reduce((s, r) => s + Number(r.balance), 0);
+  const todayDeposits = (todayTx || []).filter(t => t.type === 'deposit' || t.type === 'opening');
+  const todayPayouts = (todayTx || []).filter(t => t.type === 'payout');
+  const todayDepositTotal = todayDeposits.reduce((s, t) => s + Number(t.amount), 0);
+  const todayPayoutTotal = todayPayouts.reduce((s, t) => s + Number(t.amount), 0);
+  const activeAgentIdsToday = new Set(todayDeposits.map(t => t.agent_id).filter(Boolean));
+  const net = todayDepositTotal - todayPayoutTotal;
+
+  document.getElementById('execVault').textContent = fmt(vaultBalance);
+  document.getElementById('execCollections').textContent = fmt(todayDepositTotal);
+  document.getElementById('execPayouts').textContent = fmt(todayPayoutTotal);
+  const netEl = document.getElementById('execNet');
+  netEl.textContent = (net >= 0 ? '+' : '−') + fmt(Math.abs(net));
+  netEl.classList.toggle('neg', net < 0);
+
+  document.getElementById('execAgentsToday').textContent = `${activeAgentIdsToday.size} / ${activeReps || 0}`;
+  document.getElementById('execTxToday').textContent = todayDeposits.length;
+  document.getElementById('execPlans').textContent = activePlans || 0;
+
+  renderActionNeeded(pendDisb || [], flags || [], pdc || 0, flagCount || 0);
+}
+
+function renderActionNeeded(disbs, flags, disbCount, flagCount) {
+  const el = document.getElementById('execActionNeeded');
+  if (!el) return;
+  const totalPending = disbCount + flagCount;
+
+  if (totalPending === 0) {
+    el.innerHTML = `<div class="exec-allclear">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <div><div class="exec-allclear-title">All clear</div><div class="exec-allclear-sub">Everything is up to date. No pending actions today.</div></div>
+    </div>`;
+    return;
+  }
+
+  const disbHTML = disbs.map(d => {
+    const cust = d.customers || {};
+    const custName = d.customer_name || `${cust.first_name || 'Unknown'} ${cust.last_name || ''}`.trim();
+    const custPhone = ((d.customer_phone || cust.phone) || '').replace('+234', '0');
+    const esc = custName.replace(/'/g, "\\'");
+    const canReview = d.status === 'pending';
+    const canApprove = d.status === 'reviewed';
+    const approveBtn = canReview
+      ? `<button class="exec-btn-approve" onclick="reviewDisb('${d.id}', ${d.amount}, '${esc}')">Mark Reviewed</button>`
+      : canApprove
+      ? `<button class="exec-btn-approve" onclick="approveDisb('${d.id}', ${d.amount}, '${esc}')">✅ Approve</button>`
+      : '';
+    const declineBtn = (canReview || canApprove)
+      ? `<button class="exec-btn-decline" onclick="rejectDisb('${d.id}', ${d.amount}, '${esc}')">❌ Decline</button>`
+      : '';
+    return `<div class="exec-priority-card">
+      <div class="exec-priority-info">
+        <div class="exec-priority-title">Withdrawal request · ${fmt(d.amount)}</div>
+        <div class="exec-priority-sub">${custName}${custPhone ? ' · ' + custPhone : ''} · <span class="status-pill ${d.status}">${d.status}</span></div>
+      </div>
+      <div class="exec-priority-actions">${approveBtn}${declineBtn}</div>
+    </div>`;
+  }).join('');
+
+  const flagHTML = flags.map(f => {
+    const type = (f.type || '').replace(/emergency/gi, 'withdrawal').replace(/EXCESS_EMERGENCY/g, 'EXCESS_WITHDRAWAL');
+    return `<div class="exec-priority-card">
+      <div class="exec-priority-info">
+        <div class="exec-priority-title">🚩 ${type.replace(/_/g, ' ')} <span class="exec-sev exec-sev-${(f.severity || '').toLowerCase()}">${(f.severity || '').toUpperCase()}</span></div>
+        <div class="exec-priority-sub">${f.description || 'Flagged for review'}</div>
+      </div>
+      <div class="exec-priority-actions"><button class="exec-btn-approve" onclick="resolveFlagExec('${f.id}')">Mark Resolved</button></div>
+    </div>`;
+  }).join('');
+
+  const shown = disbs.length + flags.length;
+  const viewAllHTML = totalPending > shown
+    ? `<a href="dashboard.html#disbursements" class="exec-viewall">View all ${totalPending} pending items →</a>`
+    : '';
+
+  el.innerHTML = `<div class="exec-priority-hd">${totalPending} item${totalPending === 1 ? '' : 's'} need${totalPending === 1 ? 's' : ''} your attention</div>${disbHTML}${flagHTML}${viewAllHTML}`;
+}
+
+async function resolveFlagExec(id) {
+  showConfirm('Resolve Flag', 'Mark this fraud flag as resolved?', async () => {
+    showLoading('Updating…');
+    await db.from('fraud_flags').update({ resolved: true }).eq('id', id);
+    hideLoading();
+    await renderExecutiveOverview();
+  });
+}
+
+// Persists the admin's Executive/Detailed choice across sessions —
+// Executive is the default for a first-time visit.
+function setAdminViewMode(mode) {
+  localStorage.setItem('wagAdminViewMode', mode);
+  document.getElementById('execView').style.display = mode === 'executive' ? '' : 'none';
+  document.getElementById('detailedView').style.display = mode === 'detailed' ? '' : 'none';
+  document.getElementById('viewToggleExec').classList.toggle('active', mode === 'executive');
+  document.getElementById('viewToggleDetailed').classList.toggle('active', mode === 'detailed');
+}
+
+// ═══════════════════════════════════════════════
 // DISBURSEMENTS (admin/dashboard.html)
 // ═══════════════════════════════════════════════
 async function renderDisbPage() {
@@ -463,16 +601,16 @@ function renderDisbCard(d, compact) {
 
   const stageBar = stages.map((s, i) => `<div class="stage-step"><div class="stage-dot ${i < curIdx ? 'done' : i === curIdx ? 'active' : ''}"></div><div class="stage-label">${s}</div></div>`).join('');
 
-  const rejectBtn = `<button class="btn-reject" onclick="rejectDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button>`;
+  const rejectBtn = `<button class="btn-reject" onclick="rejectDisb('${d.id}', ${d.amount}, '${custName.replace(/'/g, "\\'")}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button>`;
 
   const actions = canReview
     ? `<div class="disb-actions">
-        <button class="btn-review" onclick="reviewDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark as Reviewed</button>
+        <button class="btn-review" onclick="reviewDisb('${d.id}', ${d.amount}, '${custName.replace(/'/g, "\\'")}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark as Reviewed</button>
         ${rejectBtn}
        </div>`
     : canApprove
     ? `<div class="disb-actions">
-        <button class="btn-review" onclick="approveDisb('${d.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Approve Withdrawal</button>
+        <button class="btn-review" onclick="approveDisb('${d.id}', ${d.amount}, '${custName.replace(/'/g, "\\'")}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Approve Withdrawal</button>
         ${rejectBtn}
        </div>`
     : isApproved
@@ -501,46 +639,52 @@ function renderDisbCard(d, compact) {
   </div>`;
 }
 
-async function reviewDisb(disbId) {
-  if (!confirm('Mark this withdrawal as REVIEWED?\nThis allows you to then approve it.')) return;
-  showLoading('Updating…');
-  const { data, error } = await db.rpc('mark_disbursement_reviewed', { p_disbursement_id: disbId });
-  if (error) { hideLoading(); alert('Review failed: ' + error.message); return; }
-  if (data === false) { hideLoading(); alert('Could not review — already reviewed or not found.'); return; }
-  await audit('review', `Admin marked withdrawal ${disbId} as reviewed`);
-  hideLoading();
-  await renderOverview();
-  if (currentPage === 'disbursements') await renderDisbPage();
+async function reviewDisb(disbId, amount, custName) {
+  showConfirm('Mark as Reviewed', amount != null ? `Mark the ${fmt(amount)} withdrawal for ${custName || 'this customer'} as reviewed? This allows you to then approve it.` : 'Mark this withdrawal as reviewed? This allows you to then approve it.', async () => {
+    showLoading('Updating…');
+    const { data, error } = await db.rpc('mark_disbursement_reviewed', { p_disbursement_id: disbId });
+    if (error) { hideLoading(); alert('Review failed: ' + error.message); return; }
+    if (data === false) { hideLoading(); alert('Could not review — already reviewed or not found.'); return; }
+    await audit('review', `Admin marked withdrawal ${disbId} as reviewed`);
+    hideLoading();
+    await renderOverview();
+    if (typeof renderExecutiveOverview === 'function') await renderExecutiveOverview();
+    if (currentPage === 'disbursements') await renderDisbPage();
+  });
 }
 
-async function approveDisb(disbId) {
-  if (!confirm('APPROVE this withdrawal?\nThe balance will be deducted immediately and the representative will deliver cash to the customer.')) return;
-  showLoading('Approving…');
-  const { data, error } = await db.rpc('approve_disbursement', { p_disbursement_id: disbId });
-  if (error) { hideLoading(); alert('Approval failed: ' + error.message); return; }
-  if (data?.ok === false) { hideLoading(); alert('Approval failed: ' + (data.error || 'Unknown error')); return; }
-  // NOTE: no audit() call here — approve_disbursement RPC already writes
-  // its own audit_log entry server-side. A second call here would duplicate it.
-  hideLoading();
-  await renderOverview();
-  if (currentPage === 'disbursements') await renderDisbPage();
+async function approveDisb(disbId, amount, custName) {
+  showConfirm('Approve Withdrawal', amount != null ? `Confirm payout of ${fmt(amount)} to ${custName || 'this customer'}? The balance will be deducted immediately and the representative will deliver cash.` : 'Approve this withdrawal? The balance will be deducted immediately and the representative will deliver cash to the customer.', async () => {
+    showLoading('Approving…');
+    const { data, error } = await db.rpc('approve_disbursement', { p_disbursement_id: disbId });
+    if (error) { hideLoading(); alert('Approval failed: ' + error.message); return; }
+    if (data?.ok === false) { hideLoading(); alert('Approval failed: ' + (data.error || 'Unknown error')); return; }
+    // NOTE: no audit() call here — approve_disbursement RPC already writes
+    // its own audit_log entry server-side. A second call here would duplicate it.
+    hideLoading();
+    await renderOverview();
+    if (typeof renderExecutiveOverview === 'function') await renderExecutiveOverview();
+    if (currentPage === 'disbursements') await renderDisbPage();
+  });
 }
 
 // Fix 9: final payment step — admin only, calls server-side RPC
-async function rejectDisb(disbId) {
-  if (!confirm('Reject this withdrawal? This action cannot be undone.')) return;
-  showLoading('Rejecting…');
-  // Guard: never allow rejecting an already-approved/paid withdrawal —
-  // the balance has already been deducted and there is no reversal logic.
-  const { error } = await db.from('disbursements')
-    .update({ status: 'rejected' })
-    .eq('id', disbId)
-    .in('status', ['pending', 'reviewed']);
-  if (error) { hideLoading(); alert('Reject failed: ' + error.message); return; }
-  await audit('reject', `Admin rejected withdrawal ${disbId}`);
-  hideLoading();
-  await renderOverview();
-  if (currentPage === 'disbursements') await renderDisbPage();
+async function rejectDisb(disbId, amount, custName) {
+  showConfirm('Decline Withdrawal', amount != null ? `Decline the ${fmt(amount)} withdrawal for ${custName || 'this customer'}? This action cannot be undone.` : 'Reject this withdrawal? This action cannot be undone.', async () => {
+    showLoading('Rejecting…');
+    // Guard: never allow rejecting an already-approved/paid withdrawal —
+    // the balance has already been deducted and there is no reversal logic.
+    const { error } = await db.from('disbursements')
+      .update({ status: 'rejected' })
+      .eq('id', disbId)
+      .in('status', ['pending', 'reviewed']);
+    if (error) { hideLoading(); alert('Reject failed: ' + error.message); return; }
+    await audit('reject', `Admin rejected withdrawal ${disbId}`);
+    hideLoading();
+    await renderOverview();
+    if (typeof renderExecutiveOverview === 'function') await renderExecutiveOverview();
+    if (currentPage === 'disbursements') await renderDisbPage();
+  });
 }
 
 // ═══════════════════════════════════════════════
