@@ -154,7 +154,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
 .cust-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);}
 .cust-row:last-child{border-bottom:none;}
-.cust-row-name{font-size:13px;font-weight:700;}
+.cust-row-name{font-size:13px;font-weight:700;color:var(--text);}
 .cust-row-sub{font-size:11px;color:var(--sub);}
 .cust-row-right{text-align:right;}
 
@@ -241,13 +241,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
 /* ─── ADMIN SEARCH RESULT ─── */
 .adr-profile{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:11px;display:flex;justify-content:space-between;align-items:flex-start;}
-.adr-name{font-size:15px;font-weight:700;}
+.adr-name{font-size:15px;font-weight:700;color:var(--text);}
 .adr-phone{font-size:12px;color:var(--sub);margin-top:2px;}
 .adr-since{font-size:11px;color:var(--sub);margin-top:2px;}
 .adr-cust-badge{background:rgba(255,186,9,.12);border:1px solid rgba(255,186,9,.3);color:var(--yellow);font-size:10px;font-weight:800;padding:4px 10px;border-radius:6px;}
 .adr-plan-card{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:11px;padding:13px;margin-bottom:9px;}
 .adr-plan-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
-.adr-plan-name{font-size:13px;font-weight:700;}
+.adr-plan-name{font-size:13px;font-weight:700;color:var(--text);}
 .adr-plan-bal{font-size:15px;font-weight:800;color:var(--yellow);}
 .adr-plan-of{font-size:10px;color:var(--sub);}
 .adr-plan-meta{font-size:11px;color:var(--sub);margin-bottom:8px;}
@@ -289,6 +289,28 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .view-toggle-btn.active{background:linear-gradient(135deg,var(--blue),#0a2e9e);color:#fff;box-shadow:0 2px 8px rgba(1,31,123,.35);}
 .view-toggle-btn:not(.active):hover{background:rgba(255,255,255,.05);color:var(--text);}
 body.light-mode .view-toggle-btn:not(.active):hover{background:rgba(0,0,0,.04);}
+
+/* Fix: dark-mode-tuned pale-pastel-text-on-translucent-tint buttons/badges
+   (designed to read well on the dark card background) have poor contrast
+   once the card background flips to white — solidify to darker, more
+   saturated colors specifically for light mode. */
+body.light-mode .btn-green{background:#059669;border-color:#059669;color:#fff;}
+body.light-mode .btn-green:hover{background:#047857;}
+body.light-mode .btn-red{background:#dc2626;border-color:#dc2626;color:#fff;}
+body.light-mode .btn-red:hover{background:#b91c1c;}
+body.light-mode .exec-btn-approve{background:#059669;border-color:#059669;color:#fff;}
+body.light-mode .exec-btn-approve:hover{background:#047857;}
+body.light-mode .exec-btn-decline{background:#dc2626;border-color:#dc2626;color:#fff;}
+body.light-mode .exec-btn-decline:hover{background:#b91c1c;}
+body.light-mode .status-pill.pending{background:#fef3c7;color:#92400e;}
+body.light-mode .status-pill.reviewed{background:#dbeafe;color:#1e40af;}
+body.light-mode .status-pill.approved{background:#d1fae5;color:#065f46;}
+body.light-mode .status-pill.paid{background:#a7f3d0;color:#065f46;}
+body.light-mode .status-pill.rejected{background:#fee2e2;color:#991b1b;}
+body.light-mode .exec-sev-high{background:#fee2e2;color:#991b1b;}
+body.light-mode .exec-sev-medium{background:#fef3c7;color:#92400e;}
+body.light-mode .exec-sev-low{background:#dbeafe;color:#1e40af;}
+body.light-mode .ff-type{color:#b91c1c;}
 
 /* ─── Attention Required card ─── */
 .exec-action-card{border:1px solid var(--border);}
