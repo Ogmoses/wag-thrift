@@ -1,8 +1,11 @@
 name: Admin Activity Digest
 
-# Daily summary every day at 7 AM WAT (Nigeria), plus a weekly rollup every
-# Monday at 7:30 AM WAT. Both can also be triggered manually from the
-# Actions tab for testing — pick "daily" or "weekly" from the dropdown.
+# Daily summary Tuesday through Friday at 7 AM WAT (Nigeria), plus a
+# weekly rollup every Monday at 7:30 AM WAT — no daily report on Monday
+# (Monday gets the weekly instead) or on Saturday/Sunday, since the
+# organization only operates Monday–Friday. Both can also be triggered
+# manually from the Actions tab for testing — pick "daily" or "weekly"
+# from the dropdown.
 #
 # NOTE on timing: these are deliberately NOT scheduled on the exact hour
 # (e.g. "0 6" or "30 6"). GitHub's own docs warn that scheduled workflows
@@ -16,7 +19,7 @@ name: Admin Activity Digest
 # endpoint) instead of GitHub Actions.
 on:
   schedule:
-    - cron: '47 5 * * *'     # every day, 5:47 AM UTC = 6:47 AM WAT
+    - cron: '47 5 * * 2-5'   # Tue–Fri, 5:47 AM UTC = 6:47 AM WAT (daily)
     - cron: '17 6 * * 1'     # Mondays, 6:17 AM UTC = 7:17 AM WAT (weekly rollup)
   workflow_dispatch:
     inputs:
