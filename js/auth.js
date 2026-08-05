@@ -367,7 +367,7 @@ async function doForgotPin() {
   if (!em) { setMsg('resetMsg', '<div class="msg-err">Please enter your email</div>'); return; }
   // Always show the same message whether or not an account was found,
   // so this can't be used to discover which emails are registered.
-  const genericMsg = '<div class="msg-ok">If an account exists with that email, a password reset link has been sent. Please check your inbox.<br><small style="color:var(--sub);font-size:11px;">Link expires in 1 hour.</small></div>';
+  const genericMsg = '<div class="msg-ok">If an account exists with that email, a password reset link has been sent. Please check your inbox.<br><small style="color:var(--sub);font-size:11px;">Link expires in 15 minutes.</small></div>';
   showLoading('Sending reset link…');
   const { data: result } = await db.rpc('request_password_reset', { p_email: em });
   if (result?.exists && result?.token) {
