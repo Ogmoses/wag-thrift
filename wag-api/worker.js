@@ -39,10 +39,8 @@ export default {
       switch (url.pathname) {
         case '/api/reset-password':
           return await handleResetPassword(request, env);
-        case '/api/send-verification':
-          return await handleSendVerification(request, env);
-        case '/api/send-reset-email':
-          return await handleSendResetEmail(request, env);
+        case '/api/request-password-reset':
+          return await handleRequestPasswordReset(request, env);
         case '/api/send-digest-now':
           return await handleSendDigestNow(request, env);
         case '/api/delete-auth-account':
@@ -129,77 +127,50 @@ async function handleResetPassword(request, env) {
 // Sends the 6-digit registration verification code via Resend.
 // Keeps the Resend API key server-side — never exposed to the browser.
 
-async function handleSendVerification(request, env) {
-  const { toEmail, toName, code } = await request.json();
+// ─── REQUEST PASSWORD RESET (generates token + sends the email, both server-side) ──
+// Previously this was two separate steps: the browser called
+// request_password_reset() directly (getting the raw token back into
+// client-side JS), built the reset link itself, then POSTed that
+// client-built link to a separate /api/send-reset-email endpoint that
+// trusted it completely — no verification the link was ever real. That
+// meant anyone could POST { toEmail: <victim>, resetLink: <anything> }
+// directly to that endpoint and this domain's Resend-verified sender
+// would send a legitimate-looking "reset your password" email with a
+// phishing link of the attacker's choosing to any address they wanted.
+// Consolidating this into one server-side step closes both problems:
+// the token never reaches the browser, and the link is always the one
+// the RPC actually generated — nothing here trusts caller-supplied
+// content beyond the target email address itself.
+async function handleRequestPasswordReset(request, env) {
+  const { email } = await request.json();
+  if (!email) return json({ error: 'Missing email' }, 400);
 
-  if (!toEmail || !code) {
-    return json({ error: 'Missing toEmail or code' }, 400);
+  const supa = supabaseAdmin(env);
+
+  // request_password_reset() already handles existence-checking,
+  // anti-enumeration, and rate limiting (3/hour per email) entirely
+  // server-side in SQL — this just calls it with the service role
+  // instead of the browser's session.
+  const { data: result } = await supa.rpc('request_password_reset', { p_email: email });
+
+  if (result?.exists && result?.token) {
+    const [{ data: cust }, { data: rep }] = await Promise.all([
+      supa.from('customers').select('first_name').eq('email', email).single(),
+      supa.from('representatives').select('first_name').eq('email', email).single(),
+    ]);
+    const toName = cust?.first_name || rep?.first_name || 'there';
+    const resetLink = `${env.SITE_URL || 'https://wag-thrift.pages.dev'}/login.html?reset=${result.token}`;
+    await sendResetEmailViaResend(env, email, toName, resetLink);
   }
 
-  // Rate limit: max 3 verification emails per email per 10 minutes
-  // Using Cloudflare KV if available, otherwise skip (graceful degradation)
-  if (env.RATE_LIMIT_KV) {
-    const key = `verify:${toEmail}`;
-    const count = parseInt(await env.RATE_LIMIT_KV.get(key) || '0');
-    if (count >= 3) {
-      return json({ error: 'Too many verification attempts. Please wait 10 minutes.' }, 429);
-    }
-    await env.RATE_LIMIT_KV.put(key, String(count + 1), { expirationTtl: 600 });
-  }
-
-  const from = env.RESEND_FROM_EMAIL || 'WAG Enterprises <onboarding@resend.dev>';
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to: [toEmail],
-      subject: 'Your WAG Enterprises verification code',
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;">
-          <h2 style="color:#011f7b;">Wonderful & Able God Enterprises</h2>
-          <p>Hi ${toName || 'there'},</p>
-          <p>Your account verification code is:</p>
-          <div style="font-size:36px;font-weight:800;letter-spacing:8px;color:#011f7b;
-                      text-align:center;padding:20px;background:#f0f2f7;
-                      border-radius:12px;margin:20px 0;">
-            ${code}
-          </div>
-          <p style="color:#6b7280;font-size:13px;">
-            This code expires in 10 minutes.<br>
-            If you didn't request this, you can safely ignore this email.
-          </p>
-        </div>
-      `,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json();
-    return json({ error: err.message || 'Failed to send email' }, 500);
-  }
-
+  // Always the same response whether or not the account exists, or
+  // whether an email actually got sent — matches the RPC's own
+  // anti-enumeration design. Never reveal which emails are registered.
   return json({ ok: true });
 }
 
-// ─── SEND PASSWORD RESET EMAIL ────────────────────────────────────────────────
-// Sends the "click here to reset your password" link via Resend.
-// Mirrors handleSendVerification above, but for the reset link instead of
-// the 6-digit code. Keeps the Resend API key server-side.
-
-async function handleSendResetEmail(request, env) {
-  const { toEmail, toName, resetLink } = await request.json();
-
-  if (!toEmail || !resetLink) {
-    return json({ error: 'Missing toEmail or resetLink' }, 400);
-  }
-
+async function sendResetEmailViaResend(env, toEmail, toName, resetLink) {
   const from = env.RESEND_FROM_EMAIL || 'WAG Enterprises <onboarding@resend.dev>';
-
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -222,7 +193,7 @@ async function handleSendResetEmail(request, env) {
             </a>
           </div>
           <p style="color:#6b7280;font-size:13px;">
-            This link expires in 1 hour.<br>
+            This link expires in 15 minutes.<br>
             If you didn't request this, you can safely ignore this email — your account remains secure.
           </p>
         </div>
@@ -231,11 +202,9 @@ async function handleSendResetEmail(request, env) {
   });
 
   if (!res.ok) {
-    const err = await res.json();
-    return json({ error: err.message || 'Failed to send email' }, 500);
+    const err = await res.json().catch(() => ({}));
+    console.error('Resend error sending reset email:', err.message || 'unknown');
   }
-
-  return json({ ok: true });
 }
 
 // ─── SEND ACTIVITY DIGEST ON DEMAND ───────────────────────────────────────────
@@ -734,5 +703,16 @@ function supabaseAdmin(env) {
     }),
   });
 
-  return { from };
+  return {
+    from,
+    rpc: async (fnName, params = {}) => {
+      const res = await fetch(`${base}/rpc/${fnName}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(params),
+      });
+      const data = await res.json().catch(() => null);
+      return { data, error: res.ok ? null : data };
+    },
+  };
 }
