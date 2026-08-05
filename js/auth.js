@@ -264,6 +264,17 @@ function friendlyRegError(msg) {
   if (!msg) return msg;
   if (msg.includes('PHONE_ALREADY_AGENT')) return 'This phone number is already registered to a Field Agent account. Please use a different phone number.';
   if (msg.includes('PHONE_ALREADY_CUSTOMER')) return 'This phone number is already registered to a Customer account. Please use a different phone number.';
+  // Fix: a raw Postgres unique-constraint violation used to leak straight
+  // to the admin verbatim (e.g. 'duplicate key value violates unique
+  // constraint "customers_email_key"') whenever the synthetic
+  // placeholder email/phone collided with an existing row that hadn't
+  // been anonymized yet. Translate the common ones into something
+  // readable instead of surfacing raw SQL.
+  if (/duplicate key value violates unique constraint/i.test(msg)) {
+    if (/email/i.test(msg)) return 'An account with this email already exists. If this phone number was recently deleted, its old account may not be fully cleared yet — contact your developer.';
+    if (/phone/i.test(msg)) return 'An account with this phone number already exists.';
+    return 'An account with these details already exists.';
+  }
   return msg;
 }
 
