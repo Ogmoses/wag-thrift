@@ -365,19 +365,18 @@ async function doForgotPin() {
   if (!dbReady()) return;
   const em = document.getElementById('resetEmail').value.trim();
   if (!em) { setMsg('resetMsg', '<div class="msg-err">Please enter your email</div>'); return; }
+  if (!WORKER_URL) {
+    setMsg('resetMsg', '<div class="msg-err">Password reset is not yet available. Please contact support.</div>');
+    return;
+  }
   // Always show the same message whether or not an account was found,
   // so this can't be used to discover which emails are registered.
   const genericMsg = '<div class="msg-ok">If an account exists with that email, a password reset link has been sent. Please check your inbox.<br><small style="color:var(--sub);font-size:11px;">Link expires in 15 minutes.</small></div>';
   showLoading('Sending reset link…');
-  const { data: result } = await db.rpc('request_password_reset', { p_email: em });
-  if (result?.exists && result?.token) {
-    const resetLink = `${location.origin}/login.html?reset=${result.token}`;
-    const [{ data: cu }, { data: re }] = await Promise.all([
-      db.from('customers').select('first_name').eq('email', em).single(),
-      db.from('representatives').select('first_name').eq('email', em).single()
-    ]);
-    await sendResetEmail(em, (cu || re)?.first_name || 'there', resetLink);
-  }
+  // The token is generated AND the email is sent entirely server-side now
+  // (see requestPasswordReset() in js/supabase.js) — it never reaches
+  // this browser at all, unlike the old two-step flow.
+  await requestPasswordReset(em);
   hideLoading();
   setMsg('resetMsg', genericMsg);
 }

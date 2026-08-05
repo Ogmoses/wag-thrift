@@ -52,62 +52,27 @@ function initEmailJS() {
   }
 }
 
-async function sendVerificationEmail(toEmail, toName, code) {
-  // Prefer the Cloudflare Worker (keeps Resend API key server-side).
-  // Falls back to EmailJS if Worker isn't deployed yet.
-  if (WORKER_URL) {
-    try {
-      const res = await fetch(`${WORKER_URL}/api/send-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toEmail, toName, code })
-      });
-      const data = await res.json();
-      return res.ok ? { ok: true } : { error: data.error || 'Failed to send email' };
-    } catch (e) {
-      console.error('Worker verification email error:', e);
-      return { error: e.message };
-    }
-  }
-  // EmailJS fallback
-  if (EMAILJS_PUBLIC_KEY.includes('YOUR_')) return { demo: true };
+// ═══════════════════════════════════════════════
+// PASSWORD RESET
+// Token generation, account lookup, and email sending all happen
+// server-side in the Worker (handleRequestPasswordReset) — this just
+// tells it who asked. The raw reset token never reaches this browser at
+// all. (This used to be a two-step client-driven flow — see the comment
+// on handleRequestPasswordReset in wag-api/worker.js for why that was a
+// real vulnerability, not just a style preference.)
+// ═══════════════════════════════════════════════
+async function requestPasswordReset(email) {
+  if (!WORKER_URL) return { error: 'Password reset requires the Worker to be deployed.' };
   try {
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_VERIFY_TMPL, {
-      to_email: toEmail, to_name: toName, code, app_name: 'WAG Enterprises'
+    const res = await fetch(`${WORKER_URL}/api/request-password-reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
     });
-    return { ok: true };
+    const data = await res.json();
+    return res.ok ? { ok: true } : { error: data.error || 'Failed to request reset' };
   } catch (e) {
-    console.error('EmailJS error:', e);
-    return { error: e.text || e.message || 'Failed to send email' };
-  }
-}
-
-async function sendResetEmail(toEmail, toName, resetLink) {
-  // Prefer the Cloudflare Worker (sends via Resend, keeps API key server-side).
-  // Falls back to EmailJS only if the Worker isn't deployed yet.
-  if (WORKER_URL) {
-    try {
-      const res = await fetch(`${WORKER_URL}/api/send-reset-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toEmail, toName, resetLink })
-      });
-      const data = await res.json();
-      return res.ok ? { ok: true } : { error: data.error || 'Failed to send email' };
-    } catch (e) {
-      console.error('Worker reset email error:', e);
-      return { error: e.message };
-    }
-  }
-  // EmailJS fallback
-  if (EMAILJS_PUBLIC_KEY.includes('YOUR_')) return { demo: true, link: resetLink };
-  try {
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_RESET_TMPL, {
-      to_email: toEmail, to_name: toName, reset_link: resetLink, app_name: 'WAG Enterprises'
-    });
-    return { ok: true };
-  } catch (e) {
-    console.error('EmailJS error:', e);
-    return { error: e.text || e.message || 'Failed to send email' };
+    console.error('Password reset request error:', e);
+    return { error: e.message };
   }
 }
