@@ -86,6 +86,7 @@ async function audit(action, description, amount = null, planId = null) {
 const ADMIN_NAV = [
   { id: 'overview', label: 'Overview', section: 'Main', href: 'dashboard.html', icon: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>' },
   { id: 'disbursements', label: 'Disbursements', section: 'Main', href: 'dashboard.html#disbursements', badge: 'disbBadge', icon: '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>' },
+  { id: 'transfers', label: 'Bank Transfers', section: 'Main', href: 'transfers.html', badge: 'transferBadge', icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>' },
   { id: 'customers', label: 'Customers', section: 'Users', href: 'users.html', icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>' },
   { id: 'agents', label: 'Field Agents', section: 'Users', href: 'representatives.html', icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>' },
   { id: 'search', label: 'Search', section: 'System', href: 'users.html#search', icon: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' },
@@ -394,7 +395,7 @@ async function renderOverview() {
   if (!db) return;
   const [
     { count: cc }, { count: rc }, { data: totals }, { count: planCnt }, { data: pendDisb },
-    { count: pdc }, { count: flagCount }, { data: auditRows }
+    { count: pdc }, { count: flagCount }, { count: ptc }, { data: auditRows }
   ] = await Promise.all([
     db.from('customers').select('*', { count: 'exact', head: true }).neq('status', 'deleted'),
     db.from('representatives').select('*', { count: 'exact', head: true }).neq('status', 'deleted'),
@@ -405,6 +406,7 @@ async function renderOverview() {
     db.from('disbursements').select('*,customers(first_name,last_name,phone)').in('status', ['pending', 'reviewed']).order('requested_at', { ascending: false }).limit(5),
     db.from('disbursements').select('*', { count: 'exact', head: true }).in('status', ['pending', 'reviewed']),
     db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
+    db.from('pending_transfers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     db.from('audit_log').select('*').not('description', 'ilike', 'New customer account created:%').order('created_at', { ascending: false }).limit(10),
   ]);
 
@@ -429,6 +431,9 @@ async function renderOverview() {
 
   const flagBadgeEl = document.getElementById('flagBadge');
   if (flagBadgeEl) { flagBadgeEl.style.display = flagCount > 0 ? '' : 'none'; flagBadgeEl.textContent = flagCount || 0; }
+
+  const transferBadgeEl = document.getElementById('transferBadge');
+  if (transferBadgeEl) { transferBadgeEl.style.display = ptc > 0 ? '' : 'none'; transferBadgeEl.textContent = ptc || 0; }
 
   renderAuditRows('ovAuditList', auditRows || []);
 }
@@ -689,9 +694,114 @@ async function rejectDisb(disbId, amount, custName) {
 }
 
 // ═══════════════════════════════════════════════
+// PENDING BANK TRANSFERS (admin/transfers.html)
+// Bank-transfer deposits never touch the balance until confirmed here —
+// see sql/pending-bank-transfers.sql. confirm_pending_transfer()/
+// reject_pending_transfer() are the ONLY path that can ever create a
+// Bank Transfer transaction row; RLS independently blocks a rep from
+// inserting one directly regardless of what this page or the app's own
+// JS does.
+// ═══════════════════════════════════════════════
+async function renderTransfersPage() {
+  if (!db) return;
+  const el = document.getElementById('transfersList');
+  if (el) el.innerHTML = '<div class="empty-state">Loading…</div>';
+
+  const { data: transfers, error } = await db.from('pending_transfers')
+    .select('*, customers(first_name,last_name,phone), representatives(first_name,last_name,rep_id)')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (error) { if (el) el.innerHTML = `<div class="msg-err">${error.message}</div>`; return; }
+
+  allTransfers = transfers || [];
+  renderTransfersList(allTransfers);
+}
+
+function renderTransfersList(list) {
+  const el = document.getElementById('transfersList');
+  if (!el) return;
+  const pending = list.filter(t => t.status === 'pending');
+  const resolved = list.filter(t => t.status !== 'pending');
+
+  if (!list.length) { el.innerHTML = '<div class="empty-state">No bank transfers submitted yet</div>'; return; }
+
+  let html = '';
+  if (pending.length) {
+    html += `<div class="section-card-title" style="margin:0 0 10px;">${pending.length} awaiting confirmation</div>`;
+    html += pending.map(renderTransferCard).join('');
+  } else {
+    html += '<div class="empty-state">No transfers awaiting confirmation</div>';
+  }
+  if (resolved.length) {
+    html += `<div class="section-card-title" style="margin:22px 0 10px;">Recently reviewed</div>`;
+    html += resolved.slice(0, 20).map(renderTransferCard).join('');
+  }
+  el.innerHTML = html;
+}
+
+function renderTransferCard(t) {
+  const cust = t.customers || {};
+  const custName = `${cust.first_name || 'Unknown'} ${cust.last_name || ''}`.trim();
+  const custPhone = (cust.phone || '').replace('+234', '0');
+  const rep = t.representatives || {};
+  const repName = `${rep.first_name || 'Unknown'} ${rep.last_name || ''}`.trim();
+  const esc = (t.account_name || '').replace(/'/g, "\\'");
+
+  const actions = t.status === 'pending'
+    ? `<div class="disb-actions">
+        <button class="btn-review" onclick="confirmTransfer('${t.id}', ${t.amount}, '${esc}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Confirm — Add to Balance</button>
+        <button class="btn-reject" onclick="rejectTransfer('${t.id}', ${t.amount}, '${esc}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button>
+       </div>`
+    : `<div class="disb-actions"><div style="font-size:11px;color:var(--sub);padding:6px 2px;">${t.status === 'confirmed' ? 'Confirmed — added to balance' : 'Rejected'}${t.rejection_reason ? ' — ' + t.rejection_reason : ''}</div></div>`;
+
+  return `<div class="disb-item">
+    <div class="disb-header">
+      <div>
+        <div class="disb-name">${custName}</div>
+        <div class="disb-phone">${custPhone}</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="disb-amount">${fmt(t.amount)}</div>
+        <span class="status-pill ${t.status === 'confirmed' ? 'approved' : t.status === 'rejected' ? 'rejected' : 'pending'}">${t.status}</span>
+      </div>
+    </div>
+    <div class="disb-reason">Account name on transfer: <strong>${t.account_name}</strong></div>
+    <div class="disb-meta">Agent: ${repName} (#${rep.rep_id || '—'}) · Ref: ${t.ref} · ${fmtDate(t.created_at)} ${fmtTime(t.created_at)}</div>
+    ${actions}
+  </div>`;
+}
+
+async function confirmTransfer(transferId, amount, accountName) {
+  showConfirm('Confirm Bank Transfer', `Confirm you've verified ${fmt(amount)} from account "${accountName}" actually landed in the bank statement? This will add it to the customer's balance immediately and cannot be undone.`, async () => {
+    showLoading('Confirming…');
+    const { data, error } = await db.rpc('confirm_pending_transfer', { p_transfer_id: transferId });
+    hideLoading();
+    if (error) { alert('Confirmation failed: ' + error.message); return; }
+    if (data?.ok === false) { alert('Confirmation failed: ' + (data.error || 'Unknown error')); return; }
+    await renderTransfersPage();
+    await updateBadges();
+    if (typeof renderExecutiveOverview === 'function') await renderExecutiveOverview();
+  });
+}
+
+async function rejectTransfer(transferId, amount, accountName) {
+  showConfirm('Reject Bank Transfer', `Reject the ${fmt(amount)} claim from account "${accountName}"? This does not touch any balance — use this if the transfer never actually arrived.`, async () => {
+    showLoading('Rejecting…');
+    const { data, error } = await db.rpc('reject_pending_transfer', { p_transfer_id: transferId, p_reason: null });
+    hideLoading();
+    if (error) { alert('Reject failed: ' + error.message); return; }
+    if (data?.ok === false) { alert('Reject failed: ' + (data.error || 'Unknown error')); return; }
+    await renderTransfersPage();
+    await updateBadges();
+  });
+}
+
+// ═══════════════════════════════════════════════
 // CUSTOMERS (admin/users.html)
 // ═══════════════════════════════════════════════
 let allCustomers = [];
+let allTransfers = [];
 
 async function renderCustomersPage() {
   // A generous cap, not full pagination — at real-world scale (low
@@ -1496,14 +1606,17 @@ let realtimeChannels = [];
 async function updateBadges() {
   if (!db || !isAdminLoggedIn()) return;
   try {
-    const [{ count: pdc }, { count: fdc }] = await Promise.all([
+    const [{ count: pdc }, { count: fdc }, { count: ptc }] = await Promise.all([
       db.from('disbursements').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false)
+      db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
+      db.from('pending_transfers').select('*', { count: 'exact', head: true }).eq('status', 'pending')
     ]);
     const disbBadge = document.getElementById('disbBadge');
     if (disbBadge) { disbBadge.style.display = pdc > 0 ? '' : 'none'; disbBadge.textContent = pdc || 0; }
     const flagBadge = document.getElementById('flagBadge');
     if (flagBadge) { flagBadge.style.display = fdc > 0 ? '' : 'none'; flagBadge.textContent = fdc || 0; }
+    const transferBadge = document.getElementById('transferBadge');
+    if (transferBadge) { transferBadge.style.display = ptc > 0 ? '' : 'none'; transferBadge.textContent = ptc || 0; }
     const ovEl = document.getElementById('ovPendingDisb');
     if (ovEl) ovEl.textContent = pdc || 0;
   } catch (e) { }

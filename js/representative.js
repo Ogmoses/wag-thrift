@@ -295,6 +295,15 @@ async function repOnPlanChange() {
 }
 
 
+function onColMethodChange() {
+  const method = document.getElementById('colMethod')?.value;
+  const isTransfer = method === 'Bank Transfer';
+  const lbl = document.getElementById('colNotesLbl');
+  const hint = document.getElementById('colNotesHint');
+  if (lbl) lbl.textContent = isTransfer ? 'Account Name (Required)' : 'Notes (Optional)';
+  if (hint) hint.style.display = isTransfer ? 'block' : 'none';
+}
+
 function openCollectModal() {
   if (!repFoundCust) { alert('Search for a customer first'); return; }
   if (!repSelectedPlan) { alert('Please select a plan first'); return; }
@@ -350,6 +359,16 @@ async function _doCollection() {
   const amtVal = document.getElementById('colAmt').value.trim(), method = document.getElementById('colMethod').value, notes = document.getElementById('colNotes').value.trim();
   if (!amtVal || +amtVal <= 0) { setMsg('colMsg', '<div class="msg-err">Enter a valid amount</div>'); return; }
   if (!method) { setMsg('colMsg', '<div class="msg-err">Select a payment method</div>'); return; }
+  // Bank transfers need admin confirmation before they count toward the
+  // balance (see doc note on the pending_transfers table) — the notes
+  // field doubles as the depositor's account name so the admin can match
+  // it against the actual bank statement. This client-side check is a
+  // UX convenience only; the real enforcement is server-side (RLS on
+  // transactions blocks a direct 'Bank Transfer' insert — see sql notes).
+  if (method === 'Bank Transfer' && !notes) {
+    setMsg('colMsg', '<div class="msg-err">Enter the account name the transfer was made from — required for bank transfers so the admin can verify it.</div>');
+    return;
+  }
   const amt = +amtVal; const rep = getUser(); const ref = genRef();
   // Use regular_contribution from the cached dropdown option (set by the
   // rep_search_customer RPC) — avoids a direct plans table query which
@@ -370,8 +389,28 @@ async function _doCollection() {
   // waiting on a request that can't possibly succeed.
   if (!navigator.onLine) { await queueOfflineCollection(details); return; }
 
-  showLoading('Saving deposit…');
+  showLoading(method === 'Bank Transfer' ? 'Submitting for admin confirmation…' : 'Saving deposit…');
   try {
+    if (method === 'Bank Transfer') {
+      // Goes to pending_transfers, NOT transactions — the balance (a live
+      // view over transactions) must not move until an admin confirms
+      // this against the actual bank statement. See sql/pending-bank-
+      // transfers.sql. RLS also independently blocks a direct
+      // 'Bank Transfer' insert into transactions regardless of what this
+      // client code does, so this isn't just a UI convention.
+      const { error: ptErr } = await db.from('pending_transfers').insert({
+        ref, amount: amt, plan_id: repSelectedPlan.id, customer_id: repFoundCust.id,
+        agent_id: rep.id, account_name: notes,
+      });
+      if (ptErr) throw ptErr;
+
+      await audit('deposit', rep.id, 'representative', `Submitted bank transfer of ${fmt(amt)} for ${custName} from account "${notes}" — pending admin confirmation, Ref: ${ref}`, amt, repSelectedPlan.id);
+      hideLoading(); closeModal('collectModal');
+      document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = ''; onColMethodChange();
+      alert(`Submitted for admin confirmation.\n\n${fmt(amt)} from account "${notes}" will be added to ${custName}'s balance once an admin verifies the transfer against the bank statement.\n\nRef: ${ref}`);
+      return;
+    }
+
     const { count: txCount } = await db.from('transactions').select('*', { count: 'exact', head: true }).eq('plan_id', repSelectedPlan.id);
     const txType = (txCount === 0) ? 'opening' : 'deposit';
     const { error: insertErr } = await db.from('transactions').insert({ ref, type: txType, amount: amt, plan_id: repSelectedPlan.id, customer_id: repFoundCust.id, agent_id: rep.id, method, notes });
@@ -382,7 +421,7 @@ async function _doCollection() {
     await audit('deposit', rep.id, 'representative', `Collected ${fmt(amt)} for ${custName} — Ref: ${ref}`, amt, repSelectedPlan.id);
     hideLoading(); closeModal('collectModal');
     setUser({ ...rep, confirmed_count: (rep.confirmed_count || 0) + 1 });
-    document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = '';
+    document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = ''; onColMethodChange();
     await repDoSearch(); // refreshes balance from RPC before showing receipt
     const dd2 = document.getElementById('repPlanDd');
     const opt2 = dd2.options[dd2.selectedIndex];
@@ -407,7 +446,7 @@ async function queueOfflineCollection(d) {
     planId: d.planId, customerId: d.customerId, agentId: d.agentId, custName: d.custName,
   });
   closeModal('collectModal');
-  document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = '';
+  document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = ''; onColMethodChange();
   await updatePendingSyncBadge();
   alert(`No connection right now — this ${fmt(d.amt)} deposit for ${d.custName} has been saved on this device and will sync automatically once you're back online.\n\nRef: ${d.ref}`);
 }
@@ -546,6 +585,17 @@ async function syncPendingCollections() {
     const pending = await getPendingCollections();
     for (const item of pending) {
       try {
+        if (item.method === 'Bank Transfer') {
+          const { error: ptErr } = await db.from('pending_transfers').insert({
+            ref: item.ref, amount: item.amount, plan_id: item.planId, customer_id: item.customerId,
+            agent_id: item.agentId, account_name: item.notes,
+          });
+          if (ptErr) throw ptErr;
+          await audit('deposit', item.agentId, 'representative', `Submitted bank transfer of ${fmt(item.amount)} for ${item.custName} from account "${item.notes}" — pending admin confirmation, Ref: ${item.ref} (synced from offline)`, item.amount, item.planId);
+          await removePendingCollection(item.localId);
+          continue;
+        }
+
         const { count: txCount } = await db.from('transactions').select('*', { count: 'exact', head: true }).eq('plan_id', item.planId);
         const txType = (txCount === 0) ? 'opening' : 'deposit';
         const { error: insertErr } = await db.from('transactions').insert({
