@@ -464,6 +464,7 @@ async function renderExecutiveOverview() {
   const [
     { data: pendDisb }, { count: pdc },
     { data: flags }, { count: flagCount },
+    { data: pendTransfers }, { count: transferCount },
     { count: activeReps },
     { count: activePlans },
     { data: balanceRows },
@@ -473,6 +474,8 @@ async function renderExecutiveOverview() {
     db.from('disbursements').select('*', { count: 'exact', head: true }).in('status', ['pending', 'reviewed']),
     db.from('fraud_flags').select('*').eq('resolved', false).order('created_at', { ascending: false }).limit(5),
     db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
+    db.from('pending_transfers').select('*,customers(first_name,last_name,phone)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
+    db.from('pending_transfers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     db.from('representatives').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
     db.from('plan_balances').select('balance'),
@@ -498,13 +501,13 @@ async function renderExecutiveOverview() {
   document.getElementById('execTxToday').textContent = todayDeposits.length;
   document.getElementById('execPlans').textContent = activePlans || 0;
 
-  renderActionNeeded(pendDisb || [], flags || [], pdc || 0, flagCount || 0);
+  renderActionNeeded(pendDisb || [], flags || [], pendTransfers || [], pdc || 0, flagCount || 0, transferCount || 0);
 }
 
-function renderActionNeeded(disbs, flags, disbCount, flagCount) {
+function renderActionNeeded(disbs, flags, transfers, disbCount, flagCount, transferCount) {
   const el = document.getElementById('execActionNeeded');
   if (!el) return;
-  const totalPending = disbCount + flagCount;
+  const totalPending = disbCount + flagCount + transferCount;
 
   if (totalPending === 0) {
     el.innerHTML = `<div class="exec-allclear">
@@ -549,12 +552,29 @@ function renderActionNeeded(disbs, flags, disbCount, flagCount) {
     </div>`;
   }).join('');
 
-  const shown = disbs.length + flags.length;
+  const transferHTML = transfers.map(t => {
+    const cust = t.customers || {};
+    const custName = `${cust.first_name || 'Unknown'} ${cust.last_name || ''}`.trim();
+    const custPhone = (cust.phone || '').replace('+234', '0');
+    const esc = (t.account_name || '').replace(/'/g, "\\'");
+    return `<div class="exec-priority-card">
+      <div class="exec-priority-info">
+        <div class="exec-priority-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:5px;"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Bank transfer · ${fmt(t.amount)}</div>
+        <div class="exec-priority-sub">${custName}${custPhone ? ' · ' + custPhone : ''} · from "${t.account_name}"</div>
+      </div>
+      <div class="exec-priority-actions">
+        <button class="exec-btn-approve" onclick="confirmTransfer('${t.id}', ${t.amount}, '${esc}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Confirm</button>
+        <button class="exec-btn-decline" onclick="rejectTransfer('${t.id}', ${t.amount}, '${esc}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const shown = disbs.length + flags.length + transfers.length;
   const viewAllHTML = totalPending > shown
     ? `<a href="dashboard.html#disbursements" class="exec-viewall">View all ${totalPending} pending items →</a>`
     : '';
 
-  el.innerHTML = `<div class="exec-priority-hd">${totalPending} item${totalPending === 1 ? '' : 's'} need${totalPending === 1 ? 's' : ''} your attention</div>${disbHTML}${flagHTML}${viewAllHTML}`;
+  el.innerHTML = `<div class="exec-priority-hd">${totalPending} item${totalPending === 1 ? '' : 's'} need${totalPending === 1 ? 's' : ''} your attention</div>${disbHTML}${flagHTML}${transferHTML}${viewAllHTML}`;
 }
 
 async function resolveFlagExec(id) {
@@ -794,6 +814,7 @@ async function rejectTransfer(transferId, amount, accountName) {
     if (data?.ok === false) { alert('Reject failed: ' + (data.error || 'Unknown error')); return; }
     await renderTransfersPage();
     await updateBadges();
+    if (typeof renderExecutiveOverview === 'function') await renderExecutiveOverview();
   });
 }
 
