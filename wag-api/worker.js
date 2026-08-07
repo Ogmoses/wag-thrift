@@ -366,18 +366,31 @@ async function verifyRequestIsAdmin(request, env) {
   const token = authHeader.replace(/^Bearer\s+/i, '');
   if (!token) return { ok: false, error: 'Not signed in' };
 
-  const userRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: env.SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
+  // Delegates entirely to is_admin() — the exact same function every SQL
+  // RPC in this project uses — instead of a separately-maintained REST
+  // query that re-implemented its logic. That old version had already
+  // silently drifted from it: is_admin() requires MFA (aal2) for any
+  // admin who has enrolled it; this Worker-side check never enforced
+  // that. Calling the real function means the two can no longer disagree
+  // by construction — there's only one place this logic lives now.
+  // The user's own token (not the service key) is passed as
+  // Authorization here specifically so auth.uid() inside is_admin()
+  // resolves to the requesting user, not nobody.
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/is_admin`, {
+    method: 'POST',
+    headers: {
+      apikey: env.SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: '{}',
   });
-  if (!userRes.ok) return { ok: false, error: 'Invalid or expired session' };
-  const user = await userRes.json();
 
-  const adminRes = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/administrators?auth_user_id=eq.${user.id}&status=eq.active&select=id`,
-    { headers: { apikey: env.SUPABASE_SERVICE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}` } }
-  );
-  const admins = await adminRes.json();
-  if (!Array.isArray(admins) || !admins.length) return { ok: false, error: 'Not an admin account' };
+  if (res.status === 401) return { ok: false, error: 'Invalid or expired session' };
+  if (!res.ok) return { ok: false, error: 'Could not verify admin status' };
+
+  const isAdmin = await res.json();
+  if (isAdmin !== true) return { ok: false, error: 'Not an admin account' };
 
   return { ok: true };
 }
