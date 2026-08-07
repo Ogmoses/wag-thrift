@@ -460,48 +460,63 @@ function startOfTodayWAT() {
 async function renderExecutiveOverview() {
   if (!db) return;
   const since = startOfTodayWAT();
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-  const [
-    { data: pendDisb }, { count: pdc },
-    { data: flags }, { count: flagCount },
-    { data: pendTransfers }, { count: transferCount },
-    { count: activeReps },
-    { count: activePlans },
-    { data: balanceRows },
-    { data: todayTx },
-  ] = await Promise.all([
-    db.from('disbursements').select('*,customers(first_name,last_name,phone)').in('status', ['pending', 'reviewed']).order('requested_at', { ascending: false }).limit(5),
-    db.from('disbursements').select('*', { count: 'exact', head: true }).in('status', ['pending', 'reviewed']),
-    db.from('fraud_flags').select('*').eq('resolved', false).order('created_at', { ascending: false }).limit(5),
-    db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
-    db.from('pending_transfers').select('*,customers(first_name,last_name,phone)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
-    db.from('pending_transfers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    db.from('representatives').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    db.from('plan_balances').select('balance'),
-    db.from('transactions').select('type,amount,agent_id').gte('created_at', since),
-  ]);
+  try {
+    const [
+      { data: pendDisb }, { count: pdc },
+      { data: flags }, { count: flagCount },
+      { data: pendTransfers }, { count: transferCount },
+      { count: activeReps },
+      { count: activePlans },
+      { data: balanceRows },
+      { data: todayTx },
+    ] = await Promise.all([
+      db.from('disbursements').select('*,customers(first_name,last_name,phone)').in('status', ['pending', 'reviewed']).order('requested_at', { ascending: false }).limit(5),
+      db.from('disbursements').select('*', { count: 'exact', head: true }).in('status', ['pending', 'reviewed']),
+      db.from('fraud_flags').select('*').eq('resolved', false).order('created_at', { ascending: false }).limit(5),
+      db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
+      db.from('pending_transfers').select('*,customers(first_name,last_name,phone)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
+      db.from('pending_transfers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      db.from('representatives').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      db.from('plan_balances').select('balance'),
+      db.from('transactions').select('type,amount,agent_id').gte('created_at', since),
+    ]);
 
-  const vaultBalance = (balanceRows || []).reduce((s, r) => s + Number(r.balance), 0);
-  const todayDeposits = (todayTx || []).filter(t => t.type === 'deposit' || t.type === 'opening');
-  const todayPayouts = (todayTx || []).filter(t => t.type === 'payout');
-  const todayDepositTotal = todayDeposits.reduce((s, t) => s + Number(t.amount), 0);
-  const todayPayoutTotal = todayPayouts.reduce((s, t) => s + Number(t.amount), 0);
-  const activeAgentIdsToday = new Set(todayDeposits.map(t => t.agent_id).filter(Boolean));
-  const net = todayDepositTotal - todayPayoutTotal;
+    const vaultBalance = (balanceRows || []).reduce((s, r) => s + Number(r.balance), 0);
+    const todayDeposits = (todayTx || []).filter(t => t.type === 'deposit' || t.type === 'opening');
+    const todayPayouts = (todayTx || []).filter(t => t.type === 'payout');
+    const todayDepositTotal = todayDeposits.reduce((s, t) => s + Number(t.amount), 0);
+    const todayPayoutTotal = todayPayouts.reduce((s, t) => s + Number(t.amount), 0);
+    const activeAgentIdsToday = new Set(todayDeposits.map(t => t.agent_id).filter(Boolean));
+    const net = todayDepositTotal - todayPayoutTotal;
 
-  document.getElementById('execVault').textContent = fmt(vaultBalance);
-  document.getElementById('execCollections').textContent = fmt(todayDepositTotal);
-  document.getElementById('execPayouts').textContent = fmt(todayPayoutTotal);
-  const netEl = document.getElementById('execNet');
-  netEl.textContent = (net >= 0 ? '+' : '−') + fmt(Math.abs(net));
-  netEl.classList.toggle('neg', net < 0);
+    setText('execVault', fmt(vaultBalance));
+    setText('execCollections', fmt(todayDepositTotal));
+    setText('execPayouts', fmt(todayPayoutTotal));
+    const netEl = document.getElementById('execNet');
+    if (netEl) { netEl.textContent = (net >= 0 ? '+' : '−') + fmt(Math.abs(net)); netEl.classList.toggle('neg', net < 0); }
 
-  document.getElementById('execAgentsToday').textContent = `${activeAgentIdsToday.size} / ${activeReps || 0}`;
-  document.getElementById('execTxToday').textContent = todayDeposits.length;
-  document.getElementById('execPlans').textContent = activePlans || 0;
+    setText('execAgentsToday', `${activeAgentIdsToday.size} / ${activeReps || 0}`);
+    setText('execTxToday', todayDeposits.length);
+    setText('execPlans', activePlans || 0);
 
-  renderActionNeeded(pendDisb || [], flags || [], pendTransfers || [], pdc || 0, flagCount || 0, transferCount || 0);
+    renderActionNeeded(pendDisb || [], flags || [], pendTransfers || [], pdc || 0, flagCount || 0, transferCount || 0);
+  } catch (e) {
+    // Fix: this whole function used to have no error handling at all, and
+    // every DOM write above had no null-guard — a single missing element
+    // or a failed query threw and silently aborted everything after it,
+    // including the call to renderActionNeeded() at the end. That meant
+    // the Attention Required card could get stuck on its initial
+    // "Loading…" placeholder indefinitely with no visible error, exactly
+    // matching "doesn't show anything unless refreshed." Now a failure
+    // anywhere still surfaces here and still gives Attention Required a
+    // real (if degraded) state instead of leaving it stuck.
+    console.error('renderExecutiveOverview error:', e);
+    const el = document.getElementById('execActionNeeded');
+    if (el) el.innerHTML = '<div class="msg-err">Could not load — try refreshing.</div>';
+  }
 }
 
 function renderActionNeeded(disbs, flags, transfers, disbCount, flagCount, transferCount) {
