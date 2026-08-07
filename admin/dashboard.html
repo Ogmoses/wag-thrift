@@ -143,6 +143,14 @@
 const _a = requireAdmin();
 if (_a) (async () => {
   initAdminTheme();
+  // Fix: wait for the Supabase client to actually finish restoring the
+  // session before firing any of the RLS-gated queries below. Without
+  // this, on a cold page load those queries could fire while auth.uid()
+  // was still null — is_admin() would then correctly (but silently)
+  // filter everything out via RLS, no error, just empty results. That's
+  // exactly what "Attention Required shows nothing until refreshed"
+  // looks like: a second load has the session already warm.
+  await db.auth.getSession();
   const initial = (location.hash === '#disbursements') ? 'disbursements' : 'overview';
   renderAdminShell(initial, initial === 'disbursements' ? 'Disbursements' : 'Overview');
   setAdminViewMode(localStorage.getItem('wagAdminViewMode') || 'executive');
