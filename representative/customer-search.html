@@ -94,10 +94,32 @@
  <p style="color:var(--sub);font-size:13px;margin-bottom:14px;">Sign this customer up on the spot — no email or verification code needed. They'll sign in later with just their phone number and PIN.</p>
  <div class="mform-group"><label class="form-lbl">Customer Phone Number</label><input type="tel" id="acPhone" class="form-inp" placeholder="e.g. 08012345678" maxlength="11" inputmode="numeric"></div>
  <div class="mform-group"><label class="form-lbl">First Name</label><input type="text" id="acFirstName" class="form-inp" placeholder="e.g. Ngozi"></div>
- <div class="mform-group"><label class="form-lbl">Surname / Stall Name</label><input type="text" id="acLastName" class="form-inp" placeholder="e.g. Okafor or Stall 14"></div>
+ <div class="mform-group"><label class="form-lbl">Surname / Stall Name (Optional)</label><input type="text" id="acLastName" class="form-inp" placeholder="e.g. Okafor or Stall 14"></div>
  <div class="mform-group"><label class="form-lbl">4-Digit PIN</label><div class="pin-wrap"><input type="password" id="acPin" class="form-inp" placeholder="····" maxlength="4" inputmode="numeric" style="font-size:20px;letter-spacing:6px;"><button type="button" class="pw-eye" onclick="togglePw('acPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
  <div id="acMsg"></div>
  <button class="btn btn-blue" style="margin-top:8px;" onclick="doAgentCreateCustomer()">Create Customer Account</button>
+ </div>
+</div>
+
+<div id="repAlertModal" class="modal">
+ <div class="msheet" style="max-width:420px;position:relative;text-align:center;">
+ <div class="m-handle"></div>
+ <div id="repAlertIcon" style="margin:4px auto 12px;"></div>
+ <div class="m-title" id="repAlertTitle" style="text-align:center;">Notice</div>
+ <p style="color:var(--sub);font-size:13px;margin-bottom:18px;white-space:pre-line;" id="repAlertMsg"></p>
+ <button class="btn btn-blue" onclick="closeModal('repAlertModal')">OK</button>
+ </div>
+</div>
+
+<div id="repConfirmModal" class="modal">
+ <div class="msheet" style="max-width:420px;position:relative;">
+ <button class="m-close" onclick="closeModal('repConfirmModal')">×</button>
+ <div class="m-title" id="repConfirmTitle">Confirm Action</div>
+ <p style="color:var(--sub);font-size:13px;margin-bottom:18px;" id="repConfirmMsg">Are you sure?</p>
+ <div style="display:flex;gap:9px;">
+  <button class="btn btn-ghost" onclick="closeModal('repConfirmModal')" style="flex:1;justify-content:center;">Cancel</button>
+  <button class="btn btn-blue" style="flex:1;justify-content:center;" onclick="repConfirmOkHandler()">Yes, Confirm</button>
+ </div>
  </div>
 </div>
 
