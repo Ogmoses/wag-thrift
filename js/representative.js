@@ -193,6 +193,18 @@ async function repDoSearch() {
   renderRepCustomerCard(result, false, null);
 }
 
+// Refreshes the already-loaded customer card after an action (deposit
+// recorded, withdrawal marked paid/rejected) — NOT a new search, so this
+// deliberately uses rep_refresh_customer() instead of rep_search_customer():
+// same data, but no "Rep X searched for customer Y" audit_log entry,
+// since nothing was actually searched.
+async function repRefreshCustomer() {
+  if (!dbReady() || !repFoundCust?.id) return;
+  const { data: result, error } = await db.rpc('rep_refresh_customer', { p_customer_id: repFoundCust.id });
+  if (error || result?.ok === false) return; // best-effort — the action itself already succeeded
+  renderRepCustomerCard(result, false, null);
+}
+
 function renderRepCustomerCard(result, isOffline, cachedAt) {
   const cust = result.customer;
   const plans = result.plans || [];
@@ -422,7 +434,7 @@ async function _doCollection() {
     hideLoading(); closeModal('collectModal');
     setUser({ ...rep, confirmed_count: (rep.confirmed_count || 0) + 1 });
     document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = ''; onColMethodChange();
-    await repDoSearch(); // refreshes balance from RPC before showing receipt
+    await repRefreshCustomer(); // refreshes balance without logging a fake search
     const dd2 = document.getElementById('repPlanDd');
     const opt2 = dd2.options[dd2.selectedIndex];
     const newBal = +(opt2?.dataset?.bal || 0);
@@ -776,7 +788,7 @@ async function _doMarkPaid(disbId, planId, amount, custId) {
   // Refresh cached profile so confirmed_count (updated server-side by the
   // RPC) reflects on the dashboard without needing a full re-login.
   if (typeof verifyRoleFromDB === 'function') await verifyRoleFromDB('representative');
-  if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
+  if (typeof repFoundCust !== 'undefined' && repFoundCust) await repRefreshCustomer();
 }
 
 async function doRejectDisb(disbId, custId) { await guardedAction('rejectDisb_' + disbId, () => _doRejectDisb(disbId, custId)); }
@@ -790,7 +802,7 @@ async function _doRejectDisb(disbId, custId) {
     return;
   }
   alert('Withdrawal rejected');
-  if (typeof repFoundCust !== 'undefined' && repFoundCust) await repDoSearch();
+  if (typeof repFoundCust !== 'undefined' && repFoundCust) await repRefreshCustomer();
 }
 
 // ═══════════════════════════════════════════════
