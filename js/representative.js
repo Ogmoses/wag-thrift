@@ -316,9 +316,37 @@ function onColMethodChange() {
   if (hint) hint.style.display = isTransfer ? 'block' : 'none';
 }
 
+// ═══════════════════════════════════════════════
+// SMOOTH ALERT / CONFIRM (replaces native alert()/confirm())
+// Same bottom-sheet modal system already used throughout this page, so
+// these transition in/out the same way every other modal here does,
+// instead of a jarring native browser popup. showRepConfirm() mirrors
+// the admin dashboard's showConfirm() exactly (Cancel / Yes, Confirm).
+// ═══════════════════════════════════════════════
+const REP_ALERT_ICONS = {
+  success: '<svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:44px;height:44px;"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>',
+  error: '<svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:44px;height:44px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="#011f7b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:44px;height:44px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+};
+function showRepAlert(title, msg, variant = 'info') {
+  const iconEl = document.getElementById('repAlertIcon');
+  if (iconEl) iconEl.innerHTML = REP_ALERT_ICONS[variant] || REP_ALERT_ICONS.info;
+  const titleEl = document.getElementById('repAlertTitle'); if (titleEl) titleEl.textContent = title;
+  const msgEl = document.getElementById('repAlertMsg'); if (msgEl) msgEl.textContent = msg;
+  showModal('repAlertModal');
+}
+
+let repConfirmOkHandler = () => {};
+function showRepConfirm(title, msg, onOk) {
+  const titleEl = document.getElementById('repConfirmTitle'); if (titleEl) titleEl.textContent = title;
+  const msgEl = document.getElementById('repConfirmMsg'); if (msgEl) msgEl.textContent = msg;
+  repConfirmOkHandler = () => { closeModal('repConfirmModal'); onOk(); };
+  showModal('repConfirmModal');
+}
+
 function openCollectModal() {
-  if (!repFoundCust) { alert('Search for a customer first'); return; }
-  if (!repSelectedPlan) { alert('Please select a plan first'); return; }
+  if (!repFoundCust) { showRepAlert('Hold on', 'Search for a customer first', 'error'); return; }
+  if (!repSelectedPlan) { showRepAlert('Hold on', 'Please select a plan first', 'error'); return; }
   renderCollectPresets();
   requirePayPin('Payment PIN', 'Enter your payment PIN to save this deposit.', () => showModal('collectModal'));
 }
@@ -419,7 +447,7 @@ async function _doCollection() {
       await audit('deposit', rep.id, 'representative', `Submitted bank transfer of ${fmt(amt)} for ${custName} from account "${notes}" — pending admin confirmation, Ref: ${ref}`, amt, repSelectedPlan.id);
       hideLoading(); closeModal('collectModal');
       document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = ''; onColMethodChange();
-      alert(`Submitted for admin confirmation.\n\n${fmt(amt)} from account "${notes}" will be added to ${custName}'s balance once an admin verifies the transfer against the bank statement.\n\nRef: ${ref}`);
+      showRepAlert('Submitted for Confirmation', `${fmt(amt)} from account "${notes}" will be added to ${custName}'s balance once an admin verifies the transfer against the bank statement.\n\nRef: ${ref}`, 'success');
       return;
     }
 
@@ -460,7 +488,7 @@ async function queueOfflineCollection(d) {
   closeModal('collectModal');
   document.getElementById('colAmt').value = ''; document.getElementById('colMethod').value = ''; document.getElementById('colNotes').value = ''; onColMethodChange();
   await updatePendingSyncBadge();
-  alert(`No connection right now — this ${fmt(d.amt)} deposit for ${d.custName} has been saved on this device and will sync automatically once you're back online.\n\nRef: ${d.ref}`);
+  showRepAlert('Saved Offline', `No connection right now — this ${fmt(d.amt)} deposit for ${d.custName} has been saved on this device and will sync automatically once you're back online.\n\nRef: ${d.ref}`, 'info');
 }
 
 // ═══════════════════════════════════════════════
@@ -515,7 +543,7 @@ async function _doAgentCreateCustomer() {
   const pin = document.getElementById('acPin')?.value?.trim() || '';
   setMsg('acMsg', '');
 
-  if (!rawPhone || !firstName || !lastName || !pin) { setMsg('acMsg', '<div class="msg-err">Please fill in phone number, first name, surname, and PIN</div>'); return; }
+  if (!rawPhone || !firstName || !pin) { setMsg('acMsg', '<div class="msg-err">Please fill in phone number, first name, and PIN</div>'); return; }
   if (!/^\d{4}$/.test(pin)) { setMsg('acMsg', '<div class="msg-err">PIN must be exactly 4 digits</div>'); return; }
 
   const normPh = normPhone(rawPhone);
@@ -569,12 +597,13 @@ async function _doAgentCreateCustomer() {
   }
 
   const rep = getUser();
-  await audit('login', rep?.id || 'unknown', 'representative', `Agent ${rep?.first_name || ''} ${rep?.last_name || ''} registered new customer on the spot: ${firstName} ${lastName} (${normPh})`);
+  const fullName = lastName ? `${firstName} ${lastName}` : firstName;
+  await audit('login', rep?.id || 'unknown', 'representative', `Agent ${rep?.first_name || ''} ${rep?.last_name || ''} registered new customer on the spot: ${fullName} (${normPh})`);
 
   closeModal('agentCreateCustomerModal');
   ['acPhone', 'acFirstName', 'acLastName', 'acPin'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   setMsg('acMsg', '');
-  alert(`Customer account created!\n\nName: ${firstName} ${lastName}\nPhone: ${normPh}\nPIN: ${pin}\n\nThey can sign in now using their phone number and this PIN. Give them a Savings Plan next from Customer Search.`);
+  showRepAlert('Customer Account Created', `Name: ${fullName}\nPhone: ${normPh}\nPIN: ${pin}\n\nThey can sign in now using their phone number and this PIN. Give them a Savings Plan next from Customer Search.`, 'success');
 }
 
 // ═══════════════════════════════════════════════
@@ -727,13 +756,13 @@ function showTxReceipt(txId) {
 // straight to the device if sharing images isn't supported.
 async function shareReceipt() {
   const el = document.getElementById('receiptContent');
-  if (!el || typeof html2canvas === 'undefined') { alert('Could not prepare the receipt image. Please try again.'); return; }
+  if (!el || typeof html2canvas === 'undefined') { showRepAlert('Error', 'Could not prepare the receipt image. Please try again.', 'error'); return; }
   showLoading('Preparing receipt…');
   try {
     const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
     canvas.toBlob(async (blob) => {
       hideLoading();
-      if (!blob) { alert('Could not generate the receipt image.'); return; }
+      if (!blob) { showRepAlert('Error', 'Could not generate the receipt image.', 'error'); return; }
       const fileName = `WAG-Receipt-${Date.now()}.png`;
       const file = new File([blob], fileName, { type: 'image/png' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -750,7 +779,7 @@ async function shareReceipt() {
   } catch (e) {
     hideLoading();
     console.error('Receipt share/save error:', e);
-    alert('Could not prepare the receipt image. Please try again.');
+    showRepAlert('Error', 'Could not prepare the receipt image. Please try again.', 'error');
   }
 }
 
@@ -768,41 +797,44 @@ async function doMarkPaid(disbId, planId, amount, custId) { guardedSubmit('markP
 async function _doMarkPaid(disbId, planId, amount, custId) {
   const { data: disbCheck } = await db.from('disbursements').select('status,reserve_ref').eq('id', disbId).single();
   if (!disbCheck || disbCheck.status !== 'approved') {
-    alert('This withdrawal must be in approved status before marking as paid.');
+    showRepAlert('Not Ready', 'This withdrawal must be in approved status before marking as paid.', 'error');
     return;
   }
   const { data: cust } = await db.from('customers').select('first_name,last_name').eq('id', custId).single();
-  if (!confirm(`Confirm cash of ${fmt(amount)} has been physically delivered to ${cust?.first_name || 'customer'}?`)) return;
-  showLoading('Confirming delivery…');
-  // Goes through a SECURITY DEFINER RPC rather than direct table updates —
-  // reps only have READ access to disbursements/transactions under RLS,
-  // so a direct .update() here would silently affect 0 rows.
-  const { data: result, error } = await db.rpc('mark_disbursement_paid', { p_disbursement_id: disbId });
-  if (error || result?.ok === false) {
+  const custName = cust?.first_name || 'customer';
+  showRepConfirm('Confirm Cash Delivery', `Confirm cash of ${fmt(amount)} has been physically delivered to ${custName}?`, async () => {
+    showLoading('Confirming delivery…');
+    // Goes through a SECURITY DEFINER RPC rather than direct table updates —
+    // reps only have READ access to disbursements/transactions under RLS,
+    // so a direct .update() here would silently affect 0 rows.
+    const { data: result, error } = await db.rpc('mark_disbursement_paid', { p_disbursement_id: disbId });
+    if (error || result?.ok === false) {
+      hideLoading();
+      showRepAlert('Failed', 'Failed to mark as paid: ' + (result?.error || error?.message || 'Unknown error'), 'error');
+      return;
+    }
     hideLoading();
-    alert('Failed to mark as paid: ' + (result?.error || error?.message || 'Unknown error'));
-    return;
-  }
-  hideLoading();
-  alert(`Payment Complete\nCash delivered to ${cust?.first_name || 'customer'}`);
-  // Refresh cached profile so confirmed_count (updated server-side by the
-  // RPC) reflects on the dashboard without needing a full re-login.
-  if (typeof verifyRoleFromDB === 'function') await verifyRoleFromDB('representative');
-  if (typeof repFoundCust !== 'undefined' && repFoundCust) await repRefreshCustomer();
+    showRepAlert('Payment Complete', `Cash delivered to ${custName}`, 'success');
+    // Refresh cached profile so confirmed_count (updated server-side by the
+    // RPC) reflects on the dashboard without needing a full re-login.
+    if (typeof verifyRoleFromDB === 'function') await verifyRoleFromDB('representative');
+    if (typeof repFoundCust !== 'undefined' && repFoundCust) await repRefreshCustomer();
+  });
 }
 
 async function doRejectDisb(disbId, custId) { await guardedAction('rejectDisb_' + disbId, () => _doRejectDisb(disbId, custId)); }
 async function _doRejectDisb(disbId, custId) {
-  if (!confirm('Reject this withdrawal request? This cannot be undone.')) return;
-  showLoading('Rejecting…');
-  const { data: result, error } = await db.rpc('rep_reject_disbursement', { p_disbursement_id: disbId });
-  hideLoading();
-  if (error || result?.ok === false) {
-    alert('Failed to reject: ' + (result?.error || error?.message || 'Unknown error'));
-    return;
-  }
-  alert('Withdrawal rejected');
-  if (typeof repFoundCust !== 'undefined' && repFoundCust) await repRefreshCustomer();
+  showRepConfirm('Reject Withdrawal', 'Reject this withdrawal request? This cannot be undone.', async () => {
+    showLoading('Rejecting…');
+    const { data: result, error } = await db.rpc('rep_reject_disbursement', { p_disbursement_id: disbId });
+    hideLoading();
+    if (error || result?.ok === false) {
+      showRepAlert('Failed', 'Failed to reject: ' + (result?.error || error?.message || 'Unknown error'), 'error');
+      return;
+    }
+    showRepAlert('Withdrawal Rejected', 'The withdrawal request has been rejected.', 'success');
+    if (typeof repFoundCust !== 'undefined' && repFoundCust) await repRefreshCustomer();
+  });
 }
 
 // ═══════════════════════════════════════════════
