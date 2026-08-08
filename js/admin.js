@@ -43,6 +43,12 @@ function requireAdmin() {
   let custOrRepSession = null;
   try { custOrRepSession = JSON.parse(sessionStorage.getItem('wagUser')); } catch (e) {}
   if (custOrRepSession && custOrRepSession.role) {
+    // Intentionally still a native alert() — this fires before
+    // renderAdminShell() has injected the custom modal's markup into the
+    // page at all, so showAdminAlert() would silently show nothing here
+    // while still redirecting instantly. Native alert() blocks and is
+    // guaranteed visible regardless of DOM state, which is what's
+    // actually needed at this specific point.
     alert('This area is restricted. You do not have permission to access the admin portal.');
     window.location.replace(rootPath() + (custOrRepSession.role === 'representative' ? 'representative/dashboard.html' : 'customer/dashboard.html'));
     return null;
@@ -131,7 +137,8 @@ function renderAdminShell(activePage, title) {
   <span class="topbar-badge">SUPER ADMIN</span>
   <button onclick="doAdminLogout()" title="Exit Portal" style="background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.3);color:#fca5a5;padding:6px 11px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Exit</button>
 </div>
-<div id="confirmModal" class="modal"><div class="msheet" style="position:relative;"><button class="m-close" onclick="closeModal('confirmModal')">×</button><div class="m-title" id="confirmTitle">Confirm Action</div><p style="color:var(--sub);font-size:13px;margin-bottom:18px;" id="confirmMsg">Are you sure?</p><div style="display:flex;gap:9px;"><button class="btn btn-ghost" onclick="closeModal('confirmModal')" style="flex:1;justify-content:center;">Cancel</button><button class="btn btn-yellow" style="flex:1;justify-content:center;" onclick="confirmOkHandler()">Yes, Confirm</button></div></div></div>`;
+<div id="confirmModal" class="modal"><div class="msheet" style="position:relative;"><button class="m-close" onclick="closeModal('confirmModal')">×</button><div class="m-title" id="confirmTitle">Confirm Action</div><p style="color:var(--sub);font-size:13px;margin-bottom:18px;" id="confirmMsg">Are you sure?</p><div style="display:flex;gap:9px;"><button class="btn btn-ghost" onclick="closeModal('confirmModal')" style="flex:1;justify-content:center;">Cancel</button><button class="btn btn-yellow" style="flex:1;justify-content:center;" onclick="confirmOkHandler()">Yes, Confirm</button></div></div></div>
+<div id="adminAlertModal" class="modal"><div class="msheet" style="max-width:420px;position:relative;text-align:center;"><div class="m-handle"></div><div id="adminAlertIcon" style="margin:4px auto 12px;"></div><div class="m-title" id="adminAlertTitle" style="text-align:center;">Notice</div><p style="color:var(--sub);font-size:13px;margin-bottom:18px;white-space:pre-line;" id="adminAlertMsg"></p><button class="btn btn-yellow" onclick="closeModal('adminAlertModal')">OK</button></div></div>`;
 
   updateBadges();
   setupRealtimeListeners();
@@ -597,7 +604,7 @@ async function resolveFlagExec(id) {
     showLoading('Updating…');
     const { error } = await db.from('fraud_flags').update({ resolved: true }).eq('id', id);
     hideLoading();
-    if (error) { alert('Could not mark this flag as resolved: ' + error.message); return; }
+    if (error) { showAdminAlert('Failed', 'Could not mark this flag as resolved: ' + error.message, 'error'); return; }
     await renderExecutiveOverview();
   });
 }
@@ -684,8 +691,8 @@ async function reviewDisb(disbId, amount, custName) {
   showConfirm('Mark as Reviewed', amount != null ? `Mark the ${fmt(amount)} withdrawal for ${custName || 'this customer'} as reviewed? This allows you to then approve it.` : 'Mark this withdrawal as reviewed? This allows you to then approve it.', async () => {
     showLoading('Updating…');
     const { data, error } = await db.rpc('mark_disbursement_reviewed', { p_disbursement_id: disbId });
-    if (error) { hideLoading(); alert('Review failed: ' + error.message); return; }
-    if (data === false) { hideLoading(); alert('Could not review — already reviewed or not found.'); return; }
+    if (error) { hideLoading(); showAdminAlert('Failed', 'Review failed: ' + error.message, 'error'); return; }
+    if (data === false) { hideLoading(); showAdminAlert('Failed', 'Could not review — already reviewed or not found.', 'error'); return; }
     await audit('review', `Admin marked withdrawal ${disbId} as reviewed`);
     hideLoading();
     await renderOverview();
@@ -698,8 +705,8 @@ async function approveDisb(disbId, amount, custName) {
   showConfirm('Approve Withdrawal', amount != null ? `Confirm payout of ${fmt(amount)} to ${custName || 'this customer'}? The balance will be deducted immediately and the representative will deliver cash.` : 'Approve this withdrawal? The balance will be deducted immediately and the representative will deliver cash to the customer.', async () => {
     showLoading('Approving…');
     const { data, error } = await db.rpc('approve_disbursement', { p_disbursement_id: disbId });
-    if (error) { hideLoading(); alert('Approval failed: ' + error.message); return; }
-    if (data?.ok === false) { hideLoading(); alert('Approval failed: ' + (data.error || 'Unknown error')); return; }
+    if (error) { hideLoading(); showAdminAlert('Failed', 'Approval failed: ' + error.message, 'error'); return; }
+    if (data?.ok === false) { hideLoading(); showAdminAlert('Failed', 'Approval failed: ' + (data.error || 'Unknown error'), 'error'); return; }
     // NOTE: no audit() call here — approve_disbursement RPC already writes
     // its own audit_log entry server-side. A second call here would duplicate it.
     hideLoading();
@@ -719,7 +726,7 @@ async function rejectDisb(disbId, amount, custName) {
       .update({ status: 'rejected' })
       .eq('id', disbId)
       .in('status', ['pending', 'reviewed']);
-    if (error) { hideLoading(); alert('Reject failed: ' + error.message); return; }
+    if (error) { hideLoading(); showAdminAlert('Failed', 'Reject failed: ' + error.message, 'error'); return; }
     await audit('reject', `Admin rejected withdrawal ${disbId}`);
     hideLoading();
     await renderOverview();
@@ -812,8 +819,8 @@ async function confirmTransfer(transferId, amount, accountName) {
     showLoading('Confirming…');
     const { data, error } = await db.rpc('confirm_pending_transfer', { p_transfer_id: transferId });
     hideLoading();
-    if (error) { alert('Confirmation failed: ' + error.message); return; }
-    if (data?.ok === false) { alert('Confirmation failed: ' + (data.error || 'Unknown error')); return; }
+    if (error) { showAdminAlert('Failed', 'Confirmation failed: ' + error.message, 'error'); return; }
+    if (data?.ok === false) { showAdminAlert('Failed', 'Confirmation failed: ' + (data.error || 'Unknown error'), 'error'); return; }
     await renderTransfersPage();
     await updateBadges();
     if (typeof renderExecutiveOverview === 'function') await renderExecutiveOverview();
@@ -825,8 +832,8 @@ async function rejectTransfer(transferId, amount, accountName) {
     showLoading('Rejecting…');
     const { data, error } = await db.rpc('reject_pending_transfer', { p_transfer_id: transferId, p_reason: null });
     hideLoading();
-    if (error) { alert('Reject failed: ' + error.message); return; }
-    if (data?.ok === false) { alert('Reject failed: ' + (data.error || 'Unknown error')); return; }
+    if (error) { showAdminAlert('Failed', 'Reject failed: ' + error.message, 'error'); return; }
+    if (data?.ok === false) { showAdminAlert('Failed', 'Reject failed: ' + (data.error || 'Unknown error'), 'error'); return; }
     await renderTransfersPage();
     await updateBadges();
     if (typeof renderExecutiveOverview === 'function') await renderExecutiveOverview();
@@ -880,7 +887,7 @@ function filterCustomersPage() {
 }
 
 function showMigrationAlert(table) {
-  alert('Database Setup Required\n\nThe \'status\' column is missing from your \'' + table + '\' table.\n\nTo fix this, go to:\nSupabase Dashboard → SQL Editor → New Query\n\nThen paste and run this SQL:\n\n' + `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';` + '\n\nAfter running it, refresh this page and try again.');
+  showAdminAlert('Database Setup Required', 'The \'status\' column is missing from your \'' + table + '\' table.\n\nTo fix this, go to Supabase Dashboard → SQL Editor → New Query, then paste and run this SQL:\n\n' + `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';` + '\n\nAfter running it, refresh this page and try again.', 'error');
 }
 
 async function suspendCustomer(id, name) {
@@ -889,7 +896,7 @@ async function suspendCustomer(id, name) {
   if (error) {
     hideLoading();
     if (error.message && error.message.includes('status')) showMigrationAlert('customers');
-    else alert('Error: ' + error.message);
+    else showAdminAlert('Error', error.message, 'error');
     return;
   }
   await audit('flag', `Admin suspended customer ${name} (${id})`);
@@ -904,7 +911,7 @@ async function restoreCustomer(id, name) {
   if (error) {
     hideLoading();
     if (error.message && error.message.includes('status')) showMigrationAlert('customers');
-    else alert('Error: ' + error.message);
+    else showAdminAlert('Error', error.message, 'error');
     return;
   }
   await audit('flag', `Admin restored customer ${name} (${id})`);
@@ -943,37 +950,38 @@ async function deleteCustomer(id, name) {
   const { data: custRow } = await db.from('customers').select('status').eq('id', id).single();
   if (!custRow || custRow.status !== 'suspended') {
     hideLoading();
-    alert(`Cannot delete ${name} — the account must be suspended before it can be permanently deleted.`);
+    showAdminAlert('Cannot Delete', `${name} — the account must be suspended before it can be permanently deleted.`, 'error');
     return;
   }
   const { data: balRows } = await db.from('plan_balances').select('balance').eq('customer_id', id);
   const totalBal = (balRows || []).reduce((s, r) => s + Number(r.balance), 0);
   hideLoading();
   if (totalBal > 0) {
-    alert(`Cannot delete ${name} — they still have ${fmt(totalBal)} in their plans.\nResolve the balance first.`);
+    showAdminAlert('Cannot Delete', `${name} still has ${fmt(totalBal)} in their plans.\nResolve the balance first.`, 'error');
     return;
   }
-  if (!confirm(`Permanently delete ${name}? This cannot be undone.`)) return;
-  showLoading('Deleting…');
-  const { data: custAuthRow } = await db.from('customers').select('auth_user_id').eq('id', id).single();
-  // Fix: transactions/disbursements already snapshot the customer's name
-  // at the moment they were created (see sql/002) — so overwriting the
-  // name here no longer erases it from historical/transactional records,
-  // receipts, or the audit log. Only this LIVE profile becomes [DELETED].
-  // Fix: also anonymize email — it was left untouched before, so its
-  // UNIQUE constraint permanently blocked ever re-registering this same
-  // phone number again (a new signup generates the same deterministic
-  // synthetic email for that phone, colliding with this old row's).
-  await db.from('customers').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id, email: 'del_' + id + '@wagthrift.retired' }).eq('id', id);
-  // Fix: also delete the orphaned Auth account (never removed before),
-  // which used to permanently block this phone number from ever being
-  // reused — signUp() would fail with Supabase's own "User already
-  // registered" error with no visible link back to this deletion.
-  const deleteAuthResult = await deleteAuthAccount(custAuthRow?.auth_user_id);
-  await audit('delete', `Admin permanently deleted customer ${name} (${id})`);
-  hideLoading();
-  if (!deleteAuthResult.ok) alert(`${name} was deleted, but their phone number may not be reusable yet (${deleteAuthResult.error || 'could not reach the server'}). Contact your developer if re-registering this phone number fails.`);
-  await renderCustomersPage();
+  showConfirm('Delete Customer', `Permanently delete ${name}? This cannot be undone.`, async () => {
+    showLoading('Deleting…');
+    const { data: custAuthRow } = await db.from('customers').select('auth_user_id').eq('id', id).single();
+    // Fix: transactions/disbursements already snapshot the customer's name
+    // at the moment they were created (see sql/002) — so overwriting the
+    // name here no longer erases it from historical/transactional records,
+    // receipts, or the audit log. Only this LIVE profile becomes [DELETED].
+    // Fix: also anonymize email — it was left untouched before, so its
+    // UNIQUE constraint permanently blocked ever re-registering this same
+    // phone number again (a new signup generates the same deterministic
+    // synthetic email for that phone, colliding with this old row's).
+    await db.from('customers').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id, email: 'del_' + id + '@wagthrift.retired' }).eq('id', id);
+    // Fix: also delete the orphaned Auth account (never removed before),
+    // which used to permanently block this phone number from ever being
+    // reused — signUp() would fail with Supabase's own "User already
+    // registered" error with no visible link back to this deletion.
+    const deleteAuthResult = await deleteAuthAccount(custAuthRow?.auth_user_id);
+    await audit('delete', `Admin permanently deleted customer ${name} (${id})`);
+    hideLoading();
+    if (!deleteAuthResult.ok) showAdminAlert('Partially Deleted', `${name} was deleted, but their phone number may not be reusable yet (${deleteAuthResult.error || 'could not reach the server'}). Contact your developer if re-registering this phone number fails.`, 'error');
+    await renderCustomersPage();
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -1023,7 +1031,7 @@ async function suspendAgent(id, name) {
   if (error) {
     hideLoading();
     if (error.message && error.message.includes('status')) showMigrationAlert('representatives');
-    else alert('Error: ' + error.message);
+    else showAdminAlert('Error', error.message, 'error');
     return;
   }
   await audit('flag', `Admin suspended agent ${name} (${id})`);
@@ -1037,7 +1045,7 @@ async function restoreAgent(id, name) {
   if (error) {
     hideLoading();
     if (error.message && error.message.includes('status')) showMigrationAlert('representatives');
-    else alert('Error: ' + error.message);
+    else showAdminAlert('Error', error.message, 'error');
     return;
   }
   await audit('flag', `Admin restored agent ${name} (${id})`);
@@ -1050,25 +1058,26 @@ async function deleteAgent(id, name) {
   const { data: repRow } = await db.from('representatives').select('status').eq('id', id).single();
   hideLoading();
   if (!repRow || repRow.status !== 'suspended') {
-    alert(`Cannot delete ${name} — the account must be suspended before it can be permanently deleted.`);
+    showAdminAlert('Cannot Delete', `${name} — the account must be suspended before it can be permanently deleted.`, 'error');
     return;
   }
-  if (!confirm(`Permanently delete agent ${name}? This cannot be undone.`)) return;
-  showLoading('Deleting…');
-  const { data: repAuthRow } = await db.from('representatives').select('auth_user_id').eq('id', id).single();
-  // Fix: transactions already snapshot the agent's name at the moment
-  // they were created (see sql/002), so this no longer erases the agent's
-  // name from historical/transactional records or the audit log.
-  // Fix: also anonymize email — same reasoning as deleteCustomer() above.
-  await db.from('representatives').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id, email: 'del_' + id + '@wagthrift.retired' }).eq('id', id);
-  // Fix: also delete the orphaned Auth account — see deleteAuthAccount()
-  // above and handleDeleteAuthAccount in wag-api/worker.js for why this
-  // couldn't be done client-side and why it used to block phone reuse.
-  const deleteAuthResult = await deleteAuthAccount(repAuthRow?.auth_user_id);
-  await audit('delete', `Admin permanently deleted agent ${name} (${id})`);
-  hideLoading();
-  if (!deleteAuthResult.ok) alert(`${name} was deleted, but their phone number may not be reusable yet (${deleteAuthResult.error || 'could not reach the server'}). Contact your developer if re-registering this phone number fails.`);
-  await renderAgentsPage();
+  showConfirm('Delete Agent', `Permanently delete agent ${name}? This cannot be undone.`, async () => {
+    showLoading('Deleting…');
+    const { data: repAuthRow } = await db.from('representatives').select('auth_user_id').eq('id', id).single();
+    // Fix: transactions already snapshot the agent's name at the moment
+    // they were created (see sql/002), so this no longer erases the agent's
+    // name from historical/transactional records or the audit log.
+    // Fix: also anonymize email — same reasoning as deleteCustomer() above.
+    await db.from('representatives').update({ status: 'deleted', first_name: '[DELETED]', last_name: '', phone: 'del_' + id, email: 'del_' + id + '@wagthrift.retired' }).eq('id', id);
+    // Fix: also delete the orphaned Auth account — see deleteAuthAccount()
+    // above and handleDeleteAuthAccount in wag-api/worker.js for why this
+    // couldn't be done client-side and why it used to block phone reuse.
+    const deleteAuthResult = await deleteAuthAccount(repAuthRow?.auth_user_id);
+    await audit('delete', `Admin permanently deleted agent ${name} (${id})`);
+    hideLoading();
+    if (!deleteAuthResult.ok) showAdminAlert('Partially Deleted', `${name} was deleted, but their phone number may not be reusable yet (${deleteAuthResult.error || 'could not reach the server'}). Contact your developer if re-registering this phone number fails.`, 'error');
+    await renderAgentsPage();
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -1271,7 +1280,7 @@ async function resolveFlag(id) {
   showLoading('Updating…');
   const { error } = await db.from('fraud_flags').update({ resolved: true }).eq('id', id);
   hideLoading();
-  if (error) { alert('Could not mark this flag as resolved: ' + error.message); return; }
+  if (error) { showAdminAlert('Failed', 'Could not mark this flag as resolved: ' + error.message, 'error'); return; }
   await renderFraudFlags();
   await renderAnalytics();
 }
@@ -1466,7 +1475,7 @@ async function start2FAEnrollment() {
   showLoading('Setting up…');
   const { data, error } = await db.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Authenticator App ' + Date.now() });
   hideLoading();
-  if (error) { alert('Could not start 2FA setup. Please try again.'); return; }
+  if (error) { showAdminAlert('Failed', 'Could not start 2FA setup. Please try again.', 'error'); return; }
 
   window._enrollFactorId = data.id;
   document.getElementById('mfaQrImg').src = data.totp.qr_code;
@@ -1494,17 +1503,18 @@ async function confirm2FAEnrollment() {
   closeModal('mfaEnrollModal');
   await audit('flag', 'Admin enabled two-factor authentication');
   await render2FASection();
-  alert('2FA is now turned on. You\'ll be asked for a code the next time you sign in.');
+  showAdminAlert('2FA Enabled', 'You\'ll be asked for a code the next time you sign in.', 'success');
 }
 
 async function disable2FA(factorId) {
-  if (!confirm('Turn off two-factor authentication? Your account will only be protected by your password.')) return;
-  showLoading('Turning off 2FA…');
-  const { error } = await db.auth.mfa.unenroll({ factorId });
-  hideLoading();
-  if (error) { alert('Could not turn off 2FA. Please try again.'); return; }
-  await audit('flag', 'Admin disabled two-factor authentication');
-  await render2FASection();
+  showConfirm('Turn Off 2FA', 'Turn off two-factor authentication? Your account will only be protected by your password.', async () => {
+    showLoading('Turning off 2FA…');
+    const { error } = await db.auth.mfa.unenroll({ factorId });
+    hideLoading();
+    if (error) { showAdminAlert('Failed', 'Could not turn off 2FA. Please try again.', 'error'); return; }
+    await audit('flag', 'Admin disabled two-factor authentication');
+    await render2FASection();
+  });
 }
 
 
@@ -1569,11 +1579,12 @@ async function addReportRecipient() {
 }
 
 async function removeReportRecipient(id, email) {
-  if (!confirm(`Stop sending reports to ${email}?`)) return;
-  showLoading('Removing…');
-  await db.from('report_recipients').delete().eq('id', id);
-  hideLoading();
-  await renderReportRecipients();
+  showConfirm('Remove Recipient', `Stop sending reports to ${email}?`, async () => {
+    showLoading('Removing…');
+    await db.from('report_recipients').delete().eq('id', id);
+    hideLoading();
+    await renderReportRecipients();
+  });
 }
 
 async function sendDigestNow(reportType) {
@@ -1605,22 +1616,23 @@ async function sendDigestNow(reportType) {
 
 
 async function deleteInactiveUsers() {
-  if (!confirm('Remove all customers with no plans and no transactions? This cannot be undone.')) return;
-  showLoading('Removing inactive users…');
-  const { data: custs } = await db.from('customers').select('id');
-  let removed = 0;
-  for (const c of (custs || [])) {
-    const { count: pc } = await db.from('plans').select('*', { count: 'exact', head: true }).eq('customer_id', c.id);
-    const { count: tc } = await db.from('transactions').select('*', { count: 'exact', head: true }).eq('customer_id', c.id);
-    if (!pc && !tc) {
-      await db.from('customers').update({ status: 'deleted' }).eq('id', c.id);
-      removed++;
+  showConfirm('Remove Inactive Users', 'Remove all customers with no plans and no transactions? This cannot be undone.', async () => {
+    showLoading('Removing inactive users…');
+    const { data: custs } = await db.from('customers').select('id');
+    let removed = 0;
+    for (const c of (custs || [])) {
+      const { count: pc } = await db.from('plans').select('*', { count: 'exact', head: true }).eq('customer_id', c.id);
+      const { count: tc } = await db.from('transactions').select('*', { count: 'exact', head: true }).eq('customer_id', c.id);
+      if (!pc && !tc) {
+        await db.from('customers').update({ status: 'deleted' }).eq('id', c.id);
+        removed++;
+      }
     }
-  }
-  await audit('delete', `Removed ${removed} inactive users`);
-  hideLoading();
-  alert(`Removed ${removed} inactive user(s)`);
-  await renderAnalytics();
+    await audit('delete', `Removed ${removed} inactive users`);
+    hideLoading();
+    showAdminAlert('Cleanup Complete', `Removed ${removed} inactive user(s)`, 'success');
+    await renderAnalytics();
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -1632,6 +1644,19 @@ function showConfirm(title, msg, onOk) {
   document.getElementById('confirmMsg').textContent = msg;
   confirmOkHandler = () => { closeModal('confirmModal'); onOk(); };
   showModal('confirmModal');
+}
+
+const ADMIN_ALERT_ICONS = {
+  success: '<svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:44px;height:44px;"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>',
+  error: '<svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:44px;height:44px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="#011f7b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:44px;height:44px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+};
+function showAdminAlert(title, msg, variant = 'info') {
+  const iconEl = document.getElementById('adminAlertIcon');
+  if (iconEl) iconEl.innerHTML = ADMIN_ALERT_ICONS[variant] || ADMIN_ALERT_ICONS.info;
+  const titleEl = document.getElementById('adminAlertTitle'); if (titleEl) titleEl.textContent = title;
+  const msgEl = document.getElementById('adminAlertMsg'); if (msgEl) msgEl.textContent = msg;
+  showModal('adminAlertModal');
 }
 
 // ═══════════════════════════════════════════════

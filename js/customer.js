@@ -161,19 +161,45 @@ async function _doCreatePlan() {
   }, 1200);
 }
 
+// ═══════════════════════════════════════════════
+// SMOOTH ALERT / CONFIRM (replaces native alert()/confirm())
+// Same pattern as representative.js — see comment there.
+// ═══════════════════════════════════════════════
+const CUST_ALERT_ICONS = {
+  success: '<svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:44px;height:44px;"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>',
+  error: '<svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:44px;height:44px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="#011f7b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:44px;height:44px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+};
+function showCustAlert(title, msg, variant = 'info') {
+  const iconEl = document.getElementById('custAlertIcon');
+  if (iconEl) iconEl.innerHTML = CUST_ALERT_ICONS[variant] || CUST_ALERT_ICONS.info;
+  const titleEl = document.getElementById('custAlertTitle'); if (titleEl) titleEl.textContent = title;
+  const msgEl = document.getElementById('custAlertMsg'); if (msgEl) msgEl.textContent = msg;
+  showModal('custAlertModal');
+}
+
+let custConfirmOkHandler = () => {};
+function showCustConfirm(title, msg, onOk) {
+  const titleEl = document.getElementById('custConfirmTitle'); if (titleEl) titleEl.textContent = title;
+  const msgEl = document.getElementById('custConfirmMsg'); if (msgEl) msgEl.textContent = msg;
+  custConfirmOkHandler = () => { closeModal('custConfirmModal'); onOk(); };
+  showModal('custConfirmModal');
+}
+
 async function closePlan() {
   if (!activePlanId) return;
   const { data: pb } = await db.from('plan_balances').select('balance,name').eq('plan_id', activePlanId).single();
   const bal = Number(pb?.balance || 0);
-  if (bal > 0) { alert('× Cannot close "' + pb.name + '"\n\nBalance remaining: ' + fmt(bal) + '\n\nPlease withdraw all your money first. Once your balance is ₦0.00, you can close this plan.'); return; }
-  if (!confirm('Close "' + pb.name + '"? This will make it inactive. You can reactivate later.')) return;
-  showLoading('Closing plan…');
-  const u = getUser();
-  await db.from('plans').update({ status: 'closed' }).eq('id', activePlanId);
-  await audit('plan', u.id, 'customer',
-    `${u.first_name} ${u.last_name} closed plan "${pb.name || ''}"`,
-    null, activePlanId);
-  hideLoading(); await renderCustDash();
+  if (bal > 0) { showCustAlert('Cannot Close Plan', `"${pb.name}" still has a balance of ${fmt(bal)}.\n\nPlease withdraw all your money first. Once your balance is ₦0.00, you can close this plan.`, 'error'); return; }
+  showCustConfirm('Close Plan', `Close "${pb.name}"? This will make it inactive. You can reactivate later.`, async () => {
+    showLoading('Closing plan…');
+    const u = getUser();
+    await db.from('plans').update({ status: 'closed' }).eq('id', activePlanId);
+    await audit('plan', u.id, 'customer',
+      `${u.first_name} ${u.last_name} closed plan "${pb.name || ''}"`,
+      null, activePlanId);
+    hideLoading(); await renderCustDash();
+  });
 }
 
 async function reactivatePlan() {
@@ -191,14 +217,15 @@ async function reactivatePlan() {
 async function permanentlyDeletePlan() {
   if (!activePlanId) return;
   const { data: pb } = await db.from('plan_balances').select('balance,name').eq('plan_id', activePlanId).single();
-  if (!confirm('PERMANENTLY delete "' + (pb?.name || '') + '"? This cannot be undone.')) return;
-  showLoading('Deleting…');
-  const u = getUser();
-  await db.from('plans').update({ status: 'deleted' }).eq('id', activePlanId);
-  await audit('plan', u.id, 'customer',
-    `${u.first_name} ${u.last_name} permanently deleted plan "${pb?.name || ''}"`,
-    null, activePlanId);
-  hideLoading(); activePlanId = null; await renderCustDash();
+  showCustConfirm('Delete Plan Permanently', `Permanently delete "${pb?.name || ''}"? This cannot be undone.`, async () => {
+    showLoading('Deleting…');
+    const u = getUser();
+    await db.from('plans').update({ status: 'deleted' }).eq('id', activePlanId);
+    await audit('plan', u.id, 'customer',
+      `${u.first_name} ${u.last_name} permanently deleted plan "${pb?.name || ''}"`,
+      null, activePlanId);
+    hideLoading(); activePlanId = null; await renderCustDash();
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -237,7 +264,7 @@ function openWithdrawalModal() { requirePayPin('Payment PIN', 'Enter your paymen
 async function _openWithdrawalModal() {
   const user = getUser();
   const { data: plans } = await db.from('plan_balances').select('*').eq('customer_id', user.id).eq('status', 'active').neq('status', 'deleted');
-  if (!plans?.length) { alert('No active plans to withdraw from'); return; }
+  if (!plans?.length) { showCustAlert('No Active Plans', 'You have no active plans to withdraw from', 'error'); return; }
   const sel = document.getElementById('wdPlan');
   sel.innerHTML = '<option value="">— Select plan —</option>';
   plans.forEach(p => sel.innerHTML += `<option value="${p.plan_id}">${p.name} (${fmt(p.balance)})</option>`);
@@ -274,7 +301,7 @@ async function _doWithdrawalRequest() {
   }
 }
 
-function milAct(act) { closeModal('milestoneModal'); if (act === 'payout') openWithdrawalModal(); else if (act === 'extend') alert('Contact your representative to extend the plan date.'); else if (act === 'increase') openNewPlanModal(); }
+function milAct(act) { closeModal('milestoneModal'); if (act === 'payout') openWithdrawalModal(); else if (act === 'extend') showCustAlert('Extend Plan', 'Contact your representative to extend the plan date.', 'info'); else if (act === 'increase') openNewPlanModal(); }
 
 // ═══════════════════════════════════════════════
 // PAYMENT PIN — generic verify-before-action (customer & representative)

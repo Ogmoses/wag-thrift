@@ -206,21 +206,22 @@ async function doLogin() {
     hideLoading();
     window.location.href = rootPath() + ROLE_HOME.customer;
   } else {
-    const rid = document.getElementById('loginRepId').value.trim(), pin = document.getElementById('loginRepPin').value.trim();
+    const rawPh = document.getElementById('loginRepPhone').value.trim(), pin = document.getElementById('loginRepPin').value.trim();
+    const normPh = normPhone(rawPh);
     showLoading('Signing in…');
 
-    const { data: emailResult, error: emailErr } = await db.rpc('get_login_email_for_rep_id', { p_rep_id: rid });
+    const { data: emailResult, error: emailErr } = await db.rpc('get_login_email_for_rep_phone', { p_phone: normPh });
     if (!emailResult) {
       hideLoading();
       if (isConnectivityError(emailErr)) { setMsg('loginRepMsg', '<div class="msg-err">No connection right now. Please check your signal and try again.</div>'); return; }
-      setMsg('loginRepMsg', '<div class="msg-err">Invalid Agent ID or password</div>'); return;
+      setMsg('loginRepMsg', '<div class="msg-err">Invalid phone number or password</div>'); return;
     }
 
     const { data: authData, error: authErr } = await db.auth.signInWithPassword({ email: emailResult, password: pin });
     if (authErr || !authData?.session) {
       hideLoading();
       if (isConnectivityError(authErr)) { setMsg('loginRepMsg', '<div class="msg-err">No connection right now. Please check your signal and try again.</div>'); return; }
-      setMsg('loginRepMsg', '<div class="msg-err">Invalid Agent ID or password</div>'); return;
+      setMsg('loginRepMsg', '<div class="msg-err">Invalid phone number or password</div>'); return;
     }
 
     // Save remember-me preference BEFORE refreshUserProfile (which calls
