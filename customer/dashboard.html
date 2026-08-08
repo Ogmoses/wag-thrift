@@ -118,6 +118,28 @@ body.dark .cal-nav-btn{background:#2a2a2a!important;color:#f0f0f0!important;}
 
 <div id="milestoneModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('milestoneModal')">×</button><div class="m-handle"></div><div class="mile-body"><div class="mile-ico"></div><div class="mile-title" id="mileTitle">Plan Complete!</div><div class="mile-msg" id="mileMsg">Your savings plan has reached its target.</div><div style="display:flex;flex-direction:column;gap:9px;"><button class="btn btn-blue" onclick="milAct('payout')">Request Withdrawal</button><button class="btn btn-outline" onclick="milAct('extend')">Extend Target Date</button><button class="btn btn-outline" onclick="milAct('increase')">Start New Plan</button></div></div></div></div>
 
+<div id="custAlertModal" class="modal">
+ <div class="msheet" style="max-width:420px;position:relative;text-align:center;">
+ <div class="m-handle"></div>
+ <div id="custAlertIcon" style="margin:4px auto 12px;"></div>
+ <div class="m-title" id="custAlertTitle" style="text-align:center;">Notice</div>
+ <p style="color:var(--sub);font-size:13px;margin-bottom:18px;white-space:pre-line;" id="custAlertMsg"></p>
+ <button class="btn btn-blue" onclick="closeModal('custAlertModal')">OK</button>
+ </div>
+</div>
+
+<div id="custConfirmModal" class="modal">
+ <div class="msheet" style="max-width:420px;position:relative;">
+ <button class="m-close" onclick="closeModal('custConfirmModal')">×</button>
+ <div class="m-title" id="custConfirmTitle">Confirm Action</div>
+ <p style="color:var(--sub);font-size:13px;margin-bottom:18px;" id="custConfirmMsg">Are you sure?</p>
+ <div style="display:flex;gap:9px;">
+  <button class="btn btn-ghost" onclick="closeModal('custConfirmModal')" style="flex:1;justify-content:center;">Cancel</button>
+  <button class="btn btn-blue" style="flex:1;justify-content:center;" onclick="custConfirmOkHandler()">Yes, Confirm</button>
+ </div>
+ </div>
+</div>
+
 <div id="payPinModal" class="modal">
  <div class="msheet" style="max-width:480px;position:relative;">
  <button class="m-close" onclick="closeModal('payPinModal')">×</button>
