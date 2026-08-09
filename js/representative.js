@@ -710,11 +710,10 @@ async function _doAgentCreateCustomer() {
   if (!dbReady()) return;
   const rawPhone = document.getElementById('acPhone')?.value?.trim() || '';
   const firstName = document.getElementById('acFirstName')?.value?.trim() || '';
-  const lastName = document.getElementById('acLastName')?.value?.trim() || '';
   const pin = document.getElementById('acPin')?.value?.trim() || '';
   setMsg('acMsg', '');
 
-  if (!rawPhone || !firstName || !pin) { setMsg('acMsg', '<div class="msg-err">Please fill in phone number, first name, and PIN</div>'); return; }
+  if (!rawPhone || !firstName || !pin) { setMsg('acMsg', '<div class="msg-err">Please fill in phone number, name, and PIN</div>'); return; }
   if (!/^\d{4}$/.test(pin)) { setMsg('acMsg', '<div class="msg-err">PIN must be exactly 4 digits</div>'); return; }
 
   const normPh = normPhone(rawPhone);
@@ -753,7 +752,7 @@ async function _doAgentCreateCustomer() {
 
   const { data: regResult, error: regErr } = await db.rpc('complete_customer_registration', {
     p_auth_user_id: signUpData.user.id,
-    p_first_name: firstName, p_last_name: lastName,
+    p_first_name: firstName, p_last_name: '',
     p_email: agentSyntheticEmail(normPh), p_phone: normPh,
     p_address: 'Registered by field agent (no address on file)'
   });
@@ -768,13 +767,12 @@ async function _doAgentCreateCustomer() {
   }
 
   const rep = getUser();
-  const fullName = lastName ? `${firstName} ${lastName}` : firstName;
-  await audit('login', rep?.id || 'unknown', 'representative', `Agent ${rep?.first_name || ''} ${rep?.last_name || ''} registered new customer on the spot: ${fullName} (${normPh})`);
+  await audit('login', rep?.id || 'unknown', 'representative', `Agent ${rep?.first_name || ''} ${rep?.last_name || ''} registered new customer on the spot: ${firstName} (${normPh})`);
 
   closeModal('agentCreateCustomerModal');
-  ['acPhone', 'acFirstName', 'acLastName', 'acPin'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  ['acPhone', 'acFirstName', 'acPin'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   setMsg('acMsg', '');
-  showRepAlert('Customer Account Created', `Name: ${fullName}\nPhone: ${normPh}\nPIN: ${pin}\n\nThey can sign in now using their phone number and this PIN. Give them a Savings Plan next from Customer Search.`, 'success');
+  showRepAlert('Customer Account Created', `Name: ${firstName}\nPhone: ${normPh}\nPIN: ${pin}\n\nThey can sign in now using their phone number and this PIN. Give them a Savings Plan next from Customer Search.`, 'success');
 }
 
 // ═══════════════════════════════════════════════
