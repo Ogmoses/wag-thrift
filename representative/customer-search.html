@@ -37,9 +37,6 @@
  <div class="search-card-title">Search Customer</div>
  <div class="search-row"><input type="tel" id="repSearchInp" class="search-inp" placeholder="e.g. 09012345678" maxlength="11"><button class="search-btn" onclick="repDoSearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:inline-block;vertical-align:middle;margin-right:4px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Search</button></div>
  <div id="repSearchMsg"></div>
- <div style="margin-top:10px;">
- <button type="button" onclick="showModal('agentCreateCustomerModal')" class="btn btn-blue" style="display:flex;align-items:center;justify-content:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>Add New Customer</button>
- </div>
  </div>
  <div id="repCustCard" style="display:none;">
  <div class="cust-result-card">
@@ -68,6 +65,10 @@
    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
    Search
   </button>
+  <button class="bnav-tab" onclick="window.location.href='manage-customer.html'">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+   Manage
+  </button>
   <button class="bnav-tab" onclick="window.location.href='settings.html'">
    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
    Profile
@@ -85,21 +86,6 @@
 </div><div class="mform-group"><label class="form-lbl">Payment Method</label><select id="colMethod" class="form-inp" onchange="onColMethodChange()"><option value="">Select method</option><option value="Cash">Cash</option><option value="Bank Transfer">Bank Transfer</option></select></div><div class="mform-group"><label class="form-lbl" id="colNotesLbl">Notes (Optional)</label><textarea id="colNotes" class="form-inp" style="resize:vertical;min-height:55px;"></textarea><div id="colNotesHint" style="display:none;font-size:11px;color:var(--orange);margin-top:4px;">Required for bank transfers — enter the account name on the transfer so the admin can match it against the bank statement.</div></div><div id="colMsg"></div><button class="btn" style="background:var(--green);color:#fff;margin-top:8px;box-shadow:0 3px 10px rgba(5,150,105,.25);" onclick="doCollection()">Confirm Deposit</button></div></div>
 
 <div id="receiptModal" class="modal"><div class="msheet" style="max-width:480px;position:relative;"><button class="m-close" onclick="closeModal('receiptModal')">×</button><div class="m-handle"></div><div class="m-title">Deposit Receipt</div><div id="receiptContent"></div><button class="btn btn-outline" style="margin-top:6px;" onclick="shareReceipt()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:6px;"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>Share / Save Receipt</button><button class="btn btn-blue" onclick="closeModal('receiptModal')" style="margin-top:6px;">Done</button></div></div>
-
-<div id="agentCreateCustomerModal" class="modal">
- <div class="msheet" style="max-width:480px;position:relative;">
- <button class="m-close" onclick="closeModal('agentCreateCustomerModal')">×</button>
- <div class="m-handle"></div>
- <div class="m-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;color:var(--blue);"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>Add New Customer</div>
- <p style="color:var(--sub);font-size:13px;margin-bottom:14px;">Sign this customer up on the spot — no email or verification code needed. They'll sign in later with just their phone number and PIN.</p>
- <div class="mform-group"><label class="form-lbl">Customer Phone Number</label><input type="tel" id="acPhone" class="form-inp" placeholder="e.g. 08012345678" maxlength="11" inputmode="numeric"></div>
- <div class="mform-group"><label class="form-lbl">First Name</label><input type="text" id="acFirstName" class="form-inp" placeholder="e.g. Ngozi"></div>
- <div class="mform-group"><label class="form-lbl">Surname / Stall Name (Optional)</label><input type="text" id="acLastName" class="form-inp" placeholder="e.g. Okafor or Stall 14"></div>
- <div class="mform-group"><label class="form-lbl">4-Digit PIN</label><div class="pin-wrap"><input type="password" id="acPin" class="form-inp" placeholder="····" maxlength="4" inputmode="numeric" style="font-size:20px;letter-spacing:6px;"><button type="button" class="pw-eye" onclick="togglePw('acPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
- <div id="acMsg"></div>
- <button class="btn btn-blue" style="margin-top:8px;" onclick="doAgentCreateCustomer()">Create Customer Account</button>
- </div>
-</div>
 
 <div id="repAlertModal" class="modal">
  <div class="msheet" style="max-width:420px;position:relative;text-align:center;">
@@ -144,12 +130,6 @@ verifyRoleFromDB('representative').then(valid => {
   startSuspendCheck();
   enforceRepPaymentPinSetup();
 });
-
-// Lets the dashboard's "+ New Customer" quick-action link straight to this
-// modal (customer-search.html?new=1) without duplicating the modal markup.
-if (new URLSearchParams(window.location.search).get('new') === '1') {
-  showModal('agentCreateCustomerModal');
-}
 </script>
 </body>
 </html>
