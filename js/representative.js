@@ -344,6 +344,177 @@ function showRepConfirm(title, msg, onOk) {
   showModal('repConfirmModal');
 }
 
+// ═══════════════════════════════════════════════
+// ASSIST EXISTING CUSTOMER (representative/manage-customer.html)
+// For a customer who can't access their own account. The customer must
+// be physically present and provide their own PIN — every action below
+// sends it fresh and it's re-verified server-side on every single call
+// (see sql/rep-assisted-customer-actions.sql), never a one-time
+// "unlock" that then gets trusted. Deliberately a SEPARATE state
+// namespace (_assist* vars, not repFoundCust/repSelectedPlan) so this
+// never collides with the main Customer Search flow if both happen to
+// be loaded.
+// ═══════════════════════════════════════════════
+let _assistCust = null;
+let _assistPlans = [];
+
+// Refreshes plan balances after an action, WITHOUT logging a fake extra
+// "searched for customer" audit entry — reuses the same silent
+// rep_refresh_customer() RPC the main Customer Search flow already uses
+// for this exact reason (see repRefreshCustomer() above).
+async function assistRefreshCustomer() {
+  if (!dbReady() || !_assistCust?.id) return;
+  const { data: result, error } = await db.rpc('rep_refresh_customer', { p_customer_id: _assistCust.id });
+  if (error || result?.ok === false) return;
+  _assistCust = result.customer;
+  _assistPlans = result.plans || [];
+  renderAssistCustCard();
+}
+
+async function assistLookupCustomer() {
+  if (!dbReady()) return;
+  const raw = document.getElementById('assistSearchInp')?.value?.trim();
+  setMsg('assistSearchMsg', '');
+  if (!raw) { setMsg('assistSearchMsg', '<div class="msg-err">Enter a phone number</div>'); return; }
+  showLoading('Looking up customer…');
+  const normPh = normPhone(raw);
+  const { data: result, error } = await db.rpc('rep_search_customer', { p_phone: normPh });
+  hideLoading();
+  if (error || result?.ok === false) {
+    setMsg('assistSearchMsg', `<div class="msg-err">${result?.error || error?.message || 'Customer not found'}</div>`);
+    document.getElementById('assistCustCard').style.display = 'none';
+    return;
+  }
+  _assistCust = result.customer;
+  _assistPlans = result.plans || [];
+  renderAssistCustCard();
+}
+
+function renderAssistCustCard() {
+  const el = document.getElementById('assistCustCard');
+  if (!el || !_assistCust) return;
+  const c = _assistCust;
+  const planOpts = _assistPlans.map(p => `<option value="${p.plan_id}" data-bal="${p.balance}">${p.name || 'Plan'} — ${fmt(p.balance)}</option>`).join('');
+
+  el.style.display = 'block';
+  el.innerHTML = `
+   <div class="search-card">
+    <div style="font-weight:700;font-size:15px;">${c.first_name || ''} ${c.last_name || ''}</div>
+    <div style="color:var(--sub);font-size:12px;margin-bottom:14px;">${(c.phone || '').replace('+234', '0')}</div>
+
+    <div class="mform-group"><label class="form-lbl">Customer's PIN</label>
+     <div class="pin-wrap"><input type="password" id="assistPin" class="form-inp" placeholder="Customer enters their own PIN" maxlength="6" inputmode="numeric"><button type="button" class="pw-eye" onclick="togglePw('assistPin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;display:inline-block;vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+    </div>
+
+    <div class="mform-group"><label class="form-lbl">Plan</label>
+     <select id="assistPlanDd" class="form-inp"><option value="">— Select a plan —</option>${planOpts}</select>
+    </div>
+
+    <div id="assistActionMsg"></div>
+
+    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
+     <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Withdraw</div>
+     <div style="display:flex;gap:8px;">
+      <input type="number" id="assistWdAmt" class="form-inp" placeholder="Amount" min="1" style="flex:1;">
+      <button class="btn btn-blue" style="width:auto;padding:0 16px;" onclick="assistDoWithdraw()">Withdraw</button>
+     </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
+     <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Create New Plan</div>
+     <input type="text" id="assistPlanName" class="form-inp" placeholder="Plan name, e.g. Shop Savings" style="margin-bottom:8px;">
+     <div style="display:flex;gap:8px;">
+      <input type="number" id="assistPlanContrib" class="form-inp" placeholder="Daily contribution (₦)" min="1" style="flex:1;">
+      <button class="btn btn-blue" style="width:auto;padding:0 16px;" onclick="assistDoCreatePlan()">Create</button>
+     </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
+     <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Close Selected Plan</div>
+     <p style="color:var(--sub);font-size:11.5px;margin-bottom:8px;">Plan must have a ₦0.00 balance — withdraw first if needed.</p>
+     <button class="btn" style="background:var(--red);color:#fff;" onclick="assistDoClosePlan()">Close Selected Plan</button>
+    </div>
+   </div>`;
+}
+
+function assistGetPin() {
+  const pinEl = document.getElementById('assistPin');
+  const pin = pinEl?.value?.trim() || '';
+  if (!/^\d{4,6}$/.test(pin)) { setMsg('assistActionMsg', '<div class="msg-err">Enter the customer\'s 4–6 digit PIN first</div>'); return null; }
+  return pin;
+}
+
+async function assistDoWithdraw() {
+  const pin = assistGetPin(); if (!pin) return;
+  const planDd = document.getElementById('assistPlanDd');
+  const planId = planDd?.value;
+  const amt = +document.getElementById('assistWdAmt')?.value;
+  setMsg('assistActionMsg', '');
+  if (!planId) { setMsg('assistActionMsg', '<div class="msg-err">Select a plan</div>'); return; }
+  if (!amt || amt <= 0) { setMsg('assistActionMsg', '<div class="msg-err">Enter a valid amount</div>'); return; }
+  const custName = `${_assistCust.first_name || ''} ${_assistCust.last_name || ''}`.trim();
+
+  showRepConfirm('Confirm Withdrawal', `Submit a withdrawal request of ${fmt(amt)} for ${custName}? The customer's PIN will be verified.`, async () => {
+    showLoading('Submitting…');
+    const pinHash = await hashPin(pin);
+    const ref = 'WD-' + Math.random().toString(36).slice(2, 10).toUpperCase();
+    const { data: result, error } = await db.rpc('rep_request_withdrawal_for_customer', {
+      p_customer_id: _assistCust.id, p_plan_id: planId, p_amount: amt,
+      p_reason: 'Requested by field agent on behalf of customer', p_ref: ref, p_pin_hash: pinHash,
+    });
+    hideLoading();
+    if (error || result?.ok === false) { setMsg('assistActionMsg', `<div class="msg-err">${result?.error || error?.message || 'Withdrawal failed'}</div>`); return; }
+    document.getElementById('assistWdAmt').value = '';
+    showRepAlert('Withdrawal Submitted', `${fmt(amt)} withdrawal request submitted for ${custName}. Ref: ${ref}`, 'success');
+    await assistRefreshCustomer();
+  });
+}
+
+async function assistDoCreatePlan() {
+  const pin = assistGetPin(); if (!pin) return;
+  const name = document.getElementById('assistPlanName')?.value?.trim();
+  const contrib = +document.getElementById('assistPlanContrib')?.value;
+  setMsg('assistActionMsg', '');
+  if (!name) { setMsg('assistActionMsg', '<div class="msg-err">Enter a plan name</div>'); return; }
+  if (!contrib || contrib <= 0) { setMsg('assistActionMsg', '<div class="msg-err">Enter a valid daily contribution</div>'); return; }
+  const custName = `${_assistCust.first_name || ''} ${_assistCust.last_name || ''}`.trim();
+
+  showRepConfirm('Create New Plan', `Create "${name}" (Daily ${fmt(contrib)}) for ${custName}? The customer's PIN will be verified.`, async () => {
+    showLoading('Creating plan…');
+    const pinHash = await hashPin(pin);
+    const { data: result, error } = await db.rpc('rep_create_plan_for_customer', {
+      p_customer_id: _assistCust.id, p_name: name, p_contribution: contrib, p_pin_hash: pinHash,
+    });
+    hideLoading();
+    if (error || result?.ok === false) { setMsg('assistActionMsg', `<div class="msg-err">${result?.error || error?.message || 'Could not create plan'}</div>`); return; }
+    document.getElementById('assistPlanName').value = ''; document.getElementById('assistPlanContrib').value = '';
+    showRepAlert('Plan Created', `"${name}" created for ${custName}.`, 'success');
+    await assistRefreshCustomer();
+  });
+}
+
+async function assistDoClosePlan() {
+  const pin = assistGetPin(); if (!pin) return;
+  const planDd = document.getElementById('assistPlanDd');
+  const planId = planDd?.value;
+  const planLabel = planDd?.options[planDd.selectedIndex]?.text || 'this plan';
+  setMsg('assistActionMsg', '');
+  if (!planId) { setMsg('assistActionMsg', '<div class="msg-err">Select a plan</div>'); return; }
+  const custName = `${_assistCust.first_name || ''} ${_assistCust.last_name || ''}`.trim();
+
+  showRepConfirm('Close Plan', `Close "${planLabel}" for ${custName}? The customer's PIN will be verified.`, async () => {
+    showLoading('Closing plan…');
+    const pinHash = await hashPin(pin);
+    const { data: result, error } = await db.rpc('rep_close_plan_for_customer', {
+      p_customer_id: _assistCust.id, p_plan_id: planId, p_pin_hash: pinHash,
+    });
+    hideLoading();
+    if (error || result?.ok === false) { setMsg('assistActionMsg', `<div class="msg-err">${result?.error || error?.message || 'Could not close plan'}</div>`); return; }
+    showRepAlert('Plan Closed', `Closed for ${custName}.`, 'success');
+    await assistRefreshCustomer();
+  });
+}
+
 function openCollectModal() {
   if (!repFoundCust) { showRepAlert('Hold on', 'Search for a customer first', 'error'); return; }
   if (!repSelectedPlan) { showRepAlert('Hold on', 'Please select a plan first', 'error'); return; }
