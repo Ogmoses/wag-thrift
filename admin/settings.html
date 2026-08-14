@@ -81,8 +81,9 @@
         <div class="section-card">
           <div class="section-card-title">Email Reports</div>
           <div style="font-size:12px;color:var(--sub);margin-bottom:12px;">
-            Get a simple daily and weekly email showing new sign-ups, money coming in and going out,
-            and anything an admin has changed. Add anyone's email below to include them — remove them any time.
+            Get the Daily Cumulative Logbook — a landscape grid of every active customer's
+            daily rate, carryover, and running slot total for the month — automatically
+            Monday through Friday at 9:00 PM WAT. Add anyone's email below to include them — remove them any time.
           </div>
           <div id="reportRecipientsList"><div class="empty-state">Loading…</div></div>
           <div class="settings-group" style="margin-top:14px;">
@@ -101,8 +102,7 @@
               Need it right now instead of waiting for the scheduled send? Send it manually below.
             </div>
             <div id="sendNowMsg"></div>
-            <button class="btn btn-outline" onclick="sendDigestNow('daily')" style="margin-top:4px;">Send Today's Summary Now</button>
-            <button class="btn btn-outline" onclick="sendDigestNow('weekly')">Send This Week's Rollup Now</button>
+            <button class="btn btn-outline" onclick="sendDigestNow()" style="margin-top:4px;">Send Cumulative Logbook Now</button>
           </div>
         </div>
 
