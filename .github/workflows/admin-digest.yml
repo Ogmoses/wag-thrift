@@ -1,36 +1,27 @@
-name: Admin Activity Digest
+name: Cumulative Logbook Report
 
-# Daily summary Tuesday through Friday at 7 AM WAT (Nigeria), plus a
-# weekly rollup every Monday at 7:30 AM WAT — no daily report on Monday
-# (Monday gets the weekly instead) or on Saturday/Sunday, since the
-# organization only operates Monday–Friday. Both can also be triggered
-# manually from the Actions tab for testing — pick "daily" or "weekly"
-# from the dropdown.
+# Cumulative Monthly Customer Ledger Grid, Monday through Friday at 9:00 PM
+# WAT (West Africa Time, UTC+1) — no report on Saturday/Sunday, since the
+# organization only operates Monday-Friday. Replaces the old separate
+# daily/weekly Cash Report schedule: there's now a single report type, so
+# there's a single schedule.
 #
-# NOTE on timing: these are deliberately NOT scheduled on the exact hour
-# (e.g. "0 6" or "30 6"). GitHub's own docs warn that scheduled workflows
-# "may be delayed during periods of high load," and load spikes hardest
-# at the top and half of every hour, since that's when most other repos'
-# cron jobs also fire. Off-the-hour minutes reduce how often a run gets
-# queued behind that pile-up. This is a mitigation, not a guarantee —
-# GitHub Actions cron has no exact-time SLA. If delivery time needs to be
-# reliable to the minute, this needs to move to a real scheduler (e.g. a
-# Cloudflare Cron Trigger calling the existing /api/send-digest-now
-# endpoint) instead of GitHub Actions.
+# 20:00 UTC = 21:00 WAT exactly (no DST in Nigeria, so this offset never
+# drifts). Can also be triggered manually from the Actions tab for testing.
+#
+# NOTE on timing: GitHub's own docs warn that scheduled workflows "may be
+# delayed during periods of high load," worst right at the top of the
+# hour, since that's when most other repos' cron jobs also fire. This is
+# scheduled exactly on the hour anyway because the business asked for a
+# specific, quotable send time (9:00 PM WAT) rather than day-level
+# freshness — if delivery time needs to be reliable to the minute, this
+# needs to move to a real scheduler (e.g. a Cloudflare Cron Trigger
+# calling the existing /api/send-digest-now endpoint) instead of GitHub
+# Actions cron, which has no exact-time SLA.
 on:
   schedule:
-    - cron: '47 5 * * 2-5'   # Tue–Fri, 5:47 AM UTC = 6:47 AM WAT (daily)
-    - cron: '17 6 * * 1'     # Mondays, 6:17 AM UTC = 7:17 AM WAT (weekly rollup)
-  workflow_dispatch:
-    inputs:
-      report_type:
-        description: 'Report type to send'
-        required: true
-        default: 'daily'
-        type: choice
-        options:
-          - daily
-          - weekly
+    - cron: '0 20 * * 1-5'   # Mon-Fri, 20:00 UTC = 9:00 PM WAT
+  workflow_dispatch: {}
 
 jobs:
   send-report:
@@ -38,25 +29,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Determine report type
-        id: type
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "type=${{ github.event.inputs.report_type }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "17 6 * * 1" ]; then
-            echo "type=weekly" >> "$GITHUB_OUTPUT"
-          else
-            echo "type=daily" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Install PDF library
         run: npm install pdf-lib
 
-      - name: Generate and send report
+      - name: Generate and send cumulative logbook
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
           ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
-        run: node .github/scripts/generate-report.js ${{ steps.type.outputs.type }}
+        run: node .github/scripts/generate-report.js
