@@ -207,13 +207,20 @@ async function sendResetEmailViaResend(env, toEmail, toName, resetLink) {
   }
 }
 
-// ─── SEND ACTIVITY DIGEST ON DEMAND ───────────────────────────────────────────
-// Powers the "Send Report Now" button in Admin → Settings, for emergencies
-// where an admin doesn't want to wait for the scheduled 7 AM / Monday run.
-// Mirrors .github/scripts/generate-report.js exactly, so a manually-triggered
-// email looks identical to a scheduled one. Requires the caller to be a real,
-// currently logged-in admin — verified against Supabase Auth + the
-// administrators table, not just trusted because the request arrived.
+// ─── SEND CUMULATIVE LOGBOOK ON DEMAND ────────────────────────────────────
+// Powers the "Send Cumulative Logbook Now" button in Admin → Settings, for
+// when an admin doesn't want to wait for the scheduled 9 PM WAT run.
+// Mirrors .github/scripts/generate-report.js exactly (same WAT date math,
+// same slot math, same PDF grid), so a manually-triggered email looks
+// identical to a scheduled one — this project's established convention,
+// since the cron script runs in GitHub Actions/Node and this Worker runs
+// in Cloudflare's own runtime, which can't share a module between them.
+//
+// This — and the whole Cumulative Monthly Customer Ledger Grid it builds —
+// REPLACES the old generic daily/weekly Cash Report that used to live
+// here. See MIGRATION NOTES.md if the old cash-report format is ever
+// needed again; the underlying transactions/disbursements data it read
+// from is untouched, so it could be rebuilt from the same tables.
 
 // Converts a Uint8Array to base64 without Node's Buffer (not available in
 // Workers by default). Chunked to avoid call-stack limits on large PDFs.
@@ -226,14 +233,10 @@ function uint8ToBase64(bytes) {
   return btoa(binary);
 }
 
-// Same PDF layout as .github/scripts/generate-report.js, so a manually
-// sent report matches a scheduled one. pdf-lib's built-in font can't
-// encode the ₦ symbol, so amounts use "NGN 1,234" here — the HTML email
-// keeps the real ₦ symbol since phones render that fine.
 // pdf-lib's built-in font only supports WinAnsi encoding (~Latin-1 range).
-// Admin-typed text can contain characters outside that — smart quotes,
-// en/em dashes, ellipses — especially across a full week of entries.
-// Sanitizes anything going into PDF text so it can never crash the send.
+// Admin-typed text (customer names, plan names) can contain characters
+// outside that — smart quotes, en/em dashes, ellipses. Sanitizes anything
+// going into PDF text so it can never crash the send.
 function pdfSafe(str) {
   return String(str ?? '')
     .replace(/[\u2018\u2019]/g, "'")
@@ -244,122 +247,52 @@ function pdfSafe(str) {
     .replace(/[^\x00-\xFF]/g, '?');
 }
 
-async function buildDigestPDF(reportType, periodLabel, reportRef, periodStart, now, d) {
-  const fmtNairaPDF = (n) => 'NGN ' + Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
-  const fmtDT = (iso) => new Date(iso).toLocaleString('en-NG', {
-    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
+// ─── WAT (West Africa Time, UTC+1, no DST) DATE HELPERS ───────────────────
+// Identical to the copy in .github/scripts/generate-report.js — verified
+// against a standalone test suite (test-logic.js) before being placed in
+// either file. Keep the two in sync if this ever changes.
 
-  const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const NAVY = rgb(0.004, 0.122, 0.482);
-  const GREY = rgb(0.42, 0.45, 0.5);
-  const BLACK = rgb(0.07, 0.09, 0.14);
-  const PAGE_W = 595, PAGE_H = 842, MARGIN = 50;
+const WAT_OFFSET_MS = 60 * 60 * 1000;
 
-  let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
-  let y = PAGE_H - MARGIN;
-  const newPageIfNeeded = (need) => { if (y - need < MARGIN) { page = pdfDoc.addPage([PAGE_W, PAGE_H]); y = PAGE_H - MARGIN; } };
-  const text = (str, x, size, f, color) => page.drawText(String(str), { x, y, size, font: f || font, color: color || BLACK });
-  const line = (h) => { y -= h; };
-
-  text('WONDERFUL & ABLE GOD ENTERPRISES', MARGIN, 10, bold, rgb(0.7, 0.5, 0));
-  const confLabel = 'CONFIDENTIAL';
-  text(confLabel, PAGE_W - MARGIN - bold.widthOfTextAtSize(confLabel, 8), 8, bold, GREY);
-  line(18);
-  text(periodLabel, MARGIN, 20, bold, NAVY);
-  line(16);
-  text(`${fmtDT(periodStart.toISOString())}  -  ${fmtDT(now.toISOString())}`, MARGIN, 10, font, GREY);
-  line(13);
-  text(`Ref: ${reportRef}`, MARGIN, 9, font, GREY);
-  line(28);
-
-  text('CASH POSITION SUMMARY', MARGIN, 11, bold, NAVY);
-  line(18);
-  [
-    ['New customers', String(d.newCustomers)],
-    ['New agents', String(d.newAgents)],
-    ['Deposits collected', `${fmtNairaPDF(d.depositTotal)} (${d.deposits.length} txn)`],
-    ['Withdrawals paid', `${fmtNairaPDF(d.payoutTotal)} (${d.payouts.length} txn)`],
-    ['Net cash movement', fmtNairaPDF(d.depositTotal - d.payoutTotal)],
-    ['Total funds held across all plans', fmtNairaPDF(d.totalHeld)],
-    ['Active customers', String(d.totalActiveCustomers)],
-    ['Active agents', String(d.totalActiveAgents)],
-  ].forEach(([label, value]) => {
-    newPageIfNeeded(16);
-    text(label, MARGIN, 10, font, BLACK);
-    text(value, PAGE_W - MARGIN - bold.widthOfTextAtSize(value, 10), 10, bold, BLACK);
-    line(16);
-  });
-  line(10);
-
-  newPageIfNeeded(100);
-  text(`WITHDRAWAL REQUESTS THIS PERIOD (${d.disbCount} total)`, MARGIN, 11, bold, NAVY);
-  line(18);
-  [['Pending', d.disbByStatus.pending || 0], ['Reviewed', d.disbByStatus.reviewed || 0],
-   ['Approved', d.disbByStatus.approved || 0], ['Paid', d.disbByStatus.paid || 0],
-   ['Rejected', d.disbByStatus.rejected || 0]].forEach(([label, value]) => {
-    newPageIfNeeded(16);
-    text(label, MARGIN, 10, font, BLACK);
-    text(String(value), PAGE_W - MARGIN - bold.widthOfTextAtSize(String(value), 10), 10, bold, BLACK);
-    line(16);
-  });
-  line(14);
-
-  newPageIfNeeded(60);
-  text(`AGENT COLLECTIONS & DISBURSEMENTS (${d.agentGroups.length} agent${d.agentGroups.length === 1 ? '' : 's'})`, MARGIN, 11, bold, NAVY);
-  line(20);
-
-  if (!d.agentGroups.length) {
-    text('No agent activity this period.', MARGIN, 10, font, GREY);
-    line(20);
-  } else {
-    d.agentGroups.forEach(g => {
-      newPageIfNeeded(50);
-      page.drawRectangle({ x: MARGIN, y: y - 4, width: PAGE_W - MARGIN * 2, height: 18, color: rgb(0.94, 0.96, 1) });
-      text(pdfSafe(g.agentName), MARGIN + 6, 10, bold, NAVY);
-      if (g.repId) text(`#${pdfSafe(g.repId)}`, MARGIN + 6 + bold.widthOfTextAtSize(pdfSafe(g.agentName), 10) + 8, 10, font, GREY);
-      const totalStr = fmtNairaPDF(g.totalCollected);
-      text(totalStr, PAGE_W - MARGIN - 6 - bold.widthOfTextAtSize(totalStr, 10), 10, bold, rgb(0.08, 0.5, 0.18));
-      line(24);
-
-      const gColTime = MARGIN, gColRef = MARGIN + 95, gColCust = MARGIN + 200, gColAmt = PAGE_W - MARGIN;
-      text('TIME', gColTime, 8, bold, GREY);
-      text('REF', gColRef, 8, bold, GREY);
-      text('CUSTOMER', gColCust, 8, bold, GREY);
-      text('AMOUNT', gColAmt - bold.widthOfTextAtSize('AMOUNT', 8), 8, bold, GREY);
-      line(13);
-
-      if (!g.transactions.length) {
-        text('No collections this period.', gColTime, 8.5, font, GREY);
-        line(15);
-      } else {
-        g.transactions.forEach(t => {
-          newPageIfNeeded(15);
-          const isIn = t.type === 'deposit' || t.type === 'opening';
-          const amtStr = `${isIn ? '+' : '-'}${fmtNairaPDF(t.amount)}`;
-          text(fmtDT(t.created_at), gColTime, 8, font, GREY);
-          text(pdfSafe(t.ref || '-'), gColRef, 8, font, BLACK);
-          text(pdfSafe(t.customer_name || 'Customer'), gColCust, 8, font, BLACK);
-          text(amtStr, gColAmt - bold.widthOfTextAtSize(amtStr, 8), 8, bold, isIn ? rgb(0.08, 0.5, 0.18) : rgb(0.73, 0.11, 0.11));
-          line(13);
-        });
-      }
-      line(10);
-    });
-  }
-  line(10);
-
-  newPageIfNeeded(30);
-  text('This report covers deposits and withdrawals only. The full admin', MARGIN, 8.5, font, GREY);
-  line(11);
-  text('audit trail is available in-app under Admin -> Settings -> Audit Log.', MARGIN, 8.5, font, GREY);
-  line(11);
-
-  const pdfBytes = await pdfDoc.save();
-  return uint8ToBase64(pdfBytes);
+function toWATParts(date) {
+  const w = new Date(date.getTime() + WAT_OFFSET_MS);
+  return { year: w.getUTCFullYear(), month0: w.getUTCMonth(), day: w.getUTCDate(), weekday: w.getUTCDay() };
 }
+function pad2(n) { return String(n).padStart(2, '0'); }
+function watDateKey(date) { const { year, month0, day } = toWATParts(date); return `${year}-${pad2(month0 + 1)}-${pad2(day)}`; }
+function yearMonthKeyOf({ year, month0 }) { return `${year}-${pad2(month0 + 1)}`; }
+function watMidnightUTC(year, month0, day) { return new Date(Date.UTC(year, month0, day, 0, 0, 0) - WAT_OFFSET_MS); }
+function watMonthEndUTC(year, month0) {
+  const lastDay = new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month0, lastDay, 23, 59, 59, 999) - WAT_OFFSET_MS);
+}
+function calendarWeekday(year, month0, day) { return new Date(Date.UTC(year, month0, day)).getUTCDay(); }
+function isBusinessDay(year, month0, day) { const wd = calendarWeekday(year, month0, day); return wd >= 1 && wd <= 5; }
+function businessDaysInMonth(year, month0, uptoDay) {
+  const lastDay = new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
+  const limit = Math.min(uptoDay, lastDay);
+  const out = [];
+  for (let d = 1; d <= limit; d++) if (isBusinessDay(year, month0, d)) out.push({ year, month0, day: d });
+  return out;
+}
+function prevYearMonth(year, month0) { return month0 === 0 ? { year: year - 1, month0: 11 } : { year, month0: month0 - 1 }; }
+function dayKeyOf({ year, month0, day }) { return `${year}-${pad2(month0 + 1)}-${pad2(day)}`; }
+
+// Converts a decimal slot count into traditional fraction notation. See
+// generate-report.js for the full rationale/edge-case notes.
+function formatSlotFraction(decimalValue) {
+  const n = Number(decimalValue) || 0;
+  if (n <= 1e-9) return '0';
+  const whole = Math.trunc(n + 1e-9);
+  const frac = n - whole;
+  const EPS = 1e-6;
+  if (frac < EPS) return String(whole);
+  if (Math.abs(frac - 0.5) < EPS) return whole === 0 ? '½' : `${whole} ½`;
+  return (Math.round(n * 100) / 100).toString();
+}
+
+function fmtNaira(n) { return '₦' + Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 }); }
+function fmtNairaPDF(n) { return 'NGN ' + Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 }); }
 
 async function verifyRequestIsAdmin(request, env) {
   const authHeader = request.headers.get('Authorization') || '';
@@ -395,13 +328,12 @@ async function verifyRequestIsAdmin(request, env) {
   return { ok: true };
 }
 
-async function handleSendDigestNow(request, env) {
-  const authCheck = await verifyRequestIsAdmin(request, env);
-  if (!authCheck.ok) return json({ error: authCheck.error }, 403);
+// ─── GATHER: active plans, this month's transactions, carryover ──────────
+// See .github/scripts/generate-report.js for the full narrative comments
+// on the rollover self-healing and weekend roll-forward behaviour — this
+// is the same logic, condensed here to keep this section scannable.
 
-  const { report_type } = await request.json();
-  const reportType = report_type === 'weekly' ? 'weekly' : 'daily';
-
+async function gatherLedgerData(env, NOW) {
   const supaHeaders = {
     apikey: env.SUPABASE_SERVICE_KEY,
     Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
@@ -412,214 +344,372 @@ async function handleSendDigestNow(request, env) {
     if (!res.ok) { console.error(`Failed to fetch ${table}:`, await res.text()); return []; }
     return res.json();
   };
-  const fetchCount = async (table, params) => {
-    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?${params}`, {
-      headers: { ...supaHeaders, Prefer: 'count=exact', Range: '0-0' },
+  const insertIgnoreDuplicate = async (table, row) => {
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { ...supaHeaders, Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify(row),
     });
-    const range = res.headers.get('content-range');
-    return range ? parseInt(range.split('/')[1] || '0', 10) : 0;
+    if (!res.ok) console.error(`Failed to insert into ${table}:`, await res.text());
   };
-  const fmtNaira = (n) => '₦' + Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
-  const fmtDateTime = (iso) => new Date(iso).toLocaleString('en-NG', {
-    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
 
-  const now = new Date();
-  const periodHours = reportType === 'weekly' ? 24 * 7 : 24;
-  const periodStart = new Date(now.getTime() - periodHours * 60 * 60 * 1000);
-  const periodLabel = reportType === 'weekly' ? 'Weekly Cash Report' : 'Daily Cash Report';
-  const since = periodStart.toISOString();
-  const reportRef = `WAG-${reportType.toUpperCase()}-${now.toISOString().slice(0, 10)}`;
+  const { year: Y, month0: M0, day: D } = toWATParts(NOW);
+  const YEAR_MONTH = yearMonthKeyOf({ year: Y, month0: M0 });
+  const { year: PY, month0: PM0 } = prevYearMonth(Y, M0);
+  const PREV_YEAR_MONTH = yearMonthKeyOf({ year: PY, month0: PM0 });
 
-  const [newCustomers, newAgents, totalActiveCustomers, totalActiveAgents, txRows, disbRows, balanceRows, agentRows] =
-    await Promise.all([
-      fetchCount('customers', `created_at=gte.${since}`),
-      fetchCount('representatives', `created_at=gte.${since}`),
-      fetchCount('customers', `status=eq.active`),
-      fetchCount('representatives', `status=eq.active`),
-      fetchRows('transactions', `created_at=gte.${since}&select=ref,type,amount,customer_name,agent_name,agent_id,created_at&order=created_at.asc`),
-      fetchRows('disbursements', `requested_at=gte.${since}&select=status,amount,customer_name,requested_at`),
-      fetchRows('plan_balances', `select=balance`),
-      fetchRows('representatives', `select=id,first_name,last_name,rep_id`),
-    ]);
+  const [activeCustomers, activePlans] = await Promise.all([
+    fetchRows('customers', 'status=eq.active&select=id,first_name,last_name'),
+    fetchRows('plans', 'status=eq.active&select=id,customer_id,name,regular_contribution,created_at&order=created_at.asc'),
+  ]);
+  const custMap = {};
+  activeCustomers.forEach(c => { custMap[c.id] = c; });
+  const plans = activePlans.filter(p => custMap[p.customer_id]);
 
-  const deposits = txRows.filter(t => t.type === 'deposit' || t.type === 'opening');
-  const payouts = txRows.filter(t => t.type === 'payout');
-  const depositTotal = deposits.reduce((s, t) => s + Number(t.amount), 0);
-  const payoutTotal = payouts.reduce((s, t) => s + Number(t.amount), 0);
-  const disbByStatus = disbRows.reduce((acc, d) => { acc[d.status] = (acc[d.status] || 0) + 1; return acc; }, {});
-  const totalHeld = balanceRows.reduce((s, r) => s + Number(r.balance), 0);
+  const dayList = businessDaysInMonth(Y, M0, D);
+  const dayKeys = dayList.map(dayKeyOf);
+  const dayKeySet = new Set(dayKeys);
+  function assignToVisibleDay(txDateKey) {
+    if (!dayKeys.length) return null;
+    if (dayKeySet.has(txDateKey)) return txDateKey;
+    for (const k of dayKeys) if (k >= txDateKey) return k;
+    return dayKeys[dayKeys.length - 1];
+  }
 
-  // Groups this period's deposit/payout transactions by the agent who
-  // handled them, so an admin can see one agent's whole day as one block.
-  // Fix: this report is a Cash Report — deposits and payouts only, for
-  // agents and customers. It used to also carry a full admin-actions
-  // audit trail (suspends, deletes, flags, etc.) alongside a per-agent
-  // "other activity" line pulled from audit_log; both are gone now. That
-  // internal audit trail still exists in full in Admin → Settings → Audit
-  // Log — it just doesn't belong in a report that gets emailed out.
-  const agentMap = {};
-  (agentRows || []).forEach(a => { agentMap[a.id] = a; });
-  const agentGroupsObj = {};
-  const getAgentGroup = (agentId, fallbackName) => {
-    if (!agentGroupsObj[agentId]) {
-      const a = agentMap[agentId];
-      agentGroupsObj[agentId] = { agentId, agentName: a ? `${a.first_name} ${a.last_name}` : (fallbackName || 'Unknown Agent'), repId: a?.rep_id || null, transactions: [], totalCollected: 0 };
+  if (!plans.length) {
+    return { Y, M0, D, YEAR_MONTH, dayList, rows: [], grandTodayNaira: 0, grandMTDNaira: 0 };
+  }
+
+  await Promise.all(plans.map(async (plan) => {
+    const already = await fetchRows('monthly_ledgers', `plan_id=eq.${plan.id}&year_month=eq.${PREV_YEAR_MONTH}&select=id&limit=1`);
+    if (already.length) return;
+
+    const priorClosed = await fetchRows(
+      'monthly_ledgers',
+      `plan_id=eq.${plan.id}&year_month=lt.${PREV_YEAR_MONTH}&select=year_month,closing_slots&order=year_month.desc&limit=1`
+    );
+    let baseSlots = 0;
+    let sinceISO = new Date(0).toISOString();
+    if (priorClosed.length) {
+      baseSlots = Number(priorClosed[0].closing_slots);
+      const [py, pm] = priorClosed[0].year_month.split('-').map(Number);
+      sinceISO = watMonthEndUTC(py, pm - 1).toISOString();
     }
-    return agentGroupsObj[agentId];
-  };
-  txRows.forEach(t => {
-    if (!t.agent_id) return;
-    const g = getAgentGroup(t.agent_id, t.agent_name);
-    g.transactions.push(t);
-    if (t.type === 'deposit' || t.type === 'opening') g.totalCollected += Number(t.amount);
+    const untilISO = watMonthEndUTC(PY, PM0).toISOString();
+    const gapTx = await fetchRows(
+      'transactions',
+      `plan_id=eq.${plan.id}&status=eq.confirmed&type=in.(opening,deposit)&created_at=gt.${sinceISO}&created_at=lte.${untilISO}&select=amount`
+    );
+    const gapAmount = gapTx.reduce((s, t) => s + Number(t.amount), 0);
+    const closingSlots = baseSlots + gapAmount / Number(plan.regular_contribution);
+    await insertIgnoreDuplicate('monthly_ledgers', {
+      plan_id: plan.id, customer_id: plan.customer_id, year_month: PREV_YEAR_MONTH, closing_slots: closingSlots,
+    });
+  }));
+
+  const previousRows = await fetchRows(
+    'monthly_ledgers',
+    `plan_id=in.(${plans.map(p => p.id).join(',')})&year_month=eq.${PREV_YEAR_MONTH}&select=plan_id,closing_slots`
+  );
+  const previousByPlan = {};
+  previousRows.forEach(r => { previousByPlan[r.plan_id] = Number(r.closing_slots); });
+
+  const monthStartISO = watMidnightUTC(Y, M0, 1).toISOString();
+  const monthTx = await fetchRows(
+    'transactions',
+    `plan_id=in.(${plans.map(p => p.id).join(',')})&status=eq.confirmed&type=in.(opening,deposit)&created_at=gte.${monthStartISO}&created_at=lte.${NOW.toISOString()}&select=plan_id,amount,created_at&order=created_at.asc`
+  );
+  const bucket = {};
+  monthTx.forEach(t => {
+    const col = assignToVisibleDay(watDateKey(new Date(t.created_at)));
+    if (!col) return;
+    bucket[t.plan_id] = bucket[t.plan_id] || {};
+    bucket[t.plan_id][col] = (bucket[t.plan_id][col] || 0) + Number(t.amount);
   });
-  const agentGroups = Object.values(agentGroupsObj).sort((a, b) => b.totalCollected - a.totalCollected);
 
-  const icon = (name, color) => {
-    const paths = {
-      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-      eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
-      check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
-      cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
-      x: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
+  let grandTodayNaira = 0, grandMTDNaira = 0;
+  const todayKey = dayKeys[dayKeys.length - 1] || null;
+
+  const rows = plans.map(plan => {
+    const cust = custMap[plan.customer_id];
+    const rate = Number(plan.regular_contribution);
+    const planBucket = bucket[plan.id] || {};
+    const dayNaira = dayKeys.map(k => planBucket[k] || 0);
+    const dayNairaSum = dayNaira.reduce((s, n) => s + n, 0);
+    const previousSlots = previousByPlan[plan.id] || 0;
+    const totalSlots = previousSlots + dayNairaSum / rate;
+    grandMTDNaira += dayNairaSum;
+    if (todayKey) grandTodayNaira += planBucket[todayKey] || 0;
+    return {
+      customerName: `${cust.first_name} ${cust.last_name}`,
+      planName: plan.name,
+      rate,
+      previousSlots,
+      dayNaira,
+      dayFractions: dayNaira.map(n => formatSlotFraction(n / rate)),
+      totalSlots,
+      totalFraction: formatSlotFraction(totalSlots),
     };
-    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block;margin-right:6px;">${paths[name]}</svg>`;
-  };
+  }).sort((a, b) => a.customerName.localeCompare(b.customerName) || a.planName.localeCompare(b.planName));
 
-  const html = `
+  return { Y, M0, D, YEAR_MONTH, dayList, rows, grandTodayNaira, grandMTDNaira };
+}
+
+// ─── BUILD HTML EMAIL ──────────────────────────────────────────────────────
+
+function buildLogbookHTML(d) {
+  const dateLabel = new Date(Date.UTC(d.Y, d.M0, d.D)).toLocaleDateString('en-NG', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+  });
+  const businessDayNum = d.dayList.length;
+
+  const rowsHTML = d.rows.length
+    ? d.rows.map(r => `
+      <tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#111827;">
+          <div style="font-weight:700;">${r.customerName}</div>
+          <div style="font-size:10px;color:#9ca3af;">${r.planName}</div>
+        </td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;text-align:right;color:#374151;">${fmtNaira(r.rate)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;text-align:right;color:#374151;">${r.previousSlots ? r.previousSlots.toFixed(2).replace(/\.00$/, '') : '0'}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:13px;font-weight:800;text-align:right;color:#011f7b;">${r.totalFraction}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="4" style="padding:14px;text-align:center;color:#9ca3af;font-size:12px;">No active customer plans yet.</td></tr>`;
+
+  return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;background:#f4f6fb;padding:24px 16px;">
     <div style="background:#011f7b;border-radius:14px 14px 0 0;padding:24px 28px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div style="color:#FFBA09;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Wonderful &amp; Able God Enterprises</div>
         <div style="color:#8a97c2;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border:1px solid #2a3a7a;border-radius:4px;padding:2px 7px;">Confidential</div>
       </div>
-      <div style="color:#fff;font-size:22px;font-weight:800;margin-top:4px;">${periodLabel}</div>
-      <div style="color:#c7d2ea;font-size:13px;margin-top:4px;">${fmtDateTime(periodStart.toISOString())} — ${fmtDateTime(now.toISOString())}</div>
-      <div style="color:#8a97c2;font-size:11px;margin-top:2px;">Ref: ${reportRef}</div>
+      <div style="color:#fff;font-size:22px;font-weight:800;margin-top:4px;">Daily Cumulative Logbook</div>
+      <div style="color:#c7d2ea;font-size:13px;margin-top:4px;">${dateLabel} — Business day ${businessDayNum} of ${d.YEAR_MONTH}</div>
     </div>
     <div style="background:#fff;padding:24px 28px;">
       <table style="width:100%;border-collapse:separate;border-spacing:8px 8px;margin:-8px;">
         <tr>
           <td style="width:50%;background:#f0f4ff;border-radius:10px;padding:14px 16px;">
-            <div style="font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:700;">New Customers</div>
-            <div style="font-size:22px;font-weight:800;color:#011f7b;">${newCustomers}</div>
+            <div style="font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:700;">Deposited Today</div>
+            <div style="font-size:20px;font-weight:800;color:#011f7b;">${fmtNaira(d.grandTodayNaira)}</div>
           </td>
           <td style="width:50%;background:#f0f4ff;border-radius:10px;padding:14px 16px;">
-            <div style="font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:700;">New Agents</div>
-            <div style="font-size:22px;font-weight:800;color:#011f7b;">${newAgents}</div>
-          </td>
-        </tr>
-        <tr>
-          <td style="background:#fff8e8;border-radius:10px;padding:14px 16px;">
-            <div style="font-size:11px;color:#92400e;text-transform:uppercase;font-weight:700;">Deposits Collected</div>
-            <div style="font-size:20px;font-weight:800;color:#111827;">${fmtNaira(depositTotal)}</div>
-            <div style="font-size:11px;color:#6b7280;">${deposits.length} transaction(s)</div>
-          </td>
-          <td style="background:#fff8e8;border-radius:10px;padding:14px 16px;">
-            <div style="font-size:11px;color:#92400e;text-transform:uppercase;font-weight:700;">Withdrawals Paid</div>
-            <div style="font-size:20px;font-weight:800;color:#111827;">${fmtNaira(payoutTotal)}</div>
-            <div style="font-size:11px;color:#6b7280;">${payouts.length} transaction(s)</div>
+            <div style="font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:700;">Deposited Month-to-Date</div>
+            <div style="font-size:20px;font-weight:800;color:#011f7b;">${fmtNaira(d.grandMTDNaira)}</div>
           </td>
         </tr>
       </table>
-      <div style="margin-top:20px;padding:16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
-        <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Platform Snapshot (as of now)</div>
-        <table style="width:100%;font-size:13px;">
-          <tr><td style="padding:3px 0;color:#374151;">Total funds held across all plans</td><td style="text-align:right;font-weight:700;color:#011f7b;">${fmtNaira(totalHeld)}</td></tr>
-          <tr><td style="padding:3px 0;color:#374151;">Active customers</td><td style="text-align:right;font-weight:700;">${totalActiveCustomers}</td></tr>
-          <tr><td style="padding:3px 0;color:#374151;">Active agents</td><td style="text-align:right;font-weight:700;">${totalActiveAgents}</td></tr>
-        </table>
-      </div>
       <div style="margin-top:20px;">
-        <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Withdrawal Requests This Period (${disbRows.length} total)</div>
-        <table style="width:100%;font-size:13px;">
-          <tr><td style="padding:3px 0;">${icon('clock', '#b45309')}Pending</td><td style="text-align:right;font-weight:700;">${disbByStatus.pending || 0}</td></tr>
-          <tr><td style="padding:3px 0;">${icon('eye', '#4338ca')}Reviewed</td><td style="text-align:right;font-weight:700;">${disbByStatus.reviewed || 0}</td></tr>
-          <tr><td style="padding:3px 0;">${icon('check', '#15803d')}Approved</td><td style="text-align:right;font-weight:700;">${disbByStatus.approved || 0}</td></tr>
-          <tr><td style="padding:3px 0;">${icon('cash', '#011f7b')}Paid</td><td style="text-align:right;font-weight:700;">${disbByStatus.paid || 0}</td></tr>
-          <tr><td style="padding:3px 0;">${icon('x', '#b91c1c')}Rejected</td><td style="text-align:right;font-weight:700;">${disbByStatus.rejected || 0}</td></tr>
+        <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Customer Ledger (${d.rows.length} active plan${d.rows.length === 1 ? '' : 's'})</div>
+        <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+          <thead>
+            <tr style="background:#fafafa;">
+              <th style="padding:6px 10px;text-align:left;font-size:10px;color:#9ca3af;text-transform:uppercase;">Customer / Account</th>
+              <th style="padding:6px 10px;text-align:right;font-size:10px;color:#9ca3af;text-transform:uppercase;">Rate</th>
+              <th style="padding:6px 10px;text-align:right;font-size:10px;color:#9ca3af;text-transform:uppercase;">Previous</th>
+              <th style="padding:6px 10px;text-align:right;font-size:10px;color:#9ca3af;text-transform:uppercase;">Total Slots</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHTML}</tbody>
         </table>
-      </div>
-      <div style="margin-top:24px;">
-        <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Agent Activity (${agentGroups.length} agent${agentGroups.length === 1 ? '' : 's'})</div>
-        ${
-          agentGroups.length
-            ? agentGroups.map(g => {
-                const txHTML = g.transactions.length
-                  ? g.transactions.map(t => {
-                      const isIn = t.type === 'deposit' || t.type === 'opening';
-                      return `<tr>
-                        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#6b7280;white-space:nowrap;">${fmtDateTime(t.created_at)}</td>
-                        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;font-family:monospace;color:#374151;">${t.ref || '—'}</td>
-                        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#111827;">${t.customer_name || 'Customer'}</td>
-                        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;font-weight:700;text-align:right;color:${isIn ? '#15803d' : '#b91c1c'};">${isIn ? '+' : '-'}${fmtNaira(t.amount)}</td>
-                      </tr>`;
-                    }).join('')
-                  : `<tr><td colspan="4" style="padding:10px;text-align:center;color:#9ca3af;font-size:12px;">No collections this period.</td></tr>`;
-                return `
-                <div style="margin-top:16px;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
-                  <div style="background:#f0f4ff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                      <span style="font-weight:700;font-size:13px;color:#011f7b;">${g.agentName}</span>
-                      ${g.repId ? `<span style="font-size:11px;color:#6b7280;margin-left:6px;">#${g.repId}</span>` : ''}
-                    </div>
-                    <span style="font-size:13px;font-weight:800;color:#15803d;">${fmtNaira(g.totalCollected)}</span>
-                  </div>
-                  <table style="width:100%;border-collapse:collapse;background:#fff;">
-                    <thead>
-                      <tr style="background:#fafafa;">
-                        <th style="padding:6px 10px;text-align:left;font-size:10px;color:#9ca3af;text-transform:uppercase;">Time</th>
-                        <th style="padding:6px 10px;text-align:left;font-size:10px;color:#9ca3af;text-transform:uppercase;">Ref</th>
-                        <th style="padding:6px 10px;text-align:left;font-size:10px;color:#9ca3af;text-transform:uppercase;">Customer</th>
-                        <th style="padding:6px 10px;text-align:right;font-size:10px;color:#9ca3af;text-transform:uppercase;">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>${txHTML}</tbody>
-                  </table>
-                </div>`;
-              }).join('')
-            : `<div style="padding:14px;text-align:center;color:#9ca3af;font-size:13px;border:1px solid #e5e7eb;border-radius:10px;">No agent activity this period.</div>`
-        }
       </div>
       <p style="color:#9ca3af;font-size:11px;margin-top:24px;text-align:center;">
-        A downloadable PDF copy of this ${reportType} Cash Report is attached for your records.<br>
-        This report covers deposits and withdrawals only. The full admin audit trail stays in-app under Admin → Settings → Audit Log.<br>
-        Full raw database backups are stored separately and privately in Cloudflare R2.
+        The full day-by-day grid (one column per business day this month) is in the attached landscape PDF.<br>
+        This report covers deposit activity only. The full admin audit trail stays in-app under Admin → Settings → Audit Log.
       </p>
     </div>
   </div>`;
+}
 
-  const recipRows = await fetchRows('report_recipients', 'select=email');
+// ─── BUILD PDF (Landscape Cumulative Grid) ────────────────────────────────
+// Same layout as .github/scripts/generate-report.js's buildPDF() — see
+// that file for the column-width/pagination reasoning.
+
+async function buildLogbookPDF(d) {
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const NAVY = rgb(0.004, 0.122, 0.482);
+  const GOLD = rgb(0.7, 0.5, 0);
+  const GREY = rgb(0.42, 0.45, 0.5);
+  const BLACK = rgb(0.07, 0.09, 0.14);
+  const GREEN = rgb(0.08, 0.5, 0.18);
+  const PAGE_W = 842, PAGE_H = 595, MARGIN = 26; // A4 landscape, points
+
+  const NAME_W = 130, RATE_W = 46, PREV_W = 42, TOTAL_W = 50;
+  const fixedW = NAME_W + RATE_W + PREV_W + TOTAL_W;
+  const availableForDays = PAGE_W - MARGIN * 2 - fixedW;
+  const numDays = Math.max(d.dayList.length, 1);
+  const dayW = Math.min(26, Math.max(14, Math.floor(availableForDays / numDays)));
+  const dayFont = dayW >= 20 ? 7 : 6;
+  const gridW = fixedW + dayW * d.dayList.length;
+
+  const HEADER_ROW_H = 24;
+  const ROW_H = 22;
+
+  let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+  let y = PAGE_H - MARGIN;
+
+  const dateLabel = new Date(Date.UTC(d.Y, d.M0, d.D)).toLocaleDateString('en-NG', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+  });
+  const WEEKDAY_INITIAL = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  function drawPageTop() {
+    page.drawText('WONDERFUL & ABLE GOD ENTERPRISES', { x: MARGIN, y, size: 10, font: bold, color: GOLD });
+    const conf = 'CONFIDENTIAL';
+    page.drawText(conf, { x: PAGE_W - MARGIN - bold.widthOfTextAtSize(conf, 8), y, size: 8, font: bold, color: GREY });
+    y -= 18;
+    page.drawText(`Daily Cumulative Logbook - ${dateLabel}`, { x: MARGIN, y, size: 15, font: bold, color: NAVY });
+    y -= 16;
+    const sub = `Business day ${d.dayList.length} of ${d.YEAR_MONTH}   |   Deposited today: ${fmtNairaPDF(d.grandTodayNaira)}   |   Deposited month-to-date: ${fmtNairaPDF(d.grandMTDNaira)}   |   Active plans: ${d.rows.length}`;
+    page.drawText(sub, { x: MARGIN, y, size: 8.5, font, color: GREY });
+    y -= 18;
+  }
+
+  function drawGridHeader() {
+    page.drawRectangle({ x: MARGIN, y: y - HEADER_ROW_H, width: gridW, height: HEADER_ROW_H, color: NAVY });
+    let x = MARGIN;
+    const headCell = (label, w, size = 8) => {
+      page.drawText(label, { x: x + 5, y: y - 15, size, font: bold, color: rgb(1, 1, 1) });
+      x += w;
+    };
+    headCell('CUSTOMER / ACCOUNT', NAME_W);
+    headCell('RATE', RATE_W);
+    headCell('PREV', PREV_W);
+    d.dayList.forEach(dd => {
+      const wd = WEEKDAY_INITIAL[calendarWeekday(dd.year, dd.month0, dd.day)];
+      const wdX = x + dayW / 2 - bold.widthOfTextAtSize(wd, 6) / 2;
+      page.drawText(wd, { x: wdX, y: y - 9, size: 6, font, color: rgb(0.75, 0.8, 0.95) });
+      const dnum = String(dd.day);
+      const dnumX = x + dayW / 2 - bold.widthOfTextAtSize(dnum, dayFont) / 2;
+      page.drawText(dnum, { x: dnumX, y: y - 18, size: dayFont, font: bold, color: rgb(1, 1, 1) });
+      x += dayW;
+    });
+    page.drawText('TOTAL', { x: x + 4, y: y - 15, size: 8, font: bold, color: rgb(1, 0.729, 0.035) });
+    y -= HEADER_ROW_H;
+  }
+
+  function newPage() {
+    page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+    y = PAGE_H - MARGIN;
+    drawPageTop();
+    drawGridHeader();
+  }
+
+  drawPageTop();
+  drawGridHeader();
+
+  if (!d.rows.length) {
+    page.drawText('No active customer plans yet.', { x: MARGIN + 6, y: y - 14, size: 9, font, color: GREY });
+    y -= ROW_H;
+  }
+
+  d.rows.forEach((r, i) => {
+    if (y - ROW_H < MARGIN + 20) newPage();
+    if (i % 2 === 0) page.drawRectangle({ x: MARGIN, y: y - ROW_H, width: gridW, height: ROW_H, color: rgb(0.97, 0.98, 1) });
+
+    let x = MARGIN;
+    page.drawText(pdfSafe(r.customerName), { x: x + 5, y: y - 10, size: 8, font: bold, color: BLACK });
+    page.drawText(pdfSafe(r.planName), { x: x + 5, y: y - 19, size: 6.5, font, color: GREY });
+    x += NAME_W;
+
+    const rateStr = fmtNairaPDF(r.rate);
+    page.drawText(rateStr, { x: x + RATE_W - 5 - font.widthOfTextAtSize(rateStr, 7.5), y: y - 14, size: 7.5, font, color: BLACK });
+    x += RATE_W;
+
+    const prevStr = r.previousSlots ? formatSlotFraction(r.previousSlots) : '0';
+    page.drawText(prevStr, { x: x + PREV_W - 5 - font.widthOfTextAtSize(prevStr, 7.5), y: y - 14, size: 7.5, font, color: GREY });
+    x += PREV_W;
+
+    r.dayFractions.forEach(fr => {
+      if (fr !== '0') {
+        const fx = x + dayW / 2 - font.widthOfTextAtSize(fr, dayFont) / 2;
+        page.drawText(fr, { x: fx, y: y - 14, size: dayFont, font, color: BLACK });
+      }
+      x += dayW;
+    });
+
+    const totStr = r.totalFraction;
+    page.drawText(totStr, { x: x + 4, y: y - 14, size: 8.5, font: bold, color: GREEN });
+
+    y -= ROW_H;
+  });
+
+  if (y - 24 < MARGIN) newPage();
+  y -= 6;
+  page.drawText("Total column = Previous carryover + sum of this month's deposit slots to date. Deposits on a non-business day", { x: MARGIN, y, size: 7, font, color: GREY });
+  y -= 9;
+  page.drawText("are folded into the next business day's column so each row's total always matches its printed columns.", { x: MARGIN, y, size: 7, font, color: GREY });
+
+  return uint8ToBase64(await pdfDoc.save());
+}
+
+async function insertAuditLog(env, row) {
+  await fetch(`${env.SUPABASE_URL}/rest/v1/audit_log`, {
+    method: 'POST',
+    headers: {
+      apikey: env.SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(row),
+  });
+}
+
+async function handleSendDigestNow(request, env) {
+  const authCheck = await verifyRequestIsAdmin(request, env);
+  if (!authCheck.ok) return json({ error: authCheck.error }, 403);
+
+  // report_type is no longer meaningful (there's only one report now) —
+  // accepted and ignored if an older cached frontend still sends it, so
+  // this endpoint never breaks for a stale client.
+  await request.json().catch(() => ({}));
+
+  const NOW = new Date();
+  const data = await gatherLedgerData(env, NOW);
+  const html = buildLogbookHTML(data);
+  const pdfBase64 = await buildLogbookPDF(data);
+
+  const supaHeaders = {
+    apikey: env.SUPABASE_SERVICE_KEY,
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  const recipRes = await fetch(`${env.SUPABASE_URL}/rest/v1/report_recipients?select=email`, { headers: supaHeaders });
+  const recipRows = recipRes.ok ? await recipRes.json() : [];
   const to = recipRows.map(r => r.email).filter(Boolean);
   if (!to.length) {
     return json({ error: 'No recipients configured. Add at least one email under Email Reports first.' }, 400);
   }
 
-  const pdfBase64 = await buildDigestPDF(reportType, periodLabel, reportRef, periodStart, now, {
-    newCustomers, newAgents, totalActiveCustomers, totalActiveAgents,
-    deposits, payouts, depositTotal, payoutTotal,
-    disbByStatus, disbCount: disbRows.length, agentGroups, totalHeld,
-  });
-
   const from = env.RESEND_FROM_EMAIL || 'WAG Enterprises <onboarding@resend.dev>';
+  const dateStr = NOW.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Africa/Lagos' });
   const sendRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from, to,
-      subject: `WAG ${periodLabel} — ${now.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+      subject: `WAG Cumulative Logbook — ${dateStr}`,
       html,
-      attachments: [
-        { filename: `WAG-${reportType}-${now.toISOString().slice(0, 10)}.pdf`, content: pdfBase64 },
-      ],
+      attachments: [{ filename: `WAG-Logbook-${data.YEAR_MONTH}-${pad2(data.D)}.pdf`, content: pdfBase64 }],
     }),
   });
 
   if (!sendRes.ok) {
-    const err = await sendRes.json();
+    const err = await sendRes.json().catch(() => ({}));
+    await insertAuditLog(env, {
+      action: 'logbook_report_failed', user_role: 'admin',
+      description: `Manual cumulative logbook send failed: ${err.message || 'unknown error'}`,
+    });
     return json({ error: err.message || 'Failed to send email' }, 500);
   }
+
+  await insertAuditLog(env, {
+    action: 'logbook_report_sent', user_role: 'admin',
+    description: `Cumulative logbook sent manually to ${to.length} recipient(s): ${to.join(', ')}`,
+  });
 
   return json({ ok: true, sentTo: to });
 }
