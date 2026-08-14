@@ -1528,9 +1528,10 @@ async function renderAdminsList() {
 }
 
 // ═══════════════════════════════════════════════
-// ADMIN DIGEST RECIPIENTS — who gets the daily/weekly activity email.
-// Managed here in Settings instead of a hardcoded GitHub secret, so any
-// admin can add/remove recipients without touching code.
+// ADMIN DIGEST RECIPIENTS — who gets the Cumulative Monthly Logbook,
+// sent Mon-Fri at 9 PM WAT. Managed here in Settings instead of a
+// hardcoded GitHub secret, so any admin can add/remove recipients
+// without touching code.
 // ═══════════════════════════════════════════════
 async function renderReportRecipients() {
   const el = document.getElementById('reportRecipientsList');
@@ -1587,19 +1588,19 @@ async function removeReportRecipient(id, email) {
   });
 }
 
-async function sendDigestNow(reportType) {
+async function sendDigestNow() {
   if (!WORKER_URL) {
     setMsg('sendNowMsg', '<div class="msg-err">This needs the Worker to be set up first — ask your developer.</div>');
     return;
   }
   const { data: { session } } = await db.auth.getSession();
   if (!session) { setMsg('sendNowMsg', '<div class="msg-err">Please sign in again</div>'); return; }
-  showLoading(reportType === 'weekly' ? 'Sending weekly report…' : 'Sending daily report…');
+  showLoading('Sending cumulative logbook…');
   try {
     const res = await fetch(`${WORKER_URL}/api/send-digest-now`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ report_type: reportType }),
+      body: JSON.stringify({}),
     });
     const result = await res.json();
     hideLoading();
