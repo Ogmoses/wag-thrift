@@ -190,6 +190,17 @@ body.dark .streak-card .sv{color:var(--yellow);}
  box-shadow:0 0 0 4px rgba(var(--yellow-rgb,255,186,9),.22);
 }
 
+/* Fractional/"split-fill" slot on the circular big-calendar cells — same
+   --fill-driven liquid effect and same brand green as the mini calendar
+   (see shared.css for the full rationale), just against this tab's dark
+   glass card background instead of a white/near-black cell border. */
+.cal-standalone-wrap.cal-big .cal-cell.c-partial{
+ background:linear-gradient(to top, var(--green) 0%, var(--green) var(--fill,50%), rgba(255,255,255,.06) var(--fill,50%), rgba(255,255,255,.06) 100%);
+ color:#fff;
+}
+.cal-standalone-wrap.cal-big .cal-cell.c-partial .cal-daynum,
+.cal-standalone-wrap.cal-big .cal-cell.c-partial .cal-badge{text-shadow:0 0 3px rgba(0,0,0,.85),0 0 1px rgba(0,0,0,.85);}
+
 /* ══════════════════════════════════════════════════════════════
    BALANCE AREA → CARD CAROUSEL (mirrors the reference: a horizontal
    row of bank-card tiles sitting with the balance). Reuses the exact

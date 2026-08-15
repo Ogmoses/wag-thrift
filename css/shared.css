@@ -494,6 +494,35 @@ body.dark .cal-cell.c-grey{color:#fff;border-color:#fff;}
 body.dark .cal-cell.c-today{border-color:var(--yellow);color:var(--yellow);}
 .cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#111;font-weight:900;}
 body.dark .cal-cell.c-payout{background:#FFBA09;color:#111;border-color:#111;font-weight:900;}
+
+/* Day number + small state badge, stacked. Plain block elements (not
+   flex) so a <td class="cal-cell"> keeps behaving as a normal table
+   cell — vertical-align:middle on the cell centers the stack as a
+   whole, same as it already centered a single text node before this. */
+.cal-daynum{display:block;line-height:1.1;}
+.cal-badge{display:block;font-size:8.5px;line-height:1;font-weight:800;margin-top:2px;opacity:.85;}
+
+/* Fractional/"split-fill" slot — a payment smaller than a full day's
+   Rate (e.g. ₦500 on a ₦1,000 rate). Liquid-fill effect: the brand
+   green rises from the bottom to the --fill percentage set inline per
+   cell (drawCal() in customer.js), same green used by .c-green so a
+   partial cell visually "becomes" a full cell once it's topped up,
+   rather than introducing a new hue. Badge text is the traditional
+   fraction glyph (½, ¼, ¾, ...) from fractionGlyph().  */
+.cal-cell.c-partial{
+  background:linear-gradient(to top, var(--green) 0%, var(--green) var(--fill,50%), transparent var(--fill,50%), transparent 100%);
+  color:#111;border-color:#111;
+}
+body.dark .cal-cell.c-partial{
+  background:linear-gradient(to top, var(--green) 0%, var(--green) var(--fill,50%), rgba(255,255,255,.06) var(--fill,50%), rgba(255,255,255,.06) 100%);
+  color:#fff;border-color:#fff;
+}
+/* The fill boundary can land anywhere behind the (vertically centered)
+   text depending on the fraction, so a single fixed text colour can't
+   guarantee contrast against both the filled and unfilled portions — a
+   halo does, regardless of where the boundary falls. */
+.cal-cell.c-partial .cal-daynum,.cal-cell.c-partial .cal-badge{text-shadow:0 0 3px rgba(255,255,255,.95),0 0 1px rgba(255,255,255,.95);}
+body.dark .cal-cell.c-partial .cal-daynum,body.dark .cal-cell.c-partial .cal-badge{text-shadow:0 0 3px rgba(0,0,0,.9),0 0 1px rgba(0,0,0,.9);}
 .cal-legend{margin-top:10px;}
 .cal-legend-item{display:inline-block;margin:0 14px 6px 0;font-size:11px;color:var(--sub);vertical-align:middle;}
 .cal-dot{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:middle;margin-right:5px;}
