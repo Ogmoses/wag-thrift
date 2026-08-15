@@ -216,13 +216,13 @@ async function sendResetEmailViaResend(env, toEmail, toName, resetLink) {
 // since the cron script runs in GitHub Actions/Node and this Worker runs
 // in Cloudflare's own runtime, which can't share a module between them.
 //
-// Report layout: one row per active plan — Name, Rate, Amount (paid
-// today), No. (running cumulative slots: Previous + every confirmed
-// payment this month ÷ Rate, as a fraction), Previous (last month's
-// frozen close). Deliberately NOT a day-by-day grid — there is no
-// per-day breakdown and no separate "Total" column; No. IS the running
-// total, carried forward report to report the way a field agent's own
-// logbook page carries a balance forward from the page before it.
+// Report layout: one block per active customer plan, and inside each
+// block, one row per business day of the current month so far — a
+// running passbook (Date | Amount | No.), where No. on each day = No.
+// from the day before + that day's payment ÷ Rate. Previous (last
+// month's closing No.) is shown once above the table, as the starting
+// point the first row's No. is computed from. See generate-report.js's
+// header comment for the full ASCII layout example.
 
 // Converts a Uint8Array to base64 without Node's Buffer (not available in
 // Workers by default). Chunked to avoid call-stack limits on large PDFs.
@@ -255,6 +255,7 @@ function pdfSafe(str) {
 // either file. Keep the two in sync if this ever changes.
 
 const WAT_OFFSET_MS = 60 * 60 * 1000;
+const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function toWATParts(date) {
   const w = new Date(date.getTime() + WAT_OFFSET_MS);
@@ -270,13 +271,16 @@ function watMonthEndUTC(year, month0) {
 }
 function calendarWeekday(year, month0, day) { return new Date(Date.UTC(year, month0, day)).getUTCDay(); }
 function isBusinessDay(year, month0, day) { const wd = calendarWeekday(year, month0, day); return wd >= 1 && wd <= 5; }
-// Used only for the "business day N of month" header label.
-function businessDaysSoFar(year, month0, uptoDay) {
-  let n = 0;
-  for (let d = 1; d <= uptoDay; d++) if (isBusinessDay(year, month0, d)) n++;
-  return n;
+function businessDaysInMonth(year, month0, uptoDay) {
+  const lastDay = new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
+  const limit = Math.min(uptoDay, lastDay);
+  const out = [];
+  for (let d = 1; d <= limit; d++) if (isBusinessDay(year, month0, d)) out.push({ year, month0, day: d });
+  return out;
 }
 function prevYearMonth(year, month0) { return month0 === 0 ? { year: year - 1, month0: 11 } : { year, month0: month0 - 1 }; }
+function dayKeyOf({ year, month0, day }) { return `${year}-${pad2(month0 + 1)}-${pad2(day)}`; }
+function dayLabelOf({ year, month0, day }) { return `${WEEKDAY_ABBR[calendarWeekday(year, month0, day)]} ${day}`; }
 
 // Converts a decimal slot count into traditional fraction notation. See
 // generate-report.js for the full rationale/edge-case notes.
@@ -328,7 +332,7 @@ async function verifyRequestIsAdmin(request, env) {
   return { ok: true };
 }
 
-// ─── GATHER: active plans, today's + month-to-date deposits, carryover ───
+// ─── GATHER: active plans, day-by-day amounts, running cumulative ────────
 // See .github/scripts/generate-report.js for the full narrative comments
 // on the rollover self-healing behaviour — this is the same logic,
 // condensed here to keep this section scannable.
@@ -357,8 +361,6 @@ async function gatherLedgerData(env, NOW) {
   const YEAR_MONTH = yearMonthKeyOf({ year: Y, month0: M0 });
   const { year: PY, month0: PM0 } = prevYearMonth(Y, M0);
   const PREV_YEAR_MONTH = yearMonthKeyOf({ year: PY, month0: PM0 });
-  const TODAY_KEY = watDateKey(NOW);
-  const businessDayNum = businessDaysSoFar(Y, M0, D);
 
   const [activeCustomers, activePlans] = await Promise.all([
     fetchRows('customers', 'status=eq.active&select=id,first_name,last_name'),
@@ -368,8 +370,18 @@ async function gatherLedgerData(env, NOW) {
   activeCustomers.forEach(c => { custMap[c.id] = c; });
   const plans = activePlans.filter(p => custMap[p.customer_id]);
 
+  const dayList = businessDaysInMonth(Y, M0, D);
+  const dayKeys = dayList.map(dayKeyOf);
+  const dayKeySet = new Set(dayKeys);
+  function assignToVisibleDay(txDateKey) {
+    if (!dayKeys.length) return null;
+    if (dayKeySet.has(txDateKey)) return txDateKey;
+    for (const k of dayKeys) if (k >= txDateKey) return k;
+    return dayKeys[dayKeys.length - 1];
+  }
+
   if (!plans.length) {
-    return { Y, M0, D, YEAR_MONTH, businessDayNum, rows: [], grandTodayNaira: 0 };
+    return { Y, M0, D, YEAR_MONTH, dayList, rows: [], grandTodayNaira: 0 };
   }
 
   await Promise.all(plans.map(async (plan) => {
@@ -406,64 +418,75 @@ async function gatherLedgerData(env, NOW) {
   const previousByPlan = {};
   previousRows.forEach(r => { previousByPlan[r.plan_id] = Number(r.closing_slots); });
 
-  // No is a running cumulative, not a per-day breakdown, so this just
-  // needs two sums per plan: everything so far this month (for No.), and
-  // today's slice of that (for Amount) — no day-by-day bucketing needed.
   const monthStartISO = watMidnightUTC(Y, M0, 1).toISOString();
   const monthTx = await fetchRows(
     'transactions',
-    `plan_id=in.(${plans.map(p => p.id).join(',')})&status=eq.confirmed&type=in.(opening,deposit)&created_at=gte.${monthStartISO}&created_at=lte.${NOW.toISOString()}&select=plan_id,amount,created_at`
+    `plan_id=in.(${plans.map(p => p.id).join(',')})&status=eq.confirmed&type=in.(opening,deposit)&created_at=gte.${monthStartISO}&created_at=lte.${NOW.toISOString()}&select=plan_id,amount,created_at&order=created_at.asc`
   );
-  const monthSumByPlan = {};
-  const todaySumByPlan = {};
+  const bucket = {};
   monthTx.forEach(t => {
-    monthSumByPlan[t.plan_id] = (monthSumByPlan[t.plan_id] || 0) + Number(t.amount);
-    if (watDateKey(new Date(t.created_at)) === TODAY_KEY) {
-      todaySumByPlan[t.plan_id] = (todaySumByPlan[t.plan_id] || 0) + Number(t.amount);
-    }
+    const col = assignToVisibleDay(watDateKey(new Date(t.created_at)));
+    if (!col) return;
+    bucket[t.plan_id] = bucket[t.plan_id] || {};
+    bucket[t.plan_id][col] = (bucket[t.plan_id][col] || 0) + Number(t.amount);
   });
 
   let grandTodayNaira = 0;
+  const todayKey = dayKeys[dayKeys.length - 1] || null;
+
   const rows = plans.map(plan => {
     const cust = custMap[plan.customer_id];
     const rate = Number(plan.regular_contribution);
-    const amountToday = todaySumByPlan[plan.id] || 0;
-    const monthAmount = monthSumByPlan[plan.id] || 0;
     const previousSlots = previousByPlan[plan.id] || 0;
-    const cumulativeSlots = previousSlots + monthAmount / rate;
-    grandTodayNaira += amountToday;
+    const planBucket = bucket[plan.id] || {};
+
+    let running = previousSlots;
+    const days = dayList.map((dd, i) => {
+      const key = dayKeys[i];
+      const amount = planBucket[key] || 0;
+      running += amount / rate;
+      return { dateLabel: dayLabelOf(dd), amount, noFraction: formatSlotFraction(running) };
+    });
+
+    if (todayKey) grandTodayNaira += planBucket[todayKey] || 0;
+
     return {
       customerName: `${cust.first_name} ${cust.last_name}`,
       planName: plan.name,
       rate,
-      amountToday,
-      noFraction: formatSlotFraction(cumulativeSlots),
       previousFraction: formatSlotFraction(previousSlots),
+      days,
     };
   }).sort((a, b) => a.customerName.localeCompare(b.customerName) || a.planName.localeCompare(b.planName));
 
-  return { Y, M0, D, YEAR_MONTH, businessDayNum, rows, grandTodayNaira };
+  return { Y, M0, D, YEAR_MONTH, dayList, rows, grandTodayNaira };
 }
 
 // ─── BUILD HTML EMAIL ──────────────────────────────────────────────────────
+// Condensed today-only summary — the full day-by-day passbook is in the
+// attached PDF, which is what's meant to be printed and filed.
 
 function buildLogbookHTML(d) {
   const dateLabel = new Date(Date.UTC(d.Y, d.M0, d.D)).toLocaleDateString('en-NG', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
   });
+  const businessDayNum = d.dayList.length;
 
   const rowsHTML = d.rows.length
-    ? d.rows.map(r => `
+    ? d.rows.map(r => {
+        const todayRow = r.days[r.days.length - 1] || { amount: 0, noFraction: r.previousFraction };
+        return `
       <tr>
         <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#111827;">
           <div style="font-weight:700;">${r.customerName}</div>
           <div style="font-size:10px;color:#9ca3af;">${r.planName}</div>
         </td>
         <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;text-align:right;color:#374151;">${fmtNaira(r.rate)}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;text-align:right;color:#374151;">${fmtNaira(r.amountToday)}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:13px;font-weight:800;text-align:right;color:#011f7b;">${r.noFraction}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;text-align:right;color:#374151;">${fmtNaira(todayRow.amount)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:13px;font-weight:800;text-align:right;color:#011f7b;">${todayRow.noFraction}</td>
         <td style="padding:6px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;text-align:right;color:#9ca3af;">${r.previousFraction}</td>
-      </tr>`).join('')
+      </tr>`;
+      }).join('')
     : `<tr><td colspan="5" style="padding:14px;text-align:center;color:#9ca3af;font-size:12px;">No active customer plans yet.</td></tr>`;
 
   return `
@@ -474,14 +497,14 @@ function buildLogbookHTML(d) {
         <div style="color:#8a97c2;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border:1px solid #2a3a7a;border-radius:4px;padding:2px 7px;">Confidential</div>
       </div>
       <div style="color:#fff;font-size:22px;font-weight:800;margin-top:4px;">Daily Cumulative Logbook</div>
-      <div style="color:#c7d2ea;font-size:13px;margin-top:4px;">${dateLabel} — Business day ${d.businessDayNum} of ${d.YEAR_MONTH}</div>
+      <div style="color:#c7d2ea;font-size:13px;margin-top:4px;">${dateLabel} — Business day ${businessDayNum} of ${d.YEAR_MONTH}</div>
     </div>
     <div style="background:#fff;padding:24px 28px;">
       <div style="background:#f0f4ff;border-radius:10px;padding:14px 16px;margin-bottom:20px;">
         <div style="font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:700;">Deposited Today</div>
         <div style="font-size:22px;font-weight:800;color:#011f7b;">${fmtNaira(d.grandTodayNaira)}</div>
       </div>
-      <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Customer Ledger (${d.rows.length} active plan${d.rows.length === 1 ? '' : 's'})</div>
+      <div style="font-size:12px;color:#6b7280;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Today's Snapshot (${d.rows.length} active plan${d.rows.length === 1 ? '' : 's'})</div>
       <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
         <thead>
           <tr style="background:#fafafa;">
@@ -495,17 +518,17 @@ function buildLogbookHTML(d) {
         <tbody>${rowsHTML}</tbody>
       </table>
       <p style="color:#9ca3af;font-size:11px;margin-top:24px;text-align:center;">
-        No. is the running cumulative slot count (Previous + every confirmed payment this month ÷ Rate) — it carries<br>
-        forward automatically day to day and month to month. A full-page printable copy is attached as a PDF.<br>
+        This is today's line only. The attached PDF has the full day-by-day passbook for ${d.YEAR_MONTH} —<br>
+        every business day so far this month, with No. accumulating down the page from Previous.<br>
         This report covers deposit activity only. The full admin audit trail stays in-app under Admin → Settings → Audit Log.
       </p>
     </div>
   </div>`;
 }
 
-// ─── BUILD PDF (Portrait Daily Ledger) ────────────────────────────────────
+// ─── BUILD PDF (Portrait, one passbook block per customer) ───────────────
 // Same layout as .github/scripts/generate-report.js's buildPDF() — see
-// that file for the column-width reasoning.
+// that file's header comment for the ASCII layout example.
 
 async function buildLogbookPDF(d) {
   const pdfDoc = await PDFDocument.create();
@@ -516,14 +539,17 @@ async function buildLogbookPDF(d) {
   const GREY = rgb(0.42, 0.45, 0.5);
   const BLACK = rgb(0.07, 0.09, 0.14);
   const GREEN = rgb(0.08, 0.5, 0.18);
+  const LIGHT_BG = rgb(0.96, 0.97, 1);
   const PAGE_W = 595, PAGE_H = 842, MARGIN = 40; // A4 portrait, points
-
-  const NAME_W = 190, RATE_W = 85, AMOUNT_W = 95, NO_W = 75;
-  const PREV_W = PAGE_W - MARGIN * 2 - (NAME_W + RATE_W + AMOUNT_W + NO_W);
   const gridW = PAGE_W - MARGIN * 2;
 
-  const HEADER_ROW_H = 22;
-  const ROW_H = 26;
+  const DATE_W = 180, AMOUNT_W = 180;
+  const NO_W = gridW - DATE_W - AMOUNT_W;
+
+  const BLOCK_HEADER_H = 30;
+  const TABLE_HEADER_H = 16;
+  const DAY_ROW_H = 15;
+  const BLOCK_GAP = 12;
 
   let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
   let y = PAGE_H - MARGIN;
@@ -536,77 +562,71 @@ async function buildLogbookPDF(d) {
     page.drawText('WONDERFUL & ABLE GOD ENTERPRISES', { x: MARGIN, y, size: 10, font: bold, color: GOLD });
     const conf = 'CONFIDENTIAL';
     page.drawText(conf, { x: PAGE_W - MARGIN - bold.widthOfTextAtSize(conf, 8), y, size: 8, font: bold, color: GREY });
-    y -= 20;
+    y -= 18;
     page.drawText(`Daily Cumulative Logbook - ${dateLabel}`, { x: MARGIN, y, size: 14, font: bold, color: NAVY });
-    y -= 16;
-    const sub = `Business day ${d.businessDayNum} of ${d.YEAR_MONTH}   |   Deposited today: ${fmtNairaPDF(d.grandTodayNaira)}   |   Active plans: ${d.rows.length}`;
+    y -= 15;
+    const sub = `Business day ${d.dayList.length} of ${d.YEAR_MONTH}   |   Deposited today: ${fmtNairaPDF(d.grandTodayNaira)}   |   Active plans: ${d.rows.length}`;
     page.drawText(sub, { x: MARGIN, y, size: 8.5, font, color: GREY });
     y -= 18;
-  }
-
-  function drawGridHeader() {
-    page.drawRectangle({ x: MARGIN, y: y - HEADER_ROW_H, width: gridW, height: HEADER_ROW_H, color: NAVY });
-    let x = MARGIN;
-    const headCell = (label, w, rightAlign) => {
-      const tx = rightAlign ? x + w - 6 - bold.widthOfTextAtSize(label, 8) : x + 6;
-      page.drawText(label, { x: tx, y: y - 14, size: 8, font: bold, color: rgb(1, 1, 1) });
-      x += w;
-    };
-    headCell('NAME', NAME_W, false);
-    headCell('RATE', RATE_W, true);
-    headCell('AMOUNT', AMOUNT_W, true);
-    headCell('NO.', NO_W, true);
-    headCell('PREVIOUS', PREV_W, true);
-    y -= HEADER_ROW_H;
   }
 
   function newPage() {
     page = pdfDoc.addPage([PAGE_W, PAGE_H]);
     y = PAGE_H - MARGIN;
     drawPageTop();
-    drawGridHeader();
   }
 
   drawPageTop();
-  drawGridHeader();
 
   if (!d.rows.length) {
-    page.drawText('No active customer plans yet.', { x: MARGIN + 6, y: y - 15, size: 9, font, color: GREY });
-    y -= ROW_H;
+    page.drawText('No active customer plans yet.', { x: MARGIN + 6, y: y - 14, size: 9, font, color: GREY });
   }
 
-  d.rows.forEach((r, i) => {
-    if (y - ROW_H < MARGIN + 24) newPage();
-    if (i % 2 === 0) page.drawRectangle({ x: MARGIN, y: y - ROW_H, width: gridW, height: ROW_H, color: rgb(0.97, 0.98, 1) });
+  d.rows.forEach((r) => {
+    const blockH = BLOCK_HEADER_H + TABLE_HEADER_H + r.days.length * DAY_ROW_H;
+    if (y - blockH < MARGIN && y < PAGE_H - MARGIN - blockH) newPage();
 
-    let x = MARGIN;
-    page.drawText(pdfSafe(r.customerName), { x: x + 6, y: y - 12, size: 9, font: bold, color: BLACK });
-    page.drawText(pdfSafe(r.planName), { x: x + 6, y: y - 22, size: 7, font, color: GREY });
-    x += NAME_W;
+    page.drawRectangle({ x: MARGIN, y: y - BLOCK_HEADER_H, width: gridW, height: BLOCK_HEADER_H, color: NAVY });
+    page.drawText(pdfSafe(`${r.customerName} — ${r.planName}`), { x: MARGIN + 8, y: y - 13, size: 10, font: bold, color: rgb(1, 1, 1) });
+    const rateLabel = `Rate: ${fmtNairaPDF(r.rate)}`;
+    const prevLabel = `Previous: ${r.previousFraction}`;
+    const prevX = MARGIN + gridW - 8 - font.widthOfTextAtSize(prevLabel, 8);
+    const rateX = prevX - 16 - font.widthOfTextAtSize(rateLabel, 8);
+    page.drawText(rateLabel, { x: rateX, y: y - 13, size: 8, font, color: rgb(0.85, 0.88, 0.98) });
+    page.drawText(prevLabel, { x: prevX, y: y - 13, size: 8, font: bold, color: rgb(1, 0.729, 0.035) });
+    y -= BLOCK_HEADER_H;
 
-    const rateStr = fmtNairaPDF(r.rate);
-    page.drawText(rateStr, { x: x + RATE_W - 6 - font.widthOfTextAtSize(rateStr, 8.5), y: y - 16, size: 8.5, font, color: BLACK });
-    x += RATE_W;
+    page.drawRectangle({ x: MARGIN, y: y - TABLE_HEADER_H, width: gridW, height: TABLE_HEADER_H, color: rgb(0.9, 0.92, 0.97) });
+    page.drawText('DATE', { x: MARGIN + 6, y: y - 11.5, size: 7, font: bold, color: GREY });
+    const amtHead = 'AMOUNT';
+    page.drawText(amtHead, { x: MARGIN + DATE_W + AMOUNT_W - 6 - bold.widthOfTextAtSize(amtHead, 7), y: y - 11.5, size: 7, font: bold, color: GREY });
+    const noHead = 'NO.';
+    page.drawText(noHead, { x: MARGIN + DATE_W + AMOUNT_W + NO_W - 6 - bold.widthOfTextAtSize(noHead, 7), y: y - 11.5, size: 7, font: bold, color: GREY });
+    y -= TABLE_HEADER_H;
 
-    const amtStr = fmtNairaPDF(r.amountToday);
-    page.drawText(amtStr, { x: x + AMOUNT_W - 6 - font.widthOfTextAtSize(amtStr, 8.5), y: y - 16, size: 8.5, font, color: r.amountToday ? BLACK : GREY });
-    x += AMOUNT_W;
+    r.days.forEach((day, i) => {
+      if (y - DAY_ROW_H < MARGIN) newPage();
+      if (i % 2 === 0) page.drawRectangle({ x: MARGIN, y: y - DAY_ROW_H, width: gridW, height: DAY_ROW_H, color: LIGHT_BG });
 
-    const noStr = r.noFraction;
-    page.drawText(noStr, { x: x + NO_W - 6 - bold.widthOfTextAtSize(noStr, 9.5), y: y - 16, size: 9.5, font: bold, color: GREEN });
-    x += NO_W;
+      page.drawText(day.dateLabel, { x: MARGIN + 8, y: y - 11, size: 8, font, color: BLACK });
 
-    const prevStr = r.previousFraction;
-    page.drawText(prevStr, { x: x + PREV_W - 6 - font.widthOfTextAtSize(prevStr, 8.5), y: y - 16, size: 8.5, font, color: GREY });
+      const amtStr = fmtNairaPDF(day.amount);
+      page.drawText(amtStr, { x: MARGIN + DATE_W + AMOUNT_W - 8 - font.widthOfTextAtSize(amtStr, 8), y: y - 11, size: 8, font, color: day.amount ? BLACK : GREY });
 
-    y -= ROW_H;
+      const noStr = day.noFraction;
+      page.drawText(noStr, { x: MARGIN + DATE_W + AMOUNT_W + NO_W - 8 - bold.widthOfTextAtSize(noStr, 8.5), y: y - 11, size: 8.5, font: bold, color: GREEN });
+
+      y -= DAY_ROW_H;
+    });
+
+    y -= BLOCK_GAP;
   });
 
-  if (y - 26 < MARGIN) newPage();
-  y -= 8;
-  page.drawText("No. = Previous + every confirmed payment this month / Rate, as a fraction. It carries forward day to day", { x: MARGIN, y, size: 7, font, color: GREY });
-  y -= 10;
-  page.drawText("and month to month; Previous is fixed for the whole month and only changes when a new month begins.", { x: MARGIN, y, size: 7, font, color: GREY });
+  if (y - 24 < MARGIN) newPage();
+  y -= 4;
+  page.drawText("No. = previous business day's No. + that day's payment / Rate. The first row of a new month starts", { x: MARGIN, y, size: 7, font, color: GREY });
+  y -= 9;
+  page.drawText("from Previous instead — last month's final No., carried forward until the plan is withdrawn/closed.", { x: MARGIN, y, size: 7, font, color: GREY });
 
   return uint8ToBase64(await pdfDoc.save());
 }
