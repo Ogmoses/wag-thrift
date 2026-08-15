@@ -355,7 +355,72 @@ function dateKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-let calState = { yr: 0, mo: 0, covered: new Set(), missed: new Set(), payouts: new Set(), actualPayDays: new Set() };
+let calState = { yr: 0, mo: 0, covered: new Set(), partial: new Map(), missed: new Set(), payouts: new Set(), actualPayDays: new Set() };
+
+// ─── SPILLOVER SLOT ALLOCATION ─────────────────────────────────────────
+// Deposits no longer have to be exact multiples of the daily Rate (see
+// doCollection() in representative.js) — a customer can pay ₦500 on a
+// ₦1,000 rate, or ₦1,700, or anything positive. This walks the plan's
+// cumulative total forward across calendar days from planStart, filling
+// each day's slot completely before moving to the next:
+//   Slots = totalDeposited / regularAmt
+//   whole days  -> fully covered ("green")
+//   leftover    -> the ONE day right after them is "partial" at that
+//                  fraction (½, ¼, ¾, ...)
+//   everything after that, up to (not including) today -> "missed"
+//
+// Because this is always recomputed from the TOTAL cumulative deposit
+// (not per-transaction), "partial payments fill open fractional slots
+// from prior days before advancing" falls out automatically — a day
+// that's ½-filled today and receives another ₦500 tomorrow recomputes
+// as fully covered, with the leftover (if any) rolling to the day after.
+// No separate state to track for that: same mechanism the pre-existing
+// `covered` set already used for whole-day catch-up payments, just
+// extended to expose the leftover fraction instead of discarding it.
+function computeSlotAllocation(planStart, today, totalDeposited, regularAmt) {
+  const EPS = 1e-9;
+  const totalSlots = regularAmt > 0 ? totalDeposited / regularAmt : 0;
+  const wholeSlots = Math.floor(totalSlots + EPS);
+  const remainder = totalSlots - wholeSlots; // in [0, 1)
+
+  const covered = new Set();
+  const partial = new Map(); // dateKey -> fraction (0 < f < 1)
+  const missed = new Set();
+
+  const walker = new Date(planStart);
+  for (let i = 0; i < wholeSlots; i++) {
+    covered.add(dateKey(walker));
+    walker.setDate(walker.getDate() + 1);
+  }
+
+  // walker now sits on the first day not fully covered.
+  if (remainder > EPS) partial.set(dateKey(walker), remainder);
+
+  const missWalker = new Date(walker);
+  // A day carrying a partial fraction is in progress, not missed.
+  if (remainder > EPS) missWalker.setDate(missWalker.getDate() + 1);
+  while (missWalker < today) {
+    missed.add(dateKey(missWalker));
+    missWalker.setDate(missWalker.getDate() + 1);
+  }
+
+  return { covered, partial, missed };
+}
+
+// Traditional fraction glyph for a partial slot. Snaps to the common
+// clean fractions a half/quarter payment actually produces; anything
+// that doesn't land near one of those (now possible since any positive
+// amount is valid — e.g. ₦333 on a ₦1,000 rate) falls back to a percent
+// rather than mislabeling it as the nearest glyph.
+function fractionGlyph(frac) {
+  const EPS = 0.02;
+  if (Math.abs(frac - 0.25) < EPS) return '¼';
+  if (Math.abs(frac - 0.5) < EPS) return '½';
+  if (Math.abs(frac - 0.75) < EPS) return '¾';
+  if (Math.abs(frac - 1 / 3) < EPS) return '⅓';
+  if (Math.abs(frac - 2 / 3) < EPS) return '⅔';
+  return Math.round(frac * 100) + '%';
+}
 
 async function renderCalendar(plan, balance) {
   const regularAmt = Number(plan.regular_contribution) || 1000;
@@ -375,19 +440,18 @@ async function renderCalendar(plan, balance) {
   const paidDisbs = disbRes.data || [];
 
   const totalDeposited = txs.reduce((s, t) => s + Number(t.amount), 0);
-  const totalDaysCovered = Math.floor(totalDeposited / regularAmt);
 
-  calState.covered = new Set();
-  calState.missed = new Set();
   calState.payouts = new Set();
   // Distinct real calendar days a deposit actually landed on — independent
-  // of `covered` above. `covered` is a cumulative "how many day-units has
-  // your money paid for" abstraction (lets a catch-up lump sum retroactively
-  // paint past missed days green), which is correct for the calendar's job
-  // but wrong as a streak basis: a single catch-up deposit shouldn't be able
-  // to hand back a broken streak. actualPayDays only ever reflects days a
-  // transaction genuinely happened, so a streak built from it truly resets
-  // on a missed day and can't be patched retroactively.
+  // of `covered`/`partial` below, which are a cumulative "how many
+  // day-units has your money paid for" abstraction (lets a catch-up lump
+  // sum retroactively paint past missed days green), correct for the
+  // calendar's job but wrong as a streak basis: a single catch-up deposit
+  // shouldn't be able to hand back a broken streak. actualPayDays only
+  // ever reflects days a transaction genuinely happened — of any size,
+  // a ₦50 top-up counts exactly the same as a full day's Rate — so a
+  // streak built from it truly resets on a missed day and can't be
+  // patched retroactively, and doesn't require reaching a full slot.
   calState.actualPayDays = new Set(txs.map(t => dateKey(new Date(t.created_at))));
 
   paidDisbs.forEach(d => {
@@ -396,18 +460,10 @@ async function renderCalendar(plan, balance) {
     }
   });
 
-  const streakWalker = new Date(planStart);
-  for (let i = 0; i < totalDaysCovered; i++) {
-    const ds = dateKey(streakWalker);
-    calState.covered.add(ds);
-    streakWalker.setDate(streakWalker.getDate() + 1);
-  }
-
-  const missWalker = new Date(streakWalker);
-  while (missWalker < today) {
-    calState.missed.add(dateKey(missWalker));
-    missWalker.setDate(missWalker.getDate() + 1);
-  }
+  const { covered, partial, missed } = computeSlotAllocation(planStart, today, totalDeposited, regularAmt);
+  calState.covered = covered;
+  calState.partial = partial;
+  calState.missed = missed;
 
   calState.yr = today.getFullYear();
   calState.mo = today.getMonth();
@@ -415,7 +471,7 @@ async function renderCalendar(plan, balance) {
 }
 
 function drawCal() {
-  const { yr, mo, covered, missed, payouts } = calState;
+  const { yr, mo, covered, partial, missed, payouts } = calState;
   const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const DN = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const todayStr = dateKey(new Date());
@@ -435,16 +491,24 @@ function drawCal() {
     const ds = `${yr}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const isPayout = payouts.has(ds);
     const isCovered = covered.has(ds);
+    const partialFrac = partial.get(ds); // undefined if not a partial day
     const isMissed = missed.has(ds);
     const isToday = ds === todayStr;
     let cls = 'cal-cell';
     let title = '';
+    let badge = '';
     if (isPayout) { cls += ' c-payout'; title = 'Withdrawal day'; }
-    else if (isCovered) { cls += ' c-green'; title = 'Paid'; }
+    else if (isCovered) { cls += ' c-green'; title = 'Paid'; badge = '✓'; }
+    else if (partialFrac !== undefined) {
+      cls += ' c-partial'; title = `Partially paid (${fractionGlyph(partialFrac)} slot)`;
+      badge = fractionGlyph(partialFrac);
+    }
     else if (isMissed) { cls += ' c-red'; title = 'Missed'; }
     else { cls += ' c-grey'; }
     if (isToday) cls += ' c-today';
-    tds.push(`<td class="${cls}" title="${title}">${d}</td>`);
+    const fillStyle = partialFrac !== undefined ? ` style="--fill:${(partialFrac * 100).toFixed(1)}%"` : '';
+    const badgeHtml = badge ? `<span class="cal-badge">${badge}</span>` : '';
+    tds.push(`<td class="${cls}" title="${title}"${fillStyle}><span class="cal-daynum">${d}</span>${badgeHtml}</td>`);
   }
   while (tds.length % 7 !== 0) tds.push('<td></td>');
 

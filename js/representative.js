@@ -294,8 +294,14 @@ async function repOnPlanChange() {
       const start = new Date(createdAt); start.setHours(0, 0, 0, 0);
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const calendarDaysElapsed = Math.max(0, Math.floor((today - start) / (1000 * 60 * 60 * 24)));
-      const daysCovered = Math.floor(totalDeposited / regContrib);
-      const missed = Math.max(0, calendarDaysElapsed - daysCovered);
+      // Floor the FINAL gap, not the days-covered total on its own —
+      // otherwise a half-slot payment (now valid; see doCollection())
+      // gets zero credit here and this overstates how far behind the
+      // customer actually is. Matches the calendar's own rule that a day
+      // isn't "missed" until it's genuinely a full day short, not just
+      // partially short.
+      const daysCovered = totalDeposited / regContrib;
+      const missed = Math.max(0, Math.floor(calendarDaysElapsed - daysCovered));
       missedEl.textContent = missed === 0 ? 'None' : `${missed} day${missed !== 1 ? 's' : ''}`;
       missedEl.style.color = missed === 0 ? 'var(--green)' : missed < 3 ? 'var(--orange)' : 'var(--red)';
     } else {
@@ -526,13 +532,14 @@ function openCollectModal() {
 // QUICK AMOUNT PRESETS (hybrid amount entry)
 // Reads the currently selected plan's regular_contribution straight from
 // the dropdown's cached data-contrib attribute (same source doCollection()
-// already trusts — no extra query). Since doCollection() requires the
-// deposit amount to be an exact multiple of that contribution, presets are
-// built as multiples of it (×1, ×2, ×3, ×5) and TAPPING SETS the field to
-// that exact value — not additive, so it can never accidentally produce a
-// non-multiple amount. Plans with no fixed contribution fall back to
-// generic round amounts instead. The manual #colAmt input stays fully
-// editable either way.
+// already trusts — no extra query). Presets are built as multiples of it
+// (×1, ×2, ×3, ×5) purely as convenient round-number shortcuts — any other
+// positive amount (including a fraction of the daily rate, e.g. ₦500 on a
+// ₦1,000 rate) is equally valid; doCollection() no longer requires an
+// exact multiple. TAPPING a preset SETS the field to that exact value —
+// not additive. Plans with no fixed contribution fall back to generic
+// round amounts instead. The manual #colAmt input stays fully editable
+// either way, for any amount.
 // ═══════════════════════════════════════════════
 function renderCollectPresets() {
   const row = document.getElementById('colPresetRow');
@@ -581,17 +588,14 @@ async function _doCollection() {
     return;
   }
   const amt = +amtVal; const rep = getUser(); const ref = genRef();
-  // Use regular_contribution from the cached dropdown option (set by the
-  // rep_search_customer RPC) — avoids a direct plans table query which
-  // reps no longer have RLS access to after the 049 policy rewrite.
-  const dd = document.getElementById('repPlanDd');
-  const opt = dd.options[dd.selectedIndex];
-  const regContrib = +(opt?.dataset?.contrib || 0);
-  if (regContrib > 0 && amt % regContrib !== 0) {
-    const multiples = [1, 2, 3].map(n => fmt(regContrib * n)).join(', ');
-    setMsg('colMsg', `<div class="msg-err">Amount must be a multiple of the regular contribution (${fmt(regContrib)}).<br>e.g. ${multiples}…</div>`);
-    return;
-  }
+  // No multiples-of-rate restriction: any positive amount is a valid
+  // deposit (e.g. ₦500 on a ₦1,000/day rate — a half slot, filled in by
+  // the calendar's spillover engine on the customer side). The amount is
+  // already validated as a positive number above, so there's nothing
+  // further to check here. (This used to also read regular_contribution
+  // off the plan dropdown just to enforce the multiples rule — no longer
+  // needed, since repSelectedPlan.id below is already module-level state,
+  // not derived from that dropdown option.)
 
   const custName = `${repFoundCust.first_name} ${repFoundCust.last_name}`;
   const details = { ref, amt, method, notes, planId: repSelectedPlan.id, customerId: repFoundCust.id, agentId: rep.id, custName };
