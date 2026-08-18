@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Bank Transfers – WAG Admin</title>
+<title>Transfers &amp; Migrations – WAG Admin</title>
 <link rel="stylesheet" href="../css/shared.css">
 <link rel="stylesheet" href="../css/admin.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -30,6 +30,15 @@
           <p style="color:var(--sub);font-size:12.5px;margin:-4px 0 14px;">Bank transfers submitted by field agents do not count toward a customer's balance until confirmed here against the actual bank statement.</p>
           <div id="transfersList"><div class="empty-state">Loading…</div></div>
         </div>
+
+        <div class="section-card" style="margin-top:20px;">
+          <div class="section-card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            Pending Paper-Balance Migrations
+          </div>
+          <p style="color:var(--sub);font-size:12.5px;margin:-4px 0 14px;">A customer coming from a paper record with a claimed starting balance. Confirming here creates the plan's opening transaction and adds it to their balance immediately — the customer can dispute a confirmed migration afterward from their own dashboard.</p>
+          <div id="migrationsList"><div class="empty-state">Loading…</div></div>
+        </div>
       </div>
     </div>
 
@@ -40,11 +49,12 @@
 const _a = requireAdmin();
 if (_a) (async () => {
   initAdminTheme();
-  renderAdminShell('transfers', 'Bank Transfers');
+  renderAdminShell('transfers', 'Transfers & Migrations');
 
   const [valid] = await Promise.all([
     verifyAdminFromDB(),
     renderTransfersPage().catch(e => console.error('Admin transfers render error:', e)),
+    renderMigrationsPage().catch(e => console.error('Admin migrations render error:', e)),
   ]);
   if (!valid) { window.location.replace(rootPath() + 'admin/login.html'); return; }
   closeSidebar();
