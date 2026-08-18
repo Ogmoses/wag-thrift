@@ -436,6 +436,19 @@ function renderAssistCustCard() {
     </div>
 
     <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
+     <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Migrate Paper Balance (Optional)</div>
+     <p style="color:var(--sub);font-size:11.5px;margin-bottom:8px;">
+      For a customer coming from a paper record with no transactions yet on the selected plan above. This submits a
+      claim for admin review — it does not touch the customer's balance until an admin confirms it, and the
+      customer can dispute it themselves afterward.
+     </p>
+     <input type="number" id="assistMigrateBalance" class="form-inp" placeholder="Claimed balance (₦)" min="1" style="margin-bottom:8px;">
+     <input type="date" id="assistMigrateDate" class="form-inp" style="margin-bottom:8px;" max="${new Date().toISOString().slice(0, 10)}">
+     <textarea id="assistMigrateNotes" class="form-inp" placeholder="Evidence notes — e.g. paper book reference, what the customer told you" rows="2" style="margin-bottom:8px;resize:vertical;"></textarea>
+     <button class="btn btn-blue" onclick="assistDoMigrateClaim()">Submit Migration Claim</button>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
      <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Close Selected Plan</div>
      <p style="color:var(--sub);font-size:11.5px;margin-bottom:8px;">Plan must have a ₦0.00 balance — withdraw first if needed.</p>
      <button class="btn" style="background:var(--red);color:#fff;" onclick="assistDoClosePlan()">Close Selected Plan</button>
@@ -497,6 +510,66 @@ async function assistDoCreatePlan() {
     showRepAlert('Plan Created', `"${name}" created for ${custName}.`, 'success');
     await assistRefreshCustomer();
   });
+}
+
+// No PIN is collected or sent here — unlike Withdraw/Create Plan/Close
+// Plan above, this doesn't touch the customer's balance by itself. It
+// only files a claim; submit_migration_claim() itself re-checks that
+// the selected plan is a real active rep's own submission and that the
+// plan genuinely has zero transactions yet (the only kind of plan a
+// migration can ever apply to) — an admin has to separately confirm it
+// before anything lands in the ledger, and the customer can dispute a
+// confirmed one afterward. guardedSubmit here (unlike the sibling
+// actions above) is a deliberate addition: nothing stops a rep from
+// double-tapping Confirm on a slow connection, and a duplicate claim on
+// the same plan is exactly the kind of noise that trips the fraud-flag
+// volume check server-side for no real reason.
+async function assistDoMigrateClaim() { guardedSubmit('migrateClaim', () => _assistDoMigrateClaim()); }
+async function _assistDoMigrateClaim() {
+  const planDd = document.getElementById('assistPlanDd');
+  const planId = planDd?.value;
+  const balEl = document.getElementById('assistMigrateBalance');
+  const dateEl = document.getElementById('assistMigrateDate');
+  const notesEl = document.getElementById('assistMigrateNotes');
+  const claimedBalance = +balEl?.value;
+  const lastContribDate = dateEl?.value || null;
+  const notes = notesEl?.value?.trim() || '';
+  setMsg('assistActionMsg', '');
+
+  if (!planId) { setMsg('assistActionMsg', '<div class="msg-err">Select a plan first</div>'); return; }
+  if (!claimedBalance || claimedBalance <= 0) { setMsg('assistActionMsg', '<div class="msg-err">Enter the customer\'s claimed paper balance</div>'); return; }
+  if (claimedBalance > 10000000) { setMsg('assistActionMsg', '<div class="msg-err">Claimed balance can\'t exceed ₦10,000,000 — the same cap that applies to any deposit.</div>'); return; }
+  if (lastContribDate) {
+    const picked = new Date(lastContribDate);
+    const today = new Date(); today.setHours(23, 59, 59, 999);
+    if (picked > today) { setMsg('assistActionMsg', '<div class="msg-err">Last contribution date can\'t be in the future</div>'); return; }
+  }
+
+  const custName = `${_assistCust.first_name || ''} ${_assistCust.last_name || ''}`.trim();
+  const planName = planDd.options[planDd.selectedIndex]?.textContent || 'this plan';
+
+  showRepConfirm(
+    'Submit Migration Claim',
+    `Submit a paper-balance migration claim of ${fmt(claimedBalance)} for ${custName} (${planName})? An admin will review this before it affects the customer's balance.`,
+    async () => {
+      showLoading('Submitting claim…');
+      const { data: result, error } = await db.rpc('submit_migration_claim', {
+        p_plan_id: planId, p_claimed_balance: claimedBalance,
+        p_last_contribution_date: lastContribDate, p_evidence_notes: notes || null,
+      });
+      hideLoading();
+      // The RPC — not this form — is the real gate on "is this plan
+      // actually eligible" (zero transactions, no existing pending
+      // claim, caller really is an active rep). Its {ok:false,error}
+      // is shown as-is rather than trying to predict its rules here.
+      if (error || result?.ok === false) {
+        setMsg('assistActionMsg', `<div class="msg-err">${escapeHtml(result?.error || error?.message || 'Could not submit migration claim')}</div>`);
+        return;
+      }
+      balEl.value = ''; dateEl.value = ''; notesEl.value = '';
+      showRepAlert('Migration Claim Submitted', `Claim for ${custName} (${planName}) sent to admin for review.`, 'success');
+    }
+  );
 }
 
 async function assistDoClosePlan() {

@@ -47,6 +47,17 @@ const genRef = () => 'WAG-TX-' + Math.floor(10000 + Math.random() * 90000);
 const genRepId = () => String(Math.floor(100000 + Math.random() * 900000));
 const genToken = () => { const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let t = 'WAGE-'; for (let i = 0; i < 8; i++) t += c[Math.floor(Math.random() * c.length)]; return t; };
 
+// ── HTML ESCAPING — for any user-typed free text (evidence notes,
+// rejection reasons, and similar) inserted via innerHTML. Free text one
+// person types (e.g. a rep's migration evidence note) often gets
+// rendered straight into another person's session (an admin reviewing
+// it, a customer viewing a dispute) — that's a stored-XSS path unless
+// it's escaped before hitting the DOM. Plain template-literal
+// interpolation alone does not do this.
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // ── AUTH PASSWORD DERIVATION FOR SHORT PINs
 // Supabase's minimum password length is project-wide and enforced server-side
 // — it can't be lowered below 6 (confirmed: setting it to 4 in the dashboard

@@ -92,7 +92,7 @@ async function audit(action, description, amount = null, planId = null) {
 const ADMIN_NAV = [
   { id: 'overview', label: 'Overview', section: 'Main', href: 'dashboard.html', icon: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>' },
   { id: 'disbursements', label: 'Disbursements', section: 'Main', href: 'dashboard.html#disbursements', badge: 'disbBadge', icon: '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>' },
-  { id: 'transfers', label: 'Bank Transfers', section: 'Main', href: 'transfers.html', badge: 'transferBadge', icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>' },
+  { id: 'transfers', label: 'Transfers & Migrations', section: 'Main', href: 'transfers.html', badge: 'transferBadge', icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>' },
   { id: 'customers', label: 'Customers', section: 'Users', href: 'users.html', icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>' },
   { id: 'agents', label: 'Field Agents', section: 'Users', href: 'representatives.html', icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>' },
   { id: 'search', label: 'Search', section: 'System', href: 'users.html#search', icon: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' },
@@ -402,7 +402,7 @@ async function renderOverview() {
   if (!db) return;
   const [
     { count: cc }, { count: rc }, { data: totals }, { count: planCnt }, { data: pendDisb },
-    { count: pdc }, { count: flagCount }, { count: ptc }, { data: auditRows }
+    { count: pdc }, { count: flagCount }, { count: ptc }, { count: pmc }, { data: auditRows }
   ] = await Promise.all([
     db.from('customers').select('*', { count: 'exact', head: true }).neq('status', 'deleted'),
     db.from('representatives').select('*', { count: 'exact', head: true }).neq('status', 'deleted'),
@@ -414,6 +414,7 @@ async function renderOverview() {
     db.from('disbursements').select('*', { count: 'exact', head: true }).in('status', ['pending', 'reviewed']),
     db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
     db.from('pending_transfers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    db.from('pending_migrations').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     db.from('audit_log').select('*').not('description', 'ilike', 'New customer account created:%').order('created_at', { ascending: false }).limit(10),
   ]);
 
@@ -439,8 +440,12 @@ async function renderOverview() {
   const flagBadgeEl = document.getElementById('flagBadge');
   if (flagBadgeEl) { flagBadgeEl.style.display = flagCount > 0 ? '' : 'none'; flagBadgeEl.textContent = flagCount || 0; }
 
+  // One shared badge for the merged Transfers & Migrations page — both
+  // queue types land on the same page now, so "does this page need
+  // attention" is their combined count, not just transfers alone.
+  const transferPlusMigrationCount = (ptc || 0) + (pmc || 0);
   const transferBadgeEl = document.getElementById('transferBadge');
-  if (transferBadgeEl) { transferBadgeEl.style.display = ptc > 0 ? '' : 'none'; transferBadgeEl.textContent = ptc || 0; }
+  if (transferBadgeEl) { transferBadgeEl.style.display = transferPlusMigrationCount > 0 ? '' : 'none'; transferBadgeEl.textContent = transferPlusMigrationCount; }
 
   renderAuditRows('ovAuditList', auditRows || []);
 }
@@ -474,6 +479,7 @@ async function renderExecutiveOverview() {
       { data: pendDisb }, { count: pdc },
       { data: flags }, { count: flagCount },
       { data: pendTransfers }, { count: transferCount },
+      { data: pendMigrations }, { count: migrationCount },
       { count: activeReps },
       { count: activePlans },
       { data: balanceRows },
@@ -485,6 +491,8 @@ async function renderExecutiveOverview() {
       db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
       db.from('pending_transfers').select('*,customers(first_name,last_name,phone)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
       db.from('pending_transfers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      db.from('pending_migrations').select('*,customers(first_name,last_name,phone),representatives(first_name,last_name,rep_id),plans(name)').eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
+      db.from('pending_migrations').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       db.from('representatives').select('*', { count: 'exact', head: true }).eq('status', 'active'),
       db.from('plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
       db.from('plan_balances').select('balance'),
@@ -509,7 +517,7 @@ async function renderExecutiveOverview() {
     setText('execTxToday', todayDeposits.length);
     setText('execPlans', activePlans || 0);
 
-    renderActionNeeded(pendDisb || [], flags || [], pendTransfers || [], pdc || 0, flagCount || 0, transferCount || 0);
+    renderActionNeeded(pendDisb || [], flags || [], pendTransfers || [], pendMigrations || [], pdc || 0, flagCount || 0, transferCount || 0, migrationCount || 0);
   } catch (e) {
     // Fix: this whole function used to have no error handling at all, and
     // every DOM write above had no null-guard — a single missing element
@@ -526,10 +534,10 @@ async function renderExecutiveOverview() {
   }
 }
 
-function renderActionNeeded(disbs, flags, transfers, disbCount, flagCount, transferCount) {
+function renderActionNeeded(disbs, flags, transfers, migrations, disbCount, flagCount, transferCount, migrationCount) {
   const el = document.getElementById('execActionNeeded');
   if (!el) return;
-  const totalPending = disbCount + flagCount + transferCount;
+  const totalPending = disbCount + flagCount + transferCount + migrationCount;
 
   if (totalPending === 0) {
     el.innerHTML = `<div class="exec-allclear">
@@ -591,12 +599,31 @@ function renderActionNeeded(disbs, flags, transfers, disbCount, flagCount, trans
     </div>`;
   }).join('');
 
-  const shown = disbs.length + flags.length + transfers.length;
+  const migrationHTML = migrations.map(m => {
+    const cust = m.customers || {};
+    const custName = `${cust.first_name || 'Unknown'} ${cust.last_name || ''}`.trim();
+    const custPhone = (cust.phone || '').replace('+234', '0');
+    const rep = m.representatives || {};
+    const repName = `${rep.first_name || ''} ${rep.last_name || ''}`.trim() || 'an agent';
+    const planName = m.plans?.name || 'a plan';
+    return `<div class="exec-priority-card">
+      <div class="exec-priority-info">
+        <div class="exec-priority-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Paper migration · ${fmt(m.claimed_balance)}</div>
+        <div class="exec-priority-sub">${escapeHtml(custName)}${custPhone ? ' · ' + custPhone : ''} · "${escapeHtml(planName)}" · reported by ${escapeHtml(repName)}</div>
+      </div>
+      <div class="exec-priority-actions">
+        <button class="exec-btn-approve" onclick="confirmMigration('${m.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Confirm</button>
+        <button class="exec-btn-decline" onclick="rejectMigration('${m.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const shown = disbs.length + flags.length + transfers.length + migrations.length;
   const viewAllHTML = totalPending > shown
     ? `<a href="dashboard.html#disbursements" class="exec-viewall">View all ${totalPending} pending items →</a>`
     : '';
 
-  el.innerHTML = `<div class="exec-priority-hd">${totalPending} item${totalPending === 1 ? '' : 's'} need${totalPending === 1 ? 's' : ''} your attention</div>${disbHTML}${flagHTML}${transferHTML}${viewAllHTML}`;
+  el.innerHTML = `<div class="exec-priority-hd">${totalPending} item${totalPending === 1 ? '' : 's'} need${totalPending === 1 ? 's' : ''} your attention</div>${disbHTML}${flagHTML}${transferHTML}${migrationHTML}${viewAllHTML}`;
 }
 
 async function resolveFlagExec(id) {
@@ -835,6 +862,134 @@ async function rejectTransfer(transferId, amount, accountName) {
     if (error) { showAdminAlert('Failed', 'Reject failed: ' + error.message, 'error'); return; }
     if (data?.ok === false) { showAdminAlert('Failed', 'Reject failed: ' + (data.error || 'Unknown error'), 'error'); return; }
     await renderTransfersPage();
+    await updateBadges();
+    if (typeof renderExecutiveOverview === 'function') await renderExecutiveOverview();
+  });
+}
+
+// ═══════════════════════════════════════════════
+// PENDING PAPER-RECORD MIGRATIONS (admin/transfers.html, same page as
+// Bank Transfers — both are "external evidence an admin has to confirm
+// before it becomes a real transaction" queues)
+//
+// A migration claim can only ever be a plan's first transaction ever —
+// submit_migration_claim() enforces that server-side (zero existing
+// transactions on the plan), and confirm_migration() re-checks it again
+// at confirmation time in case a real deposit landed in between (a
+// FOR UPDATE row lock, not just a plain re-read, so two admins clicking
+// Confirm on the same claim at once can't both succeed). Only
+// confirm_migration()/reject_migration() can ever move a claim out of
+// 'pending' — pending_migrations itself grants no UPDATE to
+// authenticated at all, so this page has no other way to act on one
+// even if it wanted to.
+// ═══════════════════════════════════════════════
+let allMigrations = [];
+
+async function renderMigrationsPage() {
+  if (!db) return;
+  const el = document.getElementById('migrationsList');
+  if (el) el.innerHTML = '<div class="empty-state">Loading…</div>';
+
+  const { data: migrations, error } = await db.from('pending_migrations')
+    .select('*, customers(first_name,last_name,phone), representatives(first_name,last_name,rep_id), plans(name,regular_contribution)')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (error) { if (el) el.innerHTML = `<div class="msg-err">${escapeHtml(error.message)}</div>`; return; }
+
+  allMigrations = migrations || [];
+  renderMigrationsList(allMigrations);
+}
+
+function renderMigrationsList(list) {
+  const el = document.getElementById('migrationsList');
+  if (!el) return;
+  const pending = list.filter(m => m.status === 'pending');
+  const resolved = list.filter(m => m.status !== 'pending');
+
+  if (!list.length) { el.innerHTML = '<div class="empty-state">No paper-balance migrations submitted yet</div>'; return; }
+
+  let html = '';
+  if (pending.length) {
+    html += `<div class="section-card-title" style="margin:0 0 10px;">${pending.length} awaiting confirmation</div>`;
+    html += pending.map(renderMigrationCard).join('');
+  } else {
+    html += '<div class="empty-state">No migrations awaiting confirmation</div>';
+  }
+  if (resolved.length) {
+    html += `<div class="section-card-title" style="margin:22px 0 10px;">Recently reviewed</div>`;
+    html += resolved.slice(0, 20).map(renderMigrationCard).join('');
+  }
+  el.innerHTML = html;
+}
+
+// All user-typed free text here (customer/rep names, plan name, and
+// especially evidence_notes/rejection_reason — genuinely free-form,
+// typed by a rep about a third party, and read by an admin and
+// potentially the customer later) goes through escapeHtml(), not raw
+// template interpolation. See utils.js for why.
+function renderMigrationCard(m) {
+  const cust = m.customers || {};
+  const custName = `${cust.first_name || 'Unknown'} ${cust.last_name || ''}`.trim();
+  const custPhone = (cust.phone || '').replace('+234', '0');
+  const rep = m.representatives || {};
+  const repName = `${rep.first_name || 'Unknown'} ${rep.last_name || ''}`.trim();
+  const planName = m.plans?.name || '—';
+  const rate = m.plans?.regular_contribution;
+
+  const statusLabel = {
+    pending: 'pending', confirmed: 'approved', rejected: 'rejected', disputed: 'rejected',
+  }[m.status] || m.status;
+  const statusText = m.status === 'disputed' ? 'DISPUTED BY CUSTOMER' : m.status;
+
+  const actions = m.status === 'pending'
+    ? `<div class="disb-actions">
+        <button class="btn-review" onclick="confirmMigration('${m.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Confirm — Add to Balance</button>
+        <button class="btn-reject" onclick="rejectMigration('${m.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Reject</button>
+       </div>`
+    : `<div class="disb-actions"><div style="font-size:11px;color:${m.status === 'disputed' ? 'var(--red)' : 'var(--sub)'};padding:6px 2px;font-weight:${m.status === 'disputed' ? '700' : '400'};">
+        ${m.status === 'confirmed' ? 'Confirmed — added to balance' : m.status === 'disputed' ? 'Disputed by customer — needs investigation' : 'Rejected'}${m.rejection_reason ? ' — ' + escapeHtml(m.rejection_reason) : ''}
+       </div></div>`;
+
+  return `<div class="disb-item">
+    <div class="disb-header">
+      <div>
+        <div class="disb-name">${escapeHtml(custName)}</div>
+        <div class="disb-phone">${escapeHtml(custPhone)}</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="disb-amount">${fmt(m.claimed_balance)}</div>
+        <span class="status-pill ${statusLabel}">${escapeHtml(statusText)}</span>
+      </div>
+    </div>
+    <div class="disb-reason">Plan: <strong>${escapeHtml(planName)}</strong>${rate ? ` (${fmt(rate)}/daily)` : ''}${m.last_contribution_date ? ` · Last paper contribution: ${fmtDate(m.last_contribution_date)}` : ''}</div>
+    ${m.evidence_notes ? `<div class="disb-reason" style="color:var(--sub);">Agent's notes: ${escapeHtml(m.evidence_notes)}</div>` : ''}
+    <div class="disb-meta">Agent: ${escapeHtml(repName)} (#${rep.rep_id || '—'}) · ${fmtDate(m.created_at)} ${fmtTime(m.created_at)}</div>
+    ${actions}
+  </div>`;
+}
+
+async function confirmMigration(migrationId) {
+  showConfirm('Confirm Paper-Balance Migration', 'Confirm this claim? This creates an opening transaction for the claimed amount and adds it to the customer\'s balance immediately. The customer will be able to see and dispute this migration afterward if it\'s wrong.', async () => {
+    showLoading('Confirming…');
+    const { data, error } = await db.rpc('confirm_migration', { p_migration_id: migrationId });
+    hideLoading();
+    if (error) { showAdminAlert('Failed', 'Confirmation failed: ' + error.message, 'error'); return; }
+    if (data?.ok === false) { showAdminAlert('Failed', 'Confirmation failed: ' + (data.error || 'Unknown error'), 'error'); return; }
+    await renderMigrationsPage();
+    await updateBadges();
+    if (typeof renderExecutiveOverview === 'function') await renderExecutiveOverview();
+  });
+}
+
+async function rejectMigration(migrationId) {
+  showConfirm('Reject Migration Claim', 'Reject this paper-balance claim? This does not touch any balance — use this if the evidence doesn\'t hold up.', async () => {
+    showLoading('Rejecting…');
+    const { data, error } = await db.rpc('reject_migration', { p_migration_id: migrationId, p_reason: null });
+    hideLoading();
+    if (error) { showAdminAlert('Failed', 'Reject failed: ' + error.message, 'error'); return; }
+    if (data?.ok === false) { showAdminAlert('Failed', 'Reject failed: ' + (data.error || 'Unknown error'), 'error'); return; }
+    await renderMigrationsPage();
     await updateBadges();
     if (typeof renderExecutiveOverview === 'function') await renderExecutiveOverview();
   });
@@ -1213,6 +1368,16 @@ async function renderFraudFlagCard(f) {
   try {
     if (type === 'LARGE_COLLECTION') accountHtml = await buildAgentFlagContext(f.user_id);
     else if (type === 'EXCESS_WITHDRAWAL') accountHtml = await buildCustomerFlagContext(f.user_id, true);
+    // EXCESS_MIGRATION: user_id is the agent (submit_migration_claim's
+    // own volume-check raises this against the rep who filed 5+ claims
+    // in the trailing 30 days) — same shape as LARGE_COLLECTION.
+    else if (type === 'EXCESS_MIGRATION') accountHtml = await buildAgentFlagContext(f.user_id);
+    // MIGRATION_DISPUTE: user_id is the customer (dispute_migration()
+    // raises this against the plan owner who filed the dispute) — plus
+    // the actual disputed claim's own details, not just generic
+    // customer withdrawal evidence (buildCustomerFlagContext's
+    // withEvidence=true doesn't apply here — wrong evidence type).
+    else if (type === 'MIGRATION_DISPUTE') accountHtml = await buildMigrationDisputeContext(f.user_id, f.plan_id);
     else if (type === 'FAILED_PIN_ATTEMPTS') {
       const { data: cust } = await db.from('customers').select('id').eq('phone', f.user_id).maybeSingle();
       accountHtml = cust
@@ -1251,6 +1416,32 @@ async function buildCustomerFlagContext(custId, withEvidence) {
   }
 
   return `<div class="ff-account"><div class="ff-account-row"><div><div class="ff-account-name">${c.first_name} ${c.last_name}<span class="ff-role-tag">CUSTOMER</span>${statusTag}</div><div class="ff-account-sub">${(c.phone || '').replace('+234', '0')} · Joined ${fmtDate(c.created_at)}</div></div><div>${actionBtn}</div></div>${evidence}</div>`;
+}
+
+// Customer identity + suspend/restore action (via buildCustomerFlagContext,
+// withEvidence=false — withdrawal evidence doesn't apply to a migration
+// dispute), plus the specific disputed claim's own details: claimed
+// balance, last paper contribution date, and the agent's original
+// evidence notes. planId comes straight off the fraud_flags row —
+// dispute_migration() sets it when it raises this flag.
+async function buildMigrationDisputeContext(custId, planId) {
+  const custHtml = await buildCustomerFlagContext(custId, false);
+  if (!planId) return custHtml;
+
+  const { data: pm } = await db.from('pending_migrations')
+    .select('*, plans(name)')
+    .eq('plan_id', planId).eq('status', 'disputed')
+    .order('disputed_at', { ascending: false }).limit(1).maybeSingle();
+  if (!pm) return custHtml;
+
+  const planName = pm.plans?.name || 'this plan';
+  const evidence = `<div class="ff-evidence">
+    <div class="ff-evidence-title">Disputed migration — ${escapeHtml(planName)}</div>
+    <div class="ff-evidence-row"><span>Claimed balance</span><span>${fmt(pm.claimed_balance)}</span></div>
+    ${pm.last_contribution_date ? `<div class="ff-evidence-row"><span>Last paper contribution</span><span>${fmtDate(pm.last_contribution_date)}</span></div>` : ''}
+    ${pm.evidence_notes ? `<div class="ff-evidence-row" style="display:block;"><span>Agent's original notes:</span><div style="margin-top:4px;color:var(--sub);">${escapeHtml(pm.evidence_notes)}</div></div>` : ''}
+  </div>`;
+  return custHtml + evidence;
 }
 
 async function buildAgentFlagContext(agentId) {
@@ -1668,17 +1859,21 @@ let realtimeChannels = [];
 async function updateBadges() {
   if (!db || !isAdminLoggedIn()) return;
   try {
-    const [{ count: pdc }, { count: fdc }, { count: ptc }] = await Promise.all([
+    const [{ count: pdc }, { count: fdc }, { count: ptc }, { count: pmc }] = await Promise.all([
       db.from('disbursements').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       db.from('fraud_flags').select('*', { count: 'exact', head: true }).eq('resolved', false),
-      db.from('pending_transfers').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+      db.from('pending_transfers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      db.from('pending_migrations').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     ]);
     const disbBadge = document.getElementById('disbBadge');
     if (disbBadge) { disbBadge.style.display = pdc > 0 ? '' : 'none'; disbBadge.textContent = pdc || 0; }
     const flagBadge = document.getElementById('flagBadge');
     if (flagBadge) { flagBadge.style.display = fdc > 0 ? '' : 'none'; flagBadge.textContent = fdc || 0; }
+    // Combined — Bank Transfers and Migrations now share one nav item
+    // and one page (admin/transfers.html), so one badge for both.
+    const transferPlusMigration = (ptc || 0) + (pmc || 0);
     const transferBadge = document.getElementById('transferBadge');
-    if (transferBadge) { transferBadge.style.display = ptc > 0 ? '' : 'none'; transferBadge.textContent = ptc || 0; }
+    if (transferBadge) { transferBadge.style.display = transferPlusMigration > 0 ? '' : 'none'; transferBadge.textContent = transferPlusMigration; }
     const ovEl = document.getElementById('ovPendingDisb');
     if (ovEl) ovEl.textContent = pdc || 0;
   } catch (e) { }
@@ -1700,9 +1895,21 @@ function setupRealtimeListeners() {
     else if (currentPage === 'flags' && table === 'fraud_flags') await renderFraudFlags();
     else if (currentPage === 'auditlog' && table === 'audit_log') await renderAuditLog();
     else if (currentPage === 'analytics') await renderAnalytics();
+    // Transfers & Migrations share one page — refresh whichever list(s)
+    // it has. (Fixing an existing gap while I'm here: pending_transfers
+    // was never in the subscribed table list below either, so this page
+    // never actually lived-refreshed for its own transfers before now —
+    // only after an action taken directly on it. Since the two now
+    // share one combined badge, leaving one of them live and the other
+    // not would just be a different, more confusing version of the
+    // same gap.)
+    else if (currentPage === 'transfers' && (table === 'pending_transfers' || table === 'pending_migrations')) {
+      if (typeof renderTransfersPage === 'function') await renderTransfersPage();
+      if (typeof renderMigrationsPage === 'function') await renderMigrationsPage();
+    }
   };
 
-  const tables = ['disbursements', 'transactions', 'audit_log', 'fraud_flags', 'customers', 'representatives', 'plans'];
+  const tables = ['disbursements', 'transactions', 'audit_log', 'fraud_flags', 'customers', 'representatives', 'plans', 'pending_transfers', 'pending_migrations'];
   tables.forEach(table => {
     const ch = db.channel('admin-rt-' + table)
       .on('postgres_changes', { event: '*', schema: 'public', table }, () => onAny(table))

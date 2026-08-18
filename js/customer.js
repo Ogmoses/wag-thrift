@@ -67,12 +67,18 @@ async function switchPlan(id) {
 
 async function renderPlanDetail(planId) {
   loadBalPref(); // restore hidden/shown preference before rendering balance
-  const [{ data: plan }, { data: planExtra }, { data: allDeposits }, { data: txs }, { data: rejDisbs }] = await Promise.all([
+  const [{ data: plan }, { data: planExtra }, { data: allDeposits }, { data: txs }, { data: rejDisbs }, { data: migrationRows }] = await Promise.all([
     db.from('plan_balances').select('*').eq('plan_id', planId).single(),
     db.from('plans').select('regular_contribution,maturity_date').eq('id', planId).single(),
     db.from('transactions').select('amount').eq('plan_id', planId).in('type', ['opening', 'deposit']),
     db.from('transactions').select('*').eq('plan_id', planId).order('created_at', { ascending: false }),
-    db.from('disbursements').select('*').eq('plan_id', planId).eq('status', 'rejected')
+    db.from('disbursements').select('*').eq('plan_id', planId).eq('status', 'rejected'),
+    // RLS (pm_customer_read) already scopes this to the signed-in
+    // customer's own plans — no separate ownership check needed here.
+    // 'pending'/'rejected' claims never reach this point (no opening
+    // transaction gets created until confirm_migration() runs), so the
+    // only rows that can come back are 'confirmed' or 'disputed'.
+    db.from('pending_migrations').select('status,confirmed_at,disputed_at').eq('plan_id', planId).order('created_at', { ascending: false }).limit(1),
   ]);
   if (!plan) return;
   plan.regular_contribution = planExtra?.regular_contribution || 0;
@@ -101,6 +107,7 @@ async function renderPlanDetail(planId) {
   const ob = document.getElementById('overdueBanner');
   if (isOverdue) { ob.style.display = 'flex'; document.getElementById('overdueCount').textContent = `${sched.missed} ${sched.label} contribution${sched.missed !== 1 ? 's' : ''} overdue`; }
   else ob.style.display = 'none';
+  renderMigratedSection(planId, txs || [], migrationRows?.[0] || null);
   const schedLabel = sched.label || 'period';
   document.getElementById('scheduleBlock').innerHTML = `
    <div class="sched-row"><span class="sched-label">Regular contribution</span><span class="sched-val">${regularAmt > 0 ? fmt(regularAmt) + ' / ' + schedLabel : 'Not set'}</span></div>
@@ -119,6 +126,60 @@ async function renderPlanDetail(planId) {
       return `<div class="tx-row"><div class="tx-ico ${isIn ? 'tx-ico-g' : 'tx-ico-r'}">${isIn ? '↓' : '↑'}</div><div class="tx-body"><div class="tx-name">${label}</div><div class="tx-dt">${fmtDate(tx.created_at)} · ${fmtTime(tx.created_at)}</div><div class="tx-ref">${tx.ref || '—'}</div></div><div class="${isIn ? 'tx-amt-g' : 'tx-amt-r'}">${isIn ? '+' : '-'}${fmt(tx.amount)}</div></div>`;
     }).join('');
   }
+}
+
+// Shows the "migrated from paper records" notice + dispute action on a
+// plan whose opening transaction was created by confirm_migration()
+// (method='Migrated' — the permanent, visible tag baked into the
+// transaction itself, not a separate flag that could drift out of sync
+// with it). Nothing renders for an ordinary plan. dispute_migration()
+// takes no PIN — it doesn't move money, it only raises a flag for admin
+// review — so this isn't PIN-gated either, consistent with the RPC.
+function renderMigratedSection(planId, txs, migrationRow) {
+  const el = document.getElementById('migratedSection');
+  if (!el) return;
+  const migratedTx = txs.find(t => t.type === 'opening' && t.method === 'Migrated');
+  if (!migratedTx || !migrationRow) { el.innerHTML = ''; return; }
+
+  if (migrationRow.status === 'disputed') {
+    el.innerHTML = `<div class="msg-info" style="margin:10px 13px 0;">
+      <strong>Starting balance under review</strong><br>
+      You disputed this migrated balance${migrationRow.disputed_at ? ' on ' + fmtDate(migrationRow.disputed_at) : ''}. An admin is looking into it — no further action needed from you right now.
+    </div>`;
+    return;
+  }
+
+  // The only other status a plan with a migrated opening transaction can
+  // be in — 'pending'/'rejected' claims never reach this point, since no
+  // opening transaction exists until confirm_migration() runs.
+  el.innerHTML = `<div class="msg-info" style="margin:10px 13px 0;">
+    <strong>Migrated from paper records</strong><br>
+    This plan's starting balance (${fmt(migratedTx.amount)}) was carried over from a paper record${migrationRow.confirmed_at ? ' and confirmed on ' + fmtDate(migrationRow.confirmed_at) : ''}. If this doesn't look right, you can dispute it below.
+    <button class="btn btn-outline" style="margin:8px 0 0;width:auto;padding:8px 14px;font-size:12.5px;" onclick="disputeMigration('${planId}')">Dispute my starting balance</button>
+  </div>`;
+}
+
+async function disputeMigration(planId) { guardedSubmit('disputeMigration', () => _disputeMigration(planId)); }
+async function _disputeMigration(planId) {
+  showCustConfirm(
+    'Dispute Starting Balance',
+    "This will flag your migrated starting balance for admin review. Only do this if the amount is genuinely wrong — an admin will look into it and follow up with you.",
+    async () => {
+      showLoading('Submitting dispute…');
+      // dispute_migration() independently re-checks that this plan
+      // really belongs to the signed-in customer — this button being
+      // visible at all already implies that, but the RPC doesn't trust
+      // the frontend's word for it.
+      const { data: result, error } = await db.rpc('dispute_migration', { p_plan_id: planId });
+      hideLoading();
+      if (error || result?.ok === false) {
+        showCustAlert('Could Not Submit', result?.error || error?.message || 'Something went wrong — please try again.', 'error');
+        return;
+      }
+      showCustAlert('Dispute Submitted', 'An admin will review your starting balance.', 'success');
+      await renderPlanDetail(planId);
+    }
+  );
 }
 
 function toggleBalVis() {
