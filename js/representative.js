@@ -413,21 +413,23 @@ function renderAssistCustCard() {
     </div>
 
     <div class="mform-group"><label class="form-lbl">Plan</label>
-     <select id="assistPlanDd" class="form-inp"><option value="">— Select a plan —</option>${planOpts}</select>
+     <select id="assistPlanDd" class="form-inp" onchange="assistLoadPlanCalendar()"><option value="">— Select a plan —</option>${planOpts}</select>
     </div>
+
+    <div id="assistCalWrap"></div>
 
     <div id="assistActionMsg"></div>
 
-    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
-     <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Withdraw</div>
+    <div class="assist-section">
+     <div class="assist-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 2v13M5 9l7-7 7 7"/><path d="M4 22h16"/></svg>Withdraw</div>
      <div style="display:flex;gap:8px;">
       <input type="number" id="assistWdAmt" class="form-inp" placeholder="Amount" min="1" style="flex:1;">
       <button class="btn btn-blue" style="width:auto;padding:0 16px;" onclick="assistDoWithdraw()">Withdraw</button>
      </div>
     </div>
 
-    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
-     <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Create New Plan</div>
+    <div class="assist-section">
+     <div class="assist-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Create New Plan</div>
      <input type="text" id="assistPlanName" class="form-inp" placeholder="Plan name, e.g. Shop Savings" style="margin-bottom:8px;">
      <div style="display:flex;gap:8px;">
       <input type="number" id="assistPlanContrib" class="form-inp" placeholder="Daily contribution (₦)" min="1" style="flex:1;">
@@ -435,8 +437,8 @@ function renderAssistCustCard() {
      </div>
     </div>
 
-    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
-     <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Migrate Paper Balance (Optional)</div>
+    <div class="assist-section">
+     <div class="assist-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 3v10M8 9l4 4 4-4"/><path d="M4 17h16"/></svg>Migrate Paper Balance (Optional)</div>
      <p style="color:var(--sub);font-size:11.5px;margin-bottom:8px;">
       For a customer coming from a paper record with no transactions yet on the selected plan above. This submits a
       claim for admin review — it does not touch the customer's balance until an admin confirms it, and the
@@ -448,12 +450,127 @@ function renderAssistCustCard() {
      <button class="btn btn-blue" onclick="assistDoMigrateClaim()">Submit Migration Claim</button>
     </div>
 
-    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
-     <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Close Selected Plan</div>
+    <div class="assist-section assist-danger">
+     <div class="assist-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>Close Selected Plan</div>
      <p style="color:var(--sub);font-size:11.5px;margin-bottom:8px;">Plan must have a ₦0.00 balance — withdraw first if needed.</p>
      <button class="btn" style="background:var(--red);color:#fff;" onclick="assistDoClosePlan()">Close Selected Plan</button>
     </div>
    </div>`;
+}
+
+// ─── MINI CALENDAR — same paid/partial/missed visual the customer sees
+// on their own dashboard, for whichever plan is selected above. Scoped
+// to the CURRENT month only (no prev/next navigation like the
+// customer's own calendar tab has) — a rep mainly needs "is this
+// customer current this month," and the customer's own dashboard is
+// already the right place for a full multi-month history if that's
+// ever needed. computeSlotAllocation()/fractionGlyph() are duplicated
+// from customer.js rather than shared — this is a separate, unbundled
+// HTML page with no module system, the same reason the report engine
+// duplicates logic between generate-report.js and worker.js. Keep the
+// three in sync if the slot-math ever changes.
+function dateKeyRep(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function computeSlotAllocation(planStart, today, totalDeposited, regularAmt) {
+  const EPS = 1e-9;
+  const totalSlots = regularAmt > 0 ? totalDeposited / regularAmt : 0;
+  const wholeSlots = Math.floor(totalSlots + EPS);
+  const remainder = totalSlots - wholeSlots;
+  const covered = new Set();
+  const partial = new Map();
+  const missed = new Set();
+  const walker = new Date(planStart);
+  for (let i = 0; i < wholeSlots; i++) { covered.add(dateKeyRep(walker)); walker.setDate(walker.getDate() + 1); }
+  if (remainder > EPS) partial.set(dateKeyRep(walker), remainder);
+  const missWalker = new Date(walker);
+  if (remainder > EPS) missWalker.setDate(missWalker.getDate() + 1);
+  while (missWalker < today) { missed.add(dateKeyRep(missWalker)); missWalker.setDate(missWalker.getDate() + 1); }
+  return { covered, partial, missed };
+}
+
+function fractionGlyph(frac) {
+  const EPS = 0.02;
+  if (Math.abs(frac - 0.25) < EPS) return '¼';
+  if (Math.abs(frac - 0.5) < EPS) return '½';
+  if (Math.abs(frac - 0.75) < EPS) return '¾';
+  if (Math.abs(frac - 1 / 3) < EPS) return '⅓';
+  if (Math.abs(frac - 2 / 3) < EPS) return '⅔';
+  return Math.round(frac * 100) + '%';
+}
+
+function buildAssistCalHTML(yr, mo, covered, partial, missed) {
+  const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const DN = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  const todayStr = dateKeyRep(new Date());
+  const rawFirstDay = new Date(yr, mo, 1).getDay();
+  const firstDay = (rawFirstDay + 6) % 7;
+  const daysInMonth = new Date(yr, mo + 1, 0).getDate();
+
+  const tds = [];
+  for (let i = 0; i < firstDay; i++) tds.push('<td></td>');
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${yr}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const isCovered = covered.has(ds);
+    const partialFrac = partial.get(ds);
+    const isMissed = missed.has(ds);
+    const isToday = ds === todayStr;
+    let cls = 'cal-cell';
+    let title = '';
+    let badge = '';
+    if (isCovered) { cls += ' c-green'; title = 'Paid'; badge = '✓'; }
+    else if (partialFrac !== undefined) { cls += ' c-partial'; title = `Partially paid (${fractionGlyph(partialFrac)} slot)`; badge = fractionGlyph(partialFrac); }
+    else if (isMissed) { cls += ' c-red'; title = 'Missed'; }
+    else { cls += ' c-grey'; }
+    if (isToday) cls += ' c-today';
+    const fillStyle = partialFrac !== undefined ? ` style="--fill:${(partialFrac * 100).toFixed(1)}%"` : '';
+    const badgeHtml = badge ? `<span class="cal-badge">${badge}</span>` : '';
+    tds.push(`<td class="${cls}" title="${title}"${fillStyle}><span class="cal-daynum">${d}</span>${badgeHtml}</td>`);
+  }
+  while (tds.length % 7 !== 0) tds.push('<td></td>');
+
+  let rows = '';
+  for (let i = 0; i < tds.length; i += 7) rows += '<tr>' + tds.slice(i, i + 7).join('') + '</tr>';
+
+  return `
+   <div class="assist-section">
+    <div class="assist-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${MN[mo]} ${yr}</div>
+    <table class="mini-cal-table"><tr>${DN.map(d => `<td class="cal-day-hdr">${d}</td>`).join('')}</tr></table>
+    <table class="mini-cal-table">${rows}</table>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:10.5px;color:var(--sub);">
+     <span><span style="background:#d1fae5;display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:3px;"></span>Paid</span>
+     <span><span style="background:linear-gradient(to top, var(--green) 50%, #e5e7eb 50%);display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:3px;"></span>Partial</span>
+     <span><span style="background:#fee2e2;display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:3px;"></span>Missed</span>
+    </div>
+   </div>`;
+}
+
+async function assistLoadPlanCalendar() {
+  const planId = document.getElementById('assistPlanDd')?.value;
+  const wrap = document.getElementById('assistCalWrap');
+  if (!wrap) return;
+  if (!planId) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<div class="empty-state" style="padding:10px;">Loading calendar…</div>';
+
+  // rep_get_plan_calendar_data() re-verifies the caller is a real
+  // representative independently — this call being reachable at all
+  // doesn't imply the RPC will trust it without checking again.
+  const { data: result, error } = await db.rpc('rep_get_plan_calendar_data', { p_plan_id: planId });
+  if (error || result?.ok === false) {
+    wrap.innerHTML = `<div class="msg-err">${escapeHtml(result?.error || error?.message || 'Could not load calendar')}</div>`;
+    return;
+  }
+
+  const planStart = new Date(result.plan_created_at);
+  planStart.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const regularAmt = Number(result.regular_contribution) || 1000;
+  const totalDeposited = (result.transactions || []).reduce((s, t) => s + Number(t.amount), 0);
+
+  const { covered, partial, missed } = computeSlotAllocation(planStart, today, totalDeposited, regularAmt);
+  wrap.innerHTML = buildAssistCalHTML(today.getFullYear(), today.getMonth(), covered, partial, missed);
 }
 
 function assistGetPin() {
@@ -598,7 +715,13 @@ function openCollectModal() {
   if (!repFoundCust) { showRepAlert('Hold on', 'Search for a customer first', 'error'); return; }
   if (!repSelectedPlan) { showRepAlert('Hold on', 'Please select a plan first', 'error'); return; }
   renderCollectPresets();
-  requirePayPin('Payment PIN', 'Enter your payment PIN to save this deposit.', () => showModal('collectModal'));
+  // PIN is asked for further down, right before doCollection() actually
+  // submits — not here. Gating the modal itself behind a PIN meant a rep
+  // had to authenticate before they'd even entered an amount; now the
+  // PIN is the final confirmation step once the deposit is actually
+  // ready to go, the same way a card PIN is entered after the amount is
+  // rung up, not before the till is opened.
+  showModal('collectModal');
 }
 
 // ═══════════════════════════════════════════════
@@ -645,7 +768,26 @@ function clearCollectAmount() {
   if (inp) inp.value = '';
 }
 
-async function doCollection() { guardedSubmit('collection', () => _doCollection()); }
+// Validates the form BEFORE asking for a PIN — no point interrupting the
+// rep with a PIN prompt if the amount/method aren't even filled in yet.
+// The PIN is requested only once the deposit is genuinely ready to
+// submit; _doCollection() itself still re-validates everything (defense
+// in depth — this upfront check is a UX improvement, not the real gate).
+function doCollection() {
+  const amtVal = document.getElementById('colAmt').value.trim();
+  const method = document.getElementById('colMethod').value;
+  const notes = document.getElementById('colNotes').value.trim();
+  setMsg('colMsg', '');
+  if (!amtVal || +amtVal <= 0) { setMsg('colMsg', '<div class="msg-err">Enter a valid amount</div>'); return; }
+  if (!method) { setMsg('colMsg', '<div class="msg-err">Select a payment method</div>'); return; }
+  if (method === 'Bank Transfer' && !notes) {
+    setMsg('colMsg', '<div class="msg-err">Enter the account name the transfer was made from — required for bank transfers so the admin can verify it.</div>');
+    return;
+  }
+  requirePayPin('Payment PIN', 'Enter your payment PIN to save this deposit.', () => {
+    guardedSubmit('collection', () => _doCollection());
+  });
+}
 async function _doCollection() {
   const amtVal = document.getElementById('colAmt').value.trim(), method = document.getElementById('colMethod').value, notes = document.getElementById('colNotes').value.trim();
   if (!amtVal || +amtVal <= 0) { setMsg('colMsg', '<div class="msg-err">Enter a valid amount</div>'); return; }

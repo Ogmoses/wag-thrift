@@ -70,7 +70,7 @@ async function renderPlanDetail(planId) {
   const [{ data: plan }, { data: planExtra }, { data: allDeposits }, { data: txs }, { data: rejDisbs }, { data: migrationRows }] = await Promise.all([
     db.from('plan_balances').select('*').eq('plan_id', planId).single(),
     db.from('plans').select('regular_contribution,maturity_date').eq('id', planId).single(),
-    db.from('transactions').select('amount').eq('plan_id', planId).in('type', ['opening', 'deposit']),
+    db.from('transactions').select('amount,method').eq('plan_id', planId).in('type', ['opening', 'deposit']),
     db.from('transactions').select('*').eq('plan_id', planId).order('created_at', { ascending: false }),
     db.from('disbursements').select('*').eq('plan_id', planId).eq('status', 'rejected'),
     // RLS (pm_customer_read) already scopes this to the signed-in
@@ -86,7 +86,17 @@ async function renderPlanDetail(planId) {
   if (nameEl) nameEl.textContent = plan.name || '—';
   activePlanBalance = Number(plan.balance || 0);
   const regularAmt = Number(plan.regular_contribution) || 1000;
-  const totalDeposited = (allDeposits || []).reduce((s, t) => s + Number(t.amount), 0);
+  // A migrated opening transaction (method='Migrated') is a paper-ledger
+  // carryover, not a digital day-by-day contribution — it sets the
+  // starting BALANCE (plan_balances, used just above, is intentionally
+  // unaffected by this exclusion) but shouldn't retroactively fill in
+  // "days paid" the customer never actually paid through this app.
+  // Comparing with !== rather than a server-side filter is deliberate:
+  // method is a nullable column, and a naive SQL != would silently drop
+  // any row where it's null instead of keeping it (NULL != 'x' is NULL,
+  // not true) — a real ordinary deposit could go missing from the
+  // calendar that way. !== in JS has no such gotcha.
+  const totalDeposited = (allDeposits || []).filter(t => t.method !== 'Migrated').reduce((s, t) => s + Number(t.amount), 0);
   const totalDaysCovered = Math.floor(totalDeposited / regularAmt);
   document.getElementById('planBal').textContent = balHidden ? '••••••' : fmt(activePlanBalance);
   const eyeBtn = document.querySelector('.eye-btn');
@@ -321,7 +331,13 @@ async function _doRenamePlan() {
 // ═══════════════════════════════════════════════
 // WITHDRAWAL REQUEST (payment PIN protected)
 // ═══════════════════════════════════════════════
-function openWithdrawalModal() { requirePayPin('Payment PIN', 'Enter your payment PIN to withdraw money.', () => _openWithdrawalModal()); }
+function openWithdrawalModal() {
+  // PIN moved to doWithdrawalRequest() below, right before submission —
+  // not here. Matches the same reordering on the rep's deposit flow: the
+  // PIN is the final confirmation once the amount/plan are actually
+  // filled in, not a gate before the form even opens.
+  _openWithdrawalModal();
+}
 async function _openWithdrawalModal() {
   const user = getUser();
   const { data: plans } = await db.from('plan_balances').select('*').eq('customer_id', user.id).eq('status', 'active').neq('status', 'deleted');
@@ -333,7 +349,21 @@ async function _openWithdrawalModal() {
   showModal('withdrawalModal');
 }
 
-async function doWithdrawalRequest() { guardedSubmit('withdrawalRequest', () => _doWithdrawalRequest()); }
+// Validates plan/amount BEFORE asking for a PIN — same reasoning as the
+// rep-side deposit flow: no point interrupting with a PIN prompt for an
+// incomplete form. _doWithdrawalRequest() still does its own balance
+// check (needs a DB round-trip, so it stays there as the real gate) —
+// this upfront check only covers what's cheap to verify synchronously.
+function doWithdrawalRequest() {
+  const planId = document.getElementById('wdPlan').value;
+  const amtVal = document.getElementById('wdAmt').value.trim();
+  setMsg('wdMsg', '');
+  if (!planId) { setMsg('wdMsg', '<div class="msg-err">Please select a plan</div>'); return; }
+  if (!amtVal || +amtVal <= 0) { setMsg('wdMsg', '<div class="msg-err">Enter a valid amount</div>'); return; }
+  requirePayPin('Payment PIN', 'Enter your payment PIN to withdraw money.', () => {
+    guardedSubmit('withdrawalRequest', () => _doWithdrawalRequest());
+  });
+}
 async function _doWithdrawalRequest() {
   const planId = document.getElementById('wdPlan').value, amtVal = document.getElementById('wdAmt').value.trim(), reason = document.getElementById('wdReason').value.trim();
   if (!planId) { setMsg('wdMsg', '<div class="msg-err">Please select a plan</div>'); return; }
@@ -492,12 +522,17 @@ async function renderCalendar(plan, balance) {
   const planId = plan.plan_id || plan.id;
 
   const [txRes, disbRes] = await Promise.all([
-    db.from('transactions').select('amount,created_at,type').eq('plan_id', planId)
+    db.from('transactions').select('amount,created_at,type,method').eq('plan_id', planId)
       .in('type', ['opening', 'deposit']).order('created_at', { ascending: true }),
     db.from('disbursements').select('confirmed_at,amount').eq('plan_id', planId)
       .eq('status', 'paid')
   ]);
-  const txs = txRes.data || [];
+  // A migrated opening transaction (method='Migrated') is a paper-ledger
+  // carryover the customer never actually paid through this app on any
+  // particular day — it shouldn't fill in calendar slots or count as a
+  // streak day. See renderPlanDetail()'s totalDeposited for the same
+  // reasoning and the same !== (not a server-side filter) approach.
+  const txs = (txRes.data || []).filter(t => t.method !== 'Migrated');
   const paidDisbs = disbRes.data || [];
 
   const totalDeposited = txs.reduce((s, t) => s + Number(t.amount), 0);

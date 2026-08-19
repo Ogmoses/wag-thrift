@@ -802,11 +802,24 @@ function renderTransfersList(list) {
   } else {
     html += '<div class="empty-state">No transfers awaiting confirmation</div>';
   }
+  // Truncated, unlike pending above — Recently Reviewed is the part
+  // that grows without bound over time, and the one actually
+  // responsible for a long scroll pushing the Migrations section
+  // (which sits right below on this same page) far down.
   if (resolved.length) {
     html += `<div class="section-card-title" style="margin:22px 0 10px;">Recently reviewed</div>`;
-    html += resolved.slice(0, 20).map(renderTransferCard).join('');
+    html += resolved.slice(0, transfersResolvedShown).map(renderTransferCard).join('');
+    const remaining = resolved.length - transfersResolvedShown;
+    if (remaining > 0) {
+      html += `<button class="btn btn-outline" onclick="showMoreTransfers()">Show More (${remaining} more reviewed)</button>`;
+    }
   }
   el.innerHTML = html;
+}
+
+function showMoreTransfers() {
+  transfersResolvedShown += 20;
+  renderTransfersList(allTransfers);
 }
 
 function renderTransferCard(t) {
@@ -884,6 +897,8 @@ async function rejectTransfer(transferId, amount, accountName) {
 // even if it wanted to.
 // ═══════════════════════════════════════════════
 let allMigrations = [];
+// Same "don't truncate anything actionable" rule as transfersResolvedShown.
+let migrationsResolvedShown = 20;
 
 async function renderMigrationsPage() {
   if (!db) return;
@@ -918,9 +933,18 @@ function renderMigrationsList(list) {
   }
   if (resolved.length) {
     html += `<div class="section-card-title" style="margin:22px 0 10px;">Recently reviewed</div>`;
-    html += resolved.slice(0, 20).map(renderMigrationCard).join('');
+    html += resolved.slice(0, migrationsResolvedShown).map(renderMigrationCard).join('');
+    const remaining = resolved.length - migrationsResolvedShown;
+    if (remaining > 0) {
+      html += `<button class="btn btn-outline" onclick="showMoreMigrations()">Show More (${remaining} more reviewed)</button>`;
+    }
   }
   el.innerHTML = html;
+}
+
+function showMoreMigrations() {
+  migrationsResolvedShown += 20;
+  renderMigrationsList(allMigrations);
 }
 
 // All user-typed free text here (customer/rep names, plan name, and
@@ -1000,6 +1024,10 @@ async function rejectMigration(migrationId) {
 // ═══════════════════════════════════════════════
 let allCustomers = [];
 let allTransfers = [];
+// How many "Recently reviewed" transfers to show before truncating with
+// a Show More button — see renderTransfersList(). Pending items are
+// never truncated.
+let transfersResolvedShown = 20;
 
 async function renderCustomersPage() {
   // A generous cap, not full pagination — at real-world scale (low
