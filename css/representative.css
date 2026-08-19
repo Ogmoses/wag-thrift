@@ -8,3 +8,20 @@
 /* Withdrawal request card — customer name visible in both themes */
 .dis-cust-name{font-weight:700;font-size:13px;color:#111;margin-bottom:4px;}
 body.dark .dis-cust-name{color:#f0f0f0;}
+
+/* Assist Existing Customer card — each action (Withdraw / Create Plan /
+   Migrate / Close) gets its own clearly bounded "well" instead of a
+   single thin divider line between them, so agents can tell the
+   sections apart at a glance rather than reading headers to find the
+   boundary. Reuses the page background as the inset tone (one level
+   further "in" than the white/dark-card .search-card wrapping all of
+   this) plus the existing border tokens — no new colours introduced. */
+.assist-section{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px;margin:14px 0;}
+body.dark .assist-section{background:#0f0f0f;border-color:var(--dark-border);}
+.assist-section-title{display:flex;align-items:center;gap:7px;font-weight:700;font-size:13px;margin-bottom:8px;}
+.assist-section-title svg{flex-shrink:0;opacity:.7;}
+/* Close Plan is the one irreversible/higher-stakes action here — a
+   subtle red-tinted border (matching its existing red button, not a
+   new colour) sets it apart from the other three at a glance too. */
+.assist-section.assist-danger{border-color:rgba(220,38,38,.35);}
+body.dark .assist-section.assist-danger{border-color:rgba(220,38,38,.45);}
