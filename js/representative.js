@@ -276,7 +276,7 @@ async function repOnPlanChange() {
   const dd = document.getElementById('repPlanDd'); const opt = dd.options[dd.selectedIndex];
   repSelectedPlan = dd.value ? { id: dd.value, balance: +opt.dataset.bal, target: +opt.dataset.tgt } : null;
   const det = document.getElementById('repPlanDetails');
-  if (!repSelectedPlan) { det.style.display = 'none'; return; }
+  if (!repSelectedPlan) { det.style.display = 'none'; renderRepPlanCalendar(null, 0, 0); return; }
   document.getElementById('rpBal').textContent = fmt(repSelectedPlan.balance);
 
   // All plan details come from the RPC response cached in the dropdown
@@ -287,6 +287,13 @@ async function repOnPlanChange() {
   const totalDeposited = +opt.dataset.deposited || 0;
 
   document.getElementById('rpTgt').textContent = regContrib > 0 ? fmt(regContrib) + ' / daily' : 'Not set';
+  // Same paid/partial/missed calendar the customer sees for themselves
+  // — gives the rep visual context on this customer's payment history
+  // right where they're about to decide how much to collect, not
+  // buried in a different part of the app. total_deposited already
+  // excludes migrated paper-ledger balances (see rep_search_customer/
+  // rep_refresh_customer) the same way the customer's own calendar does.
+  renderRepPlanCalendar(createdAt, regContrib, totalDeposited);
 
   const missedEl = document.getElementById('rpMissed');
   if (missedEl) {
@@ -413,10 +420,8 @@ function renderAssistCustCard() {
     </div>
 
     <div class="mform-group"><label class="form-lbl">Plan</label>
-     <select id="assistPlanDd" class="form-inp" onchange="assistLoadPlanCalendar()"><option value="">— Select a plan —</option>${planOpts}</select>
+     <select id="assistPlanDd" class="form-inp"><option value="">— Select a plan —</option>${planOpts}</select>
     </div>
-
-    <div id="assistCalWrap"></div>
 
     <div id="assistActionMsg"></div>
 
@@ -445,7 +450,9 @@ function renderAssistCustCard() {
       customer can dispute it themselves afterward.
      </p>
      <input type="number" id="assistMigrateBalance" class="form-inp" placeholder="Claimed balance (₦)" min="1" style="margin-bottom:8px;">
-     <input type="date" id="assistMigrateDate" class="form-inp" style="margin-bottom:8px;" max="${new Date().toISOString().slice(0, 10)}">
+     <div class="mform-group" style="margin-bottom:8px;"><label class="form-lbl">Last Paper Contribution Date (optional)</label>
+      <input type="date" id="assistMigrateDate" class="form-inp" max="${new Date().toISOString().slice(0, 10)}">
+     </div>
      <textarea id="assistMigrateNotes" class="form-inp" placeholder="Evidence notes — e.g. paper book reference, what the customer told you" rows="2" style="margin-bottom:8px;resize:vertical;"></textarea>
      <button class="btn btn-blue" onclick="assistDoMigrateClaim()">Submit Migration Claim</button>
     </div>
@@ -459,14 +466,25 @@ function renderAssistCustCard() {
 }
 
 // ─── MINI CALENDAR — same paid/partial/missed visual the customer sees
-// on their own dashboard, for whichever plan is selected above. Scoped
-// to the CURRENT month only (no prev/next navigation like the
+// on their own dashboard. Lives on the Record Deposit flow (Search
+// Customer → select a plan), not the Assist card — this is where a rep
+// actually decides how much to collect, so it's the place visual
+// confirmation of the customer's payment history is actually useful.
+// Scoped to the CURRENT month only (no prev/next navigation like the
 // customer's own calendar tab has) — a rep mainly needs "is this
 // customer current this month," and the customer's own dashboard is
-// already the right place for a full multi-month history if that's
-// ever needed. computeSlotAllocation()/fractionGlyph() are duplicated
-// from customer.js rather than shared — this is a separate, unbundled
-// HTML page with no module system, the same reason the report engine
+// already the right place for full history if that's ever needed.
+//
+// Needs no extra network round-trip: computeSlotAllocation() only needs
+// the plan's aggregate total-deposited (not a day-by-day transaction
+// breakdown — it fills whole slots sequentially from planStart, same as
+// the customer's own calendar), and that total is already cached on the
+// plan dropdown's data-deposited attribute (repOnPlanChange() already
+// reads it for the Missed Contributions stat, from rep_search_customer/
+// rep_refresh_customer — already fixed to exclude migrated amounts).
+// computeSlotAllocation()/fractionGlyph() are duplicated from
+// customer.js rather than shared — this is a separate, unbundled HTML
+// page with no module system, the same reason the report engine
 // duplicates logic between generate-report.js and worker.js. Keep the
 // three in sync if the slot-math ever changes.
 function dateKeyRep(d) {
@@ -500,7 +518,7 @@ function fractionGlyph(frac) {
   return Math.round(frac * 100) + '%';
 }
 
-function buildAssistCalHTML(yr, mo, covered, partial, missed) {
+function buildRepCalHTML(yr, mo, covered, partial, missed) {
   const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const DN = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const todayStr = dateKeyRep(new Date());
@@ -546,31 +564,21 @@ function buildAssistCalHTML(yr, mo, covered, partial, missed) {
    </div>`;
 }
 
-async function assistLoadPlanCalendar() {
-  const planId = document.getElementById('assistPlanDd')?.value;
-  const wrap = document.getElementById('assistCalWrap');
+// Renders straight from data already sitting on the selected <option>'s
+// data-* attributes (see repOnPlanChange() below) — no RPC call, no
+// loading state needed.
+function renderRepPlanCalendar(createdAt, regContrib, totalDeposited) {
+  const wrap = document.getElementById('repCalWrap');
   if (!wrap) return;
-  if (!planId) { wrap.innerHTML = ''; return; }
-  wrap.innerHTML = '<div class="empty-state" style="padding:10px;">Loading calendar…</div>';
+  if (!createdAt || !regContrib) { wrap.innerHTML = ''; return; }
 
-  // rep_get_plan_calendar_data() re-verifies the caller is a real
-  // representative independently — this call being reachable at all
-  // doesn't imply the RPC will trust it without checking again.
-  const { data: result, error } = await db.rpc('rep_get_plan_calendar_data', { p_plan_id: planId });
-  if (error || result?.ok === false) {
-    wrap.innerHTML = `<div class="msg-err">${escapeHtml(result?.error || error?.message || 'Could not load calendar')}</div>`;
-    return;
-  }
-
-  const planStart = new Date(result.plan_created_at);
+  const planStart = new Date(createdAt);
   planStart.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const regularAmt = Number(result.regular_contribution) || 1000;
-  const totalDeposited = (result.transactions || []).reduce((s, t) => s + Number(t.amount), 0);
 
-  const { covered, partial, missed } = computeSlotAllocation(planStart, today, totalDeposited, regularAmt);
-  wrap.innerHTML = buildAssistCalHTML(today.getFullYear(), today.getMonth(), covered, partial, missed);
+  const { covered, partial, missed } = computeSlotAllocation(planStart, today, totalDeposited, regContrib);
+  wrap.innerHTML = buildRepCalHTML(today.getFullYear(), today.getMonth(), covered, partial, missed);
 }
 
 function assistGetPin() {
