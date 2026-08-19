@@ -438,9 +438,15 @@ async function gatherLedgerData(env, NOW) {
     const untilISO = watMonthEndUTC(PY, PM0).toISOString();
     const gapTx = await fetchRows(
       'transactions',
-      `plan_id=eq.${plan.id}&status=eq.confirmed&type=in.(opening,deposit)&created_at=gt.${sinceISO}&created_at=lte.${untilISO}&select=amount`
+      `plan_id=eq.${plan.id}&status=eq.confirmed&type=in.(opening,deposit)&created_at=gt.${sinceISO}&created_at=lte.${untilISO}&select=amount,method`
     );
-    const gapAmount = gapTx.reduce((s, t) => s + Number(t.amount), 0);
+    // A migrated opening transaction (method='Migrated') is a paper-ledger
+    // carryover, not a digital day-by-day contribution — excluded from
+    // slot math the same way customer.js excludes it from the customer's
+    // own calendar. Filtered in JS: method is nullable, and PostgREST's
+    // neq compiles to SQL <>, which silently drops NULL rows instead of
+    // keeping them — !== here has no such gotcha.
+    const gapAmount = gapTx.filter(t => t.method !== 'Migrated').reduce((s, t) => s + Number(t.amount), 0);
     const closingSlots = baseSlots + gapAmount / Number(plan.regular_contribution);
     await insertIgnoreDuplicate('monthly_ledgers', {
       plan_id: plan.id, customer_id: plan.customer_id, year_month: PREV_YEAR_MONTH, closing_slots: closingSlots,
@@ -454,10 +460,10 @@ async function gatherLedgerData(env, NOW) {
   const monthStartISO = watMidnightUTC(Y, M0, 1).toISOString();
   const monthTx = await fetchRowsForIds(
     'transactions', 'plan_id', planIds,
-    `status=eq.confirmed&type=in.(opening,deposit)&created_at=gte.${monthStartISO}&created_at=lte.${NOW.toISOString()}&select=plan_id,amount,created_at&order=created_at.asc`
+    `status=eq.confirmed&type=in.(opening,deposit)&created_at=gte.${monthStartISO}&created_at=lte.${NOW.toISOString()}&select=plan_id,amount,created_at,method&order=created_at.asc`
   );
   const bucket = {};
-  monthTx.forEach(t => {
+  monthTx.filter(t => t.method !== 'Migrated').forEach(t => {
     const col = assignToVisibleDay(watDateKey(new Date(t.created_at)));
     if (!col) return;
     bucket[t.plan_id] = bucket[t.plan_id] || {};
