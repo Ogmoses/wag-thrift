@@ -209,14 +209,28 @@ function renderRepCustomerCard(result, isOffline, cachedAt) {
   const cust = result.customer;
   const plans = result.plans || [];
   const disbs = result.disbursements || [];
+  // Whatever plan was selected before this refresh (e.g. the one just
+  // used to record a deposit) — re-selected below once the dropdown is
+  // rebuilt with fresh data, instead of resetting to "no plan selected."
+  const previouslySelectedId = repSelectedPlan?.id || null;
   repFoundCust = cust;
   document.getElementById('repCustAv').textContent = cust.first_name[0].toUpperCase();
   document.getElementById('repCustNm').textContent = cust.first_name + ' ' + cust.last_name;
   document.getElementById('repCustPh').textContent = cust.phone;
   const dd = document.getElementById('repPlanDd');
   dd.innerHTML = '<option value="">— Select a plan —</option>';
-  plans.forEach(p => dd.innerHTML += `<option value="${p.plan_id}" data-bal="${p.balance}" data-tgt="${p.target_amount}" data-contrib="${p.regular_contribution || 0}" data-createdat="${p.plan_created_at || ''}" data-deposited="${p.total_deposited || 0}">${p.name} — ${fmt(p.balance)}</option>`);
-  if (plans.length === 1) { dd.value = plans[0].plan_id; repOnPlanChange(); } else document.getElementById('repPlanDetails').style.display = 'none';
+  plans.forEach(p => dd.innerHTML += `<option value="${p.plan_id}" data-bal="${p.balance}" data-tgt="${p.target_amount}" data-contrib="${p.regular_contribution || 0}" data-createdat="${p.plan_created_at || ''}" data-deposited="${p.total_deposited || 0}" data-name="${escapeHtml(p.name || '')}">${escapeHtml(p.name || 'Plan')} — ${fmt(p.balance)}</option>`);
+  // Re-selecting the previous plan (when it still exists) fixes the
+  // actual bug, not just a symptom of it: with more than one plan, a
+  // refresh used to always fall back to "no plan selected," which hid
+  // the details panel but never cleared (or updated) the calendar or
+  // deposit history — both kept showing pre-deposit data even though
+  // the plan dropdown itself had fresh numbers. Falls through to the
+  // single-plan auto-select, then to a clean empty state, same as before.
+  const stillExists = previouslySelectedId && plans.some(p => p.plan_id === previouslySelectedId);
+  if (stillExists) { dd.value = previouslySelectedId; repOnPlanChange(); }
+  else if (plans.length === 1) { dd.value = plans[0].plan_id; repOnPlanChange(); }
+  else { repSelectedPlan = null; document.getElementById('repPlanDetails').style.display = 'none'; renderRepPlanCalendar(null, 0, 0); renderRepDepositHistory(null); }
   renderRepDisbList(cust.id, disbs);
 
   let banner = document.getElementById('repOfflineBanner');
@@ -274,9 +288,9 @@ function renderDisbCards(disbs) {
 
 async function repOnPlanChange() {
   const dd = document.getElementById('repPlanDd'); const opt = dd.options[dd.selectedIndex];
-  repSelectedPlan = dd.value ? { id: dd.value, balance: +opt.dataset.bal, target: +opt.dataset.tgt } : null;
+  repSelectedPlan = dd.value ? { id: dd.value, name: opt.dataset.name || '', balance: +opt.dataset.bal, target: +opt.dataset.tgt } : null;
   const det = document.getElementById('repPlanDetails');
-  if (!repSelectedPlan) { det.style.display = 'none'; renderRepPlanCalendar(null, 0, 0); return; }
+  if (!repSelectedPlan) { det.style.display = 'none'; renderRepPlanCalendar(null, 0, 0); renderRepDepositHistory(null); return; }
   document.getElementById('rpBal').textContent = fmt(repSelectedPlan.balance);
 
   // All plan details come from the RPC response cached in the dropdown
@@ -294,6 +308,7 @@ async function repOnPlanChange() {
   // excludes migrated paper-ledger balances (see rep_search_customer/
   // rep_refresh_customer) the same way the customer's own calendar does.
   renderRepPlanCalendar(createdAt, regContrib, totalDeposited);
+  renderRepDepositHistory(repSelectedPlan.id);
 
   const missedEl = document.getElementById('rpMissed');
   if (missedEl) {
@@ -579,6 +594,46 @@ function renderRepPlanCalendar(createdAt, regContrib, totalDeposited) {
 
   const { covered, partial, missed } = computeSlotAllocation(planStart, today, totalDeposited, regContrib);
   wrap.innerHTML = buildRepCalHTML(today.getFullYear(), today.getMonth(), covered, partial, missed);
+}
+
+// ─── DEPOSIT HISTORY — plan-tethered list of past deposits, shown right
+// after Pending Withdrawals. Uses rep_get_plan_deposit_history() rather
+// than a direct client-side query: tx_rep_own_read RLS only lets a rep
+// read transactions THEY personally collected (agent_id = their own id)
+// — a direct query would silently, not visibly, show an incomplete
+// history on any plan other reps have also collected on. Includes the
+// migrated opening transaction if there is one, clearly labeled — a
+// history list is a factual record of what happened, unlike the
+// calendar it isn't making a "days paid" claim a paper carryover would
+// distort, so there's no reason to hide it here.
+async function renderRepDepositHistory(planId) {
+  const wrap = document.getElementById('repDepositHistoryList');
+  if (!wrap) return;
+  if (!planId) { wrap.innerHTML = '<div class="tx-empty">Select a plan above to see its deposit history</div>'; return; }
+  wrap.innerHTML = '<div class="tx-empty">Loading…</div>';
+
+  const { data: result, error } = await db.rpc('rep_get_plan_deposit_history', { p_plan_id: planId });
+  if (error || result?.ok === false) {
+    wrap.innerHTML = `<div class="msg-err">${escapeHtml(result?.error || error?.message || 'Could not load deposit history')}</div>`;
+    return;
+  }
+
+  const history = result.history || [];
+  if (!history.length) { wrap.innerHTML = '<div class="tx-empty">No deposits recorded yet</div>'; return; }
+
+  wrap.innerHTML = history.map(h => {
+    const isMigrated = h.method === 'Migrated';
+    const label = isMigrated ? 'Migrated Balance' : h.type === 'opening' ? 'Opening Contribution' : 'Deposit';
+    const agentPart = h.agent_name ? ' · ' + escapeHtml(h.agent_name) : '';
+    return `<div class="tx-row">
+ <div class="tx-ico tx-ico-g">↓</div>
+ <div class="tx-body">
+ <div class="tx-name">${label}</div>
+ <div class="tx-dt">${fmtDate(h.created_at)} · ${fmtTime(h.created_at)}${agentPart}</div>
+ </div>
+ <div class="tx-amt-g">+${fmt(h.amount)}</div>
+ </div>`;
+  }).join('');
 }
 
 function assistGetPin() {
@@ -1093,7 +1148,7 @@ function showReceipt(amount, plan, rep, cust, ref, method, newBal) {
  <div class="receipt-logo"></div>
  <div class="receipt-title">WAG Deposit Receipt</div>
  <div class="receipt-amount">${fmt(amount)}</div>
- <div class="receipt-plan">${plan.name || 'Savings Plan'}</div>
+ <div class="receipt-plan">${escapeHtml(plan.name) || 'Savings Plan'}</div>
  <div class="receipt-row"><span class="receipt-lbl">Date</span><span class="receipt-val">${fmtDate(now.toISOString())}</span></div>
  <div class="receipt-row"><span class="receipt-lbl">Time</span><span class="receipt-val">${fmtTime(now.toISOString())}</span></div>
  <div class="receipt-row"><span class="receipt-lbl">Agent ID</span><span class="receipt-val">#${rep.rep_id}</span></div>
@@ -1129,6 +1184,7 @@ function buildReceiptHTML(tx, custName) {
  <div class="receipt-logo"></div>
  <div class="receipt-title">WAG ${label} Receipt</div>
  <div class="receipt-amount">${fmt(tx.amount)}</div>
+ ${tx.plan_name ? `<div class="receipt-plan">${escapeHtml(tx.plan_name)}</div>` : ''}
  <div class="receipt-row"><span class="receipt-lbl">Date</span><span class="receipt-val">${fmtDate(tx.created_at)}</span></div>
  <div class="receipt-row"><span class="receipt-lbl">Time</span><span class="receipt-val">${fmtTime(tx.created_at)}</span></div>
  <div class="receipt-row"><span class="receipt-lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline-block;vertical-align:middle;margin-right:5px;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Customer</span><span class="receipt-val">${custName || 'Customer'}</span></div>
