@@ -596,42 +596,48 @@ function renderRepPlanCalendar(createdAt, regContrib, totalDeposited) {
   wrap.innerHTML = buildRepCalHTML(today.getFullYear(), today.getMonth(), covered, partial, missed);
 }
 
-// ─── DEPOSIT HISTORY — plan-tethered list of past deposits, shown right
-// after Pending Withdrawals. Uses rep_get_plan_deposit_history() rather
-// than a direct client-side query: tx_rep_own_read RLS only lets a rep
-// read transactions THEY personally collected (agent_id = their own id)
-// — a direct query would silently, not visibly, show an incomplete
-// history on any plan other reps have also collected on. Includes the
-// migrated opening transaction if there is one, clearly labeled — a
-// history list is a factual record of what happened, unlike the
-// calendar it isn't making a "days paid" claim a paper carryover would
-// distort, so there's no reason to hide it here.
+// ─── TRANSACTION HISTORY — plan-tethered list of past deposits AND
+// completed withdrawals, shown right after Pending Withdrawals. Uses
+// rep_get_plan_deposit_history() rather than a direct client-side
+// query: tx_rep_own_read RLS only lets a rep read transactions THEY
+// personally collected (agent_id = their own id) — a direct query
+// would silently, not visibly, show an incomplete history on any plan
+// other reps have also collected on. Includes the migrated opening
+// transaction if there is one, clearly labeled — a history list is a
+// factual record of what happened, unlike the calendar it isn't making
+// a "days paid" claim a paper carryover would distort, so there's no
+// reason to hide it here.
 async function renderRepDepositHistory(planId) {
   const wrap = document.getElementById('repDepositHistoryList');
   if (!wrap) return;
-  if (!planId) { wrap.innerHTML = '<div class="tx-empty">Select a plan above to see its deposit history</div>'; return; }
+  if (!planId) { wrap.innerHTML = '<div class="tx-empty">Select a plan above to see its transaction history</div>'; return; }
   wrap.innerHTML = '<div class="tx-empty">Loading…</div>';
 
   const { data: result, error } = await db.rpc('rep_get_plan_deposit_history', { p_plan_id: planId });
   if (error || result?.ok === false) {
-    wrap.innerHTML = `<div class="msg-err">${escapeHtml(result?.error || error?.message || 'Could not load deposit history')}</div>`;
+    wrap.innerHTML = `<div class="msg-err">${escapeHtml(result?.error || error?.message || 'Could not load transaction history')}</div>`;
     return;
   }
 
   const history = result.history || [];
-  if (!history.length) { wrap.innerHTML = '<div class="tx-empty">No deposits recorded yet</div>'; return; }
+  if (!history.length) { wrap.innerHTML = '<div class="tx-empty">No transactions recorded yet</div>'; return; }
 
   wrap.innerHTML = history.map(h => {
+    const isPayout = h.type === 'payout';
     const isMigrated = h.method === 'Migrated';
-    const label = isMigrated ? 'Migrated Balance' : h.type === 'opening' ? 'Opening Contribution' : 'Deposit';
+    const label = isPayout ? 'Withdrawal' : isMigrated ? 'Migrated Balance' : h.type === 'opening' ? 'Opening Contribution' : 'Deposit';
     const agentPart = h.agent_name ? ' · ' + escapeHtml(h.agent_name) : '';
+    const icoCls = isPayout ? 'tx-ico-r' : 'tx-ico-g';
+    const icoGlyph = isPayout ? '↑' : '↓';
+    const amtCls = isPayout ? 'tx-amt-r' : 'tx-amt-g';
+    const sign = isPayout ? '-' : '+';
     return `<div class="tx-row">
- <div class="tx-ico tx-ico-g">↓</div>
+ <div class="tx-ico ${icoCls}">${icoGlyph}</div>
  <div class="tx-body">
  <div class="tx-name">${label}</div>
  <div class="tx-dt">${fmtDate(h.created_at)} · ${fmtTime(h.created_at)}${agentPart}</div>
  </div>
- <div class="tx-amt-g">+${fmt(h.amount)}</div>
+ <div class="${amtCls}">${sign}${fmt(h.amount)}</div>
  </div>`;
   }).join('');
 }
@@ -663,6 +669,12 @@ async function assistDoWithdraw() {
     });
     hideLoading();
     if (error || result?.ok === false) { setMsg('assistActionMsg', `<div class="msg-err">${result?.error || error?.message || 'Withdrawal failed'}</div>`); return; }
+    // Same fraud check the customer's own self-service withdrawal path
+    // already runs — this rep-assisted path used to skip it entirely,
+    // meaning a rep-submitted excess withdrawal on a plan would never
+    // get flagged even though the identical request through the
+    // customer's own dashboard would.
+    await checkExcessWithdrawal(_assistCust.id, planId);
     document.getElementById('assistWdAmt').value = '';
     showRepAlert('Withdrawal Submitted', `${fmt(amt)} withdrawal request submitted for ${custName}. Ref: ${ref}`, 'success');
     await assistRefreshCustomer();

@@ -381,7 +381,7 @@ async function _doWithdrawalRequest() {
       p_ref: ref
     });
     if (error) throw new Error(error.message);
-    await checkExcessWithdrawal(user.id);
+    await checkExcessWithdrawal(user.id, planId);
     setMsg('wdMsg', '<div class="msg-ok">✓ Request submitted! A representative will approve it shortly.</div>');
     setTimeout(() => { closeModal('withdrawalModal'); setMsg('wdMsg', ''); document.getElementById('wdAmt').value = ''; document.getElementById('wdReason').value = ''; }, 2500);
   } catch (e) {

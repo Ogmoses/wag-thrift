@@ -126,8 +126,17 @@ async function audit(action, userId, userRole, description, amount = null, planI
 // ═══════════════════════════════════════════════
 // FRAUD DETECTION
 // ═══════════════════════════════════════════════
+// Scoped to plan_id (when provided) as well as type+user — otherwise a
+// customer with two plans that each independently earn a flag this
+// month would only ever get ONE flag total: the second plan's attempt
+// would find the first plan's still-unresolved flag for this type+user
+// and silently skip, even though it's a distinct, separate incident on
+// a different plan. Matches the same "each plan is its own case"
+// principle checkExcessWithdrawal below now applies.
 async function flagFraud(type, severity, userId, description, planId = null) {
-  const { data: existing } = await db.from('fraud_flags').select('id').eq('type', type).eq('user_id', userId).eq('resolved', false);
+  let q = db.from('fraud_flags').select('id').eq('type', type).eq('user_id', userId).eq('resolved', false);
+  if (planId) q = q.eq('plan_id', planId);
+  const { data: existing } = await q;
   if (!existing || existing.length === 0) {
     await db.from('fraud_flags').insert({ type, severity, user_id: userId, description, plan_id: planId, resolved: false });
   }
@@ -135,10 +144,19 @@ async function flagFraud(type, severity, userId, description, planId = null) {
 async function checkLargeCollection(amount, agentId, planId) {
   if (amount > 50000) await flagFraud('LARGE_COLLECTION', 'medium', agentId, `Unusually large collection of ${fmt(amount)}`, planId);
 }
-async function checkExcessWithdrawal(customerId) {
-  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const { data } = await db.from('disbursements').select('id').eq('customer_id', customerId).eq('type', 'withdrawal').gte('requested_at', since);
-  if (data && data.length >= 3) await flagFraud('EXCESS_WITHDRAWAL', 'high', customerId, `${data.length} withdrawal requests in 30 days`);
+// Each PLAN gets its own limit of 1 withdrawal request per calendar
+// month — not a combined count across all of a customer's plans. A
+// customer with two plans each requesting once in the same month is
+// two separate, unremarkable events, not one suspicious pattern; a
+// single plan's second request in the same month is the actual signal
+// worth a look. Calendar month (not a rolling 30-day window) so
+// "already requested this month" means what an admin reading the flag
+// would expect it to mean.
+async function checkExcessWithdrawal(customerId, planId) {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const { data } = await db.from('disbursements').select('id').eq('plan_id', planId).eq('type', 'withdrawal').gte('requested_at', monthStart);
+  if (data && data.length >= 2) await flagFraud('EXCESS_WITHDRAWAL', 'high', customerId, `${data.length} withdrawal requests on this plan this month`, planId);
 }
 // checkFailedPin is now superseded by Supabase Auth's own rate limiting on
 // signInWithPassword, but we keep a lightweight local counter for the

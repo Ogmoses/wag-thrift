@@ -1395,7 +1395,7 @@ async function renderFraudFlagCard(f) {
   let accountHtml;
   try {
     if (type === 'LARGE_COLLECTION') accountHtml = await buildAgentFlagContext(f.user_id);
-    else if (type === 'EXCESS_WITHDRAWAL') accountHtml = await buildCustomerFlagContext(f.user_id, true);
+    else if (type === 'EXCESS_WITHDRAWAL') accountHtml = await buildCustomerFlagContext(f.user_id, true, f.plan_id);
     // EXCESS_MIGRATION: user_id is the agent (submit_migration_claim's
     // own volume-check raises this against the rep who filed 5+ claims
     // in the trailing 30 days) — same shape as LARGE_COLLECTION.
@@ -1421,7 +1421,12 @@ async function renderFraudFlagCard(f) {
   return `<div class="fraud-flag-card"><div class="ff-header"><span class="ff-type">${type.replace(/_/g, ' ')} · ${(f.severity||'').toUpperCase()}</span><span class="ff-time">${fmtDate(f.created_at)}</span></div><div class="ff-desc">${desc}</div>${accountHtml}<div class="ff-actions"><button class="btn btn-green" style="font-size:12px;padding:7px 12px;" onclick="resolveFlag('${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark Resolved</button></div></div>`;
 }
 
-async function buildCustomerFlagContext(custId, withEvidence) {
+// withEvidence's evidence is now scoped to the specific plan_id the
+// flag itself carries (when provided) rather than the customer's
+// withdrawals across every plan — accurate now that EXCESS_WITHDRAWAL
+// is a per-plan limit, and it means the evidence shown is actually what
+// triggered this specific flag, not a mix of unrelated plans' history.
+async function buildCustomerFlagContext(custId, withEvidence, planId = null) {
   const { data: c } = await db.from('customers').select('*').eq('id', custId).maybeSingle();
   if (!c) return '<div class="ff-not-found">Customer account not found — may have been deleted.</div>';
   const isSuspended = c.status === 'suspended';
@@ -1435,9 +1440,12 @@ async function buildCustomerFlagContext(custId, withEvidence) {
 
   let evidence = '';
   if (withEvidence) {
-    const { data: withdrawals } = await db.from('disbursements').select('*').eq('customer_id', custId).eq('type', 'withdrawal').order('requested_at', { ascending: false }).limit(5);
+    let q = db.from('disbursements').select('*, plans(name)').eq('customer_id', custId).eq('type', 'withdrawal').order('requested_at', { ascending: false }).limit(5);
+    if (planId) q = q.eq('plan_id', planId);
+    const { data: withdrawals } = await q;
     if (withdrawals?.length) {
-      evidence = `<div class="ff-evidence"><div class="ff-evidence-title">Recent withdrawal requests</div>` +
+      const planLabel = planId && withdrawals[0]?.plans?.name ? ` — ${escapeHtml(withdrawals[0].plans.name)}` : '';
+      evidence = `<div class="ff-evidence"><div class="ff-evidence-title">Recent withdrawal requests${planLabel}</div>` +
         withdrawals.map(w => `<div class="ff-evidence-row"><span>${fmt(w.amount)}</span><span>${(w.status || 'pending').toUpperCase()} · ${fmtDate(w.requested_at)}</span></div>`).join('') +
         `</div>`;
     }
